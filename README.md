@@ -41,6 +41,7 @@ Unity 工程已创建，目录结构已规划，URP 渲染管线已配置。Asse
 | --- | --- | --- |
 | 游戏引擎 | Unity 2022.3.62f3c1 LTS | 已安装 |
 | 渲染管线 | URP 14.0.12 | 已配置 |
+| AI 开发辅助 | Unity-MCP（CoplayDev） | 已安装 |
 | 物理引擎 | JSBSim（独立进程，UDP 通信） | 待接入 |
 | 地景填充 | Cesium for Unity | 待安装 |
 | 机模转换 | XPlane2Blender（Blender 插件） | 待使用 |
@@ -80,9 +81,7 @@ AeroSim-737/
 │   │   └── manifest.json                # 包依赖清单，新增包在此声明，禁止直接改 packages-lock.json
 │   ├── ProjectSettings/                 # Unity 工程设置（由 Unity 自动管理，禁止手动编辑）
 │   └── Library/                         # Unity 本地缓存（已 .gitignore，禁止提交）
-├── Docs/                                # 项目文档
-│   ├── 开发文档.md                       # 开发过程记录、决策说明
-│   └── superpowers/specs/               # 设计文档与技术规格
+├── Docs/                                # 项目文档（待补充）
 └── README.md                            # 项目总览（本文件）
 ```
 
