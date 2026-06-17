@@ -1,0 +1,42 @@
+# Unity generated folders
+[Ll]ibrary/
+[Tt]emp/
+[Oo]bj/
+[Bb]uild/
+[Bb]uilds/
+[Ll]ogs/
+[Uu]ser[Ss]ettings/
+[Mm]emoryCaptures/
+[Rr]ecordings/
+
+# Unity generated files
+*.csproj
+*.unityproj
+*.sln
+*.suo
+*.tmp
+*.user
+*.userprefs
+*.pidb
+*.booproj
+*.svd
+*.pdb
+*.mdb
+*.opendb
+*.VC.db
+*.pid
+
+# Unity package cache and IDE state
+**/[Pp]ackageCache/
+.vs/
+.vscode/
+.idea/
+
+# OS / editor noise
+Thumbs.db
+Desktop.ini
+.DS_Store
+~$*
+XPlaneAssets/
+AeroSimUnity/.vsconfig
+AeroSimUnity/Assets/Screenshots/
