@@ -51,18 +51,82 @@ Unity 工程已创建，目录结构已规划，URP 渲染管线已配置。Asse
 
 ```
 AeroSim-737/
-├── AeroSimUnity/                        # Unity 工程
-│   ├── Assets/
-│   │   ├── Aircrafts/B737-800/
-│   │   │   ├── Model/{FBX,Liveries,Materials,Textures}/
-│   │   │   ├── Prefabs/
-│   │   │   ├── Scripts/{Movement,Cameras}/
-│   │   │   └── Instruments/
-│   │   ├── Scenes/Main.unity
-│   │   └── Settings/                    # URP 渲染管线配置
-│   └── Packages/manifest.json
-└── README.md
+├── AeroSimUnity/                        # Unity 工程根目录
+│   ├── Assets/                          # 所有项目资源（唯一允许手动编辑的目录）
+│   │   ├── Aircrafts/                   # 飞机资源，按机型隔离
+│   │   │   └── B737-800/
+│   │   │       ├── Model/               # 静态资源，只读导入，禁止在 Unity 内手动修改
+│   │   │       │   ├── FBX/             # 从 Blender 导出的 FBX 文件（由流水线生成，不手动编辑）
+│   │   │       │   ├── Liveries/        # 各涂装贴图（DDS/PNG），命名规范：<航司>_<部位>.png
+│   │   │       │   ├── Materials/       # URP Lit 材质，每套涂装对应一组材质，禁止共用
+│   │   │       │   └── Textures/        # 公用基础贴图（AO、法线、金属度等）
+│   │   │       ├── Prefabs/             # 飞机 Prefab，场景中只允许拖入 Prefab，禁止直接拖 FBX
+│   │   │       ├── Scripts/             # 飞机相关 C# 脚本
+│   │   │       │   ├── Movement/        # 各部件运动驱动（副翼、方向舵、起落架等）
+│   │   │       │   └── Cameras/         # 座舱视角、外部跟随等摄像机控制
+│   │   │       └── Instruments/         # 仪表系统（第二阶段开发，现阶段禁止写入）
+│   │   ├── Environment/                 # 场景环境资源
+│   │   │   └── Airport/                 # 机场地景：X-Plane OBJ 转换后的 FBX、材质、贴图
+│   │   ├── Simulation/                  # 飞行仿真对接层
+│   │   │   └── JSBSim/                  # JSBSim UDP 通信脚本与数据结构定义
+│   │   ├── Scenes/
+│   │   │   └── Main.unity               # 唯一主场景，所有开发在此场景进行
+│   │   └── Settings/                    # URP 渲染管线配置（自动生成，禁止手动编辑）
+│   │       ├── URP-Performant.asset      # 低配质量预设
+│   │       ├── URP-Balanced.asset        # 中配质量预设（默认）
+│   │       ├── URP-HighFidelity.asset    # 高配质量预设
+│   │       └── UniversalRenderPipelineGlobalSettings.asset
+│   ├── Packages/
+│   │   └── manifest.json                # 包依赖清单，新增包在此声明，禁止直接改 packages-lock.json
+│   ├── ProjectSettings/                 # Unity 工程设置（由 Unity 自动管理，禁止手动编辑）
+│   └── Library/                         # Unity 本地缓存（已 .gitignore，禁止提交）
+├── Docs/                                # 项目文档
+│   ├── 开发文档.md                       # 开发过程记录、决策说明
+│   └── superpowers/specs/               # 设计文档与技术规格
+└── README.md                            # 项目总览（本文件）
 ```
+
+---
+
+## 开发规范
+
+### 资源导入
+
+- **FBX 只放 `Model/FBX/`**，不直接拖入场景，统一通过 `Prefabs/` 使用。
+- 贴图文件统一放对应的 `Liveries/` 或 `Textures/` 目录，命名使用英文小写加下划线（如 `china_southern_fuselage.png`）。
+- 新机型资源放 `Aircrafts/<机型>/`，禁止混放在 B737-800 目录下。
+
+### 脚本
+
+- 脚本文件名与类名保持一致，使用 PascalCase（如 `AileronController.cs`）。
+- `Movement/` 只放部件运动逻辑，禁止在此写 UI 或通信代码。
+- `Cameras/` 只放摄像机控制逻辑。
+- JSBSim 通信相关代码统一放 `Simulation/JSBSim/`，不散落到其他目录。
+
+### 场景
+
+- **只有一个主场景 `Main.unity`**，禁止新建其他场景提交。
+- 场景中的飞机只能是 Prefab 实例，禁止直接放 FBX 或裸 GameObject。
+- 提交前必须保存场景（`Ctrl+S`），避免提交到一半的场景状态。
+
+### Git 提交
+
+- **禁止提交 `Library/`、`Temp/`、`obj/`、`UserSettings/`**，已在 `.gitignore` 中排除。
+- **禁止提交 `*.csproj`、`*.sln`** 等 IDE 生成文件。
+- 每次提交只做一件事，Commit Message 格式：`<类型>：<简述>`，例如：
+  - `资源：导入 B737-800 机体 FBX`
+  - `脚本：实现副翼运动驱动`
+  - `修复：起落架动画权重错误`
+- 大体积资源（FBX、贴图）通过 Git LFS 管理，拉取前执行 `git lfs pull`。
+
+### 禁止改动的内容
+
+| 路径 | 原因 |
+| --- | --- |
+| `Assets/Settings/` | URP 管线配置，改动影响全局渲染 |
+| `ProjectSettings/` | Unity 工程设置，由 Unity 自动维护 |
+| `Packages/packages-lock.json` | 包锁定文件，只通过 Unity Package Manager 更新 |
+| `Assets/Aircrafts/B737-800/Instruments/` | 第二阶段才开发，现阶段禁止写入 |
 
 ---
 
