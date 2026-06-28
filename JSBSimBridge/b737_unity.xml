@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?xml-stylesheet type="text/xsl" href="http://jsbsim.sourceforge.net/JSBSimScript.xsl"?>
+<runscript xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:noNamespaceSchemaLocation="http://jsbsim.sf.net/JSBSimScript.xsd"
+    name="Boeing 737 Unity realtime sim">
+
+  <description>
+    Boeing 737 realtime sim for Unity. 地面静止起步,双发启动后怠速,停在跑道上等待起飞。
+    配平后持续实时运行,供 Unity 通过 socket 操控与可视化。控制输入 socket 已内嵌在本脚本中。
+    起飞:在 Unity 里推油门(Shift)滑跑加速,到约 150 节拉杆(S)抬轮离地。
+  </description>
+
+  <!-- 用 737 飞机,unity_air 是地面静止初始状态 -->
+  <use aircraft="737" initialize="unity_air"/>
+
+  <!-- 接收 Unity 控制命令的 TCP socket(telnet 风格)。必须放在 <run> 之外的脚本顶层。
+       Unity 连上后逐行发送: set fcs/throttle-cmd-norm 0.8\n -->
+  <input port="5502"/>
+
+  <!-- dt = 1/120 秒,内部以 120Hz 步进,物理更稳;end 设很大,相当于一直运行 -->
+  <run start="0.0" end="360000" dt="0.0083333">
+
+    <!-- 注意:状态输出 socket(unity_output.xml)由 start_jsbsim.bat 作为
+         命令行参数传入。本机 JSBSim 1.3.1 不解析脚本内嵌的 <output>。 -->
+
+    <!-- 启动发动机:737 是涡扇喷气机,直接让所有发动机进入运转状态(-1 表示全部)。
+         油门保持怠速(0),飞机停在跑道上不动,等待 Unity 端推油门起飞。 -->
+    <event name="Start engines">
+      <condition>simulation/sim-time-sec ge 0.1</condition>
+      <set name="propulsion/set-running" value="-1"/>
+      <set name="fcs/throttle-cmd-norm[0]" value="0.0"/>
+      <set name="fcs/throttle-cmd-norm[1]" value="0.0"/>
+      <notify/>
+    </event>
+
+  </run>
+</runscript>
