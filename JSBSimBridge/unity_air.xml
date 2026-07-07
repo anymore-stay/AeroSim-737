@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<initialize name="unity_air">
+  <!--
+    MainScene-aligned ground start for the Unity bridge demo.
+    Position is anchored by Unity's scene placement; lat/lon/heading are kept
+    in sync with the current MainScene setup so the incoming state is not
+    obviously inconsistent with the visible world.
+  -->
+  <ubody unit="FT/SEC">0.0</ubody>
+  <vbody unit="FT/SEC">0.0</vbody>
+  <wbody unit="FT/SEC">0.0</wbody>
+  <latitude unit="DEG">33.52</latitude>
+  <longitude unit="DEG">120.3</longitude>
+  <phi unit="DEG">0.0</phi>
+  <theta unit="DEG">0.0</theta>
+  <psi unit="DEG">340.0</psi>
+  <altitude unit="IN">49.0</altitude>
+  <trim>1</trim>
+</initialize>

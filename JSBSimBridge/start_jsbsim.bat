@@ -17,6 +17,8 @@ if not defined JSBSIM_DIR set "JSBSIM_DIR=%DEFAULT_JSBSIM_DIR%"
 set "BRIDGE=%~dp0"
 set "SCRIPT=%BRIDGE%b737_unity.xml"
 set "OUTCFG=%BRIDGE%unity_output.xml"
+set "INIT_SRC=%BRIDGE%unity_air.xml"
+set "INIT_DST=%JSBSIM_DIR%\aircraft\737\unity_air.xml"
 
 echo ============================================
 echo   JSBSim realtime sim starting (Boeing 737)
@@ -38,6 +40,21 @@ if not exist "%SCRIPT%" (
     echo [ERROR] Script not found: %SCRIPT%
     goto end
 )
+if not exist "%INIT_SRC%" (
+    echo [ERROR] Init file not found: %INIT_SRC%
+    goto end
+)
+if not exist "%JSBSIM_DIR%\aircraft\737\" (
+    echo [ERROR] JSBSim aircraft folder not found: %JSBSIM_DIR%\aircraft\737\
+    goto end
+)
+
+copy /Y "%INIT_SRC%" "%INIT_DST%" >nul
+if errorlevel 1 (
+    echo [ERROR] Failed to sync init file to: %INIT_DST%
+    goto end
+)
+echo [INFO] Synced init file: %INIT_DST%
 
 cd /d "%JSBSIM_DIR%"
 "%JSBSIM_DIR%\JSBSim.exe" --realtime --root="%JSBSIM_DIR%" --script="%SCRIPT%" "%OUTCFG%"
