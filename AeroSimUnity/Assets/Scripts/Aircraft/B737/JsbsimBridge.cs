@@ -297,17 +297,10 @@ public class JsbsimBridge : MonoBehaviour
 
         if (HasState)
         {
-            if (firstPose || smoothing <= 0f || useFloatingOrigin)
+            if (firstPose || smoothing <= 0f)
             {
-                // 浮动原点模式下位置必须硬切(不能 Lerp),
-                // 否则飞机渐近追赶和环境瞬间跳转不同步,导致视觉抽搐。
-                // 姿态仍然平滑,旋转不影响坐标精度。
                 aircraft.position = targetPos;
-                if (firstPose || smoothing <= 0f)
-                    aircraft.rotation = targetRot;
-                else
-                    aircraft.rotation = Quaternion.Slerp(aircraft.rotation, targetRot,
-                        1f - Mathf.Exp(-smoothing * Time.deltaTime));
+                aircraft.rotation = targetRot;
                 firstPose = false;
             }
             else
