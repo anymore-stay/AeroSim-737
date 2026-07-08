@@ -20576,6 +20576,7 @@ GameObject:
   - component: {fileID: 8861624428223092022}
   - component: {fileID: 3114196441864359765}
   - component: {fileID: 3083099364855524867}
+  - component: {fileID: 8884930322662335683}
   m_Layer: 0
   m_Name: ThirdPersonCamera
   m_TagString: Untagged
@@ -20630,7 +20631,7 @@ Camera:
     width: 1
     height: 1
   near clip plane: 0.15
-  far clip plane: 1000
+  far clip plane: 100000
   field of view: 60
   orthographic: 0
   orthographic size: 5
@@ -20751,6 +20752,50 @@ MonoBehaviour:
     serializedVersion: 2
     m_Bits: 4294967295
   nearClipPlane: 0.15
+--- !u!114 &8884930322662335683
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1893994009262861087}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a79441f348de89743a2939f4d699eac1, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  m_RenderShadows: 1
+  m_RequiresDepthTextureOption: 2
+  m_RequiresOpaqueTextureOption: 2
+  m_CameraType: 0
+  m_Cameras: []
+  m_RendererIndex: -1
+  m_VolumeLayerMask:
+    serializedVersion: 2
+    m_Bits: 1
+  m_VolumeTrigger: {fileID: 0}
+  m_VolumeFrameworkUpdateModeOption: 2
+  m_RenderPostProcessing: 0
+  m_Antialiasing: 0
+  m_AntialiasingQuality: 2
+  m_StopNaN: 0
+  m_Dithering: 0
+  m_ClearDepth: 1
+  m_AllowXRRendering: 1
+  m_AllowHDROutput: 1
+  m_UseScreenCoordOverride: 0
+  m_ScreenSizeOverride: {x: 0, y: 0, z: 0, w: 0}
+  m_ScreenCoordScaleBias: {x: 0, y: 0, z: 0, w: 0}
+  m_RequiresDepthTexture: 0
+  m_RequiresColorTexture: 0
+  m_Version: 2
+  m_TaaSettings:
+    m_Quality: 3
+    m_FrameInfluence: 0.1
+    m_JitterScale: 1
+    m_MipBias: 0
+    m_VarianceClampScale: 0.9
+    m_ContrastAdaptiveSharpening: 0
 --- !u!1 &1896055451103612923
 GameObject:
   m_ObjectHideFlags: 0
@@ -65905,7 +65950,7 @@ MonoBehaviour:
   landingGearParts:
   - label: Nose Gear
     target: {fileID: 7016206067113733261}
-    targetPath: "\u524D\u8D77\u843D\u67B6/ImpEmpty.007_x195_64319"
+    targetPath: "\u524D\u8D77\u843D\u67B6/ImpEmpty.001_x195_58564/ImpEmpty.004_x195_93963/ImpEmpty.005_x195_23366/ImpEmpty.007_x195_64319"
     retractedLocalEuler: {x: -92, y: 0, z: 0}
     retractedLocalPositionOffset: {x: 0, y: 0.2, z: -0.25}
     motionCurve:
@@ -65936,7 +65981,7 @@ MonoBehaviour:
     neutralLocalPosition: {x: 0, y: 0, z: 0}
   - label: Left Main Gear
     target: {fileID: 4885659086828692622}
-    targetPath: "\u673A\u8EAB/ImpEmpty.002_x62f_12527"
+    targetPath: "\u5176\u4ED6/ImpEmpty.001_x62f_80674/ImpEmpty.002_x62f_12527"
     retractedLocalEuler: {x: 0, y: 0, z: 88}
     retractedLocalPositionOffset: {x: 0.05, y: 0.3, z: -0.2}
     motionCurve:
@@ -65967,7 +66012,7 @@ MonoBehaviour:
     neutralLocalPosition: {x: 0, y: 0, z: 0}
   - label: Right Main Gear
     target: {fileID: 4675900135506586686}
-    targetPath: "\u53F3\u53D1\u52A8\u673A/ImpEmpty.008_x62f_605/ImpEmpty.009_x62f_31195"
+    targetPath: "\u5176\u4ED6/ImpEmpty.008_x62f_605/ImpEmpty.009_x62f_31195"
     retractedLocalEuler: {x: 0, y: 0, z: -88}
     retractedLocalPositionOffset: {x: -0.05, y: 0.3, z: -0.2}
     motionCurve:
@@ -66021,6 +66066,10 @@ MonoBehaviour:
   altitudeOffset: 0
   modelYawOffsetDeg: 180
   smoothing: 15
+  useCesiumGeoreference: 1
+  cesiumOriginShiftDistance: 250
+  anchorStaticCesiumChildren: 1
+  preserveStaticCesiumChildRotation: 1
   useFloatingOrigin: 1
   floatingOriginObjects:
   - {fileID: 0}
@@ -66043,6 +66092,26 @@ MonoBehaviour:
   rudderRate: 0.5
   centerRate: 0.75
   throttleRate: 0.5
+  elevatorNeutralBias: -0.08
+  elevatorAuthority: 0.75
+  aileronAuthority: 0.85
+  rudderAuthority: 0.07
+  coordinatedTurnAssist: 1
+  yawToAileron: 0.15
+  maxTurnRudderInput: 0.42
+  coordinatedTurnBankDeg: 42
+  bankHoldGain: 0.014
+  bankTargetSlewRate: 45
+  rollRateDamping: 0.03
+  coordinatedTurnDeadzone: 0.08
+  maxCoordinatedAileron: 0.42
+  levelBankDeadzoneDeg: 1.5
+  maxLevelingAileron: 0.28
+  pitchHoldAssist: 1
+  pitchHoldDeg: 3
+  pitchHoldGain: 0.03
+  turnPitchCompensation: 0.012
+  maxPitchAssist: 0.45
   sendRate: 50
 --- !u!114 &8219233128410032355
 MonoBehaviour:
@@ -66126,7 +66195,6 @@ MonoBehaviour:
     - {fileID: 183471862308178923}
     rpmMultiplier: 1
     localSpinAxis: {x: 0, y: 1, z: 0}
-    runtimePivots: []
   rightEngine:
     label: Right Engine
     blades:
@@ -66135,7 +66203,6 @@ MonoBehaviour:
     - {fileID: 5258467700073300402}
     rpmMultiplier: 1
     localSpinAxis: {x: 0, y: 1, z: 0}
-    runtimePivots: []
   hideGeneratedPivots: 1
   currentRpm: 0
 --- !u!1 &5778099152727672844

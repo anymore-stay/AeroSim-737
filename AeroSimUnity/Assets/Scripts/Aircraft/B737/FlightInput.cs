@@ -30,6 +30,48 @@ public class FlightInput : MonoBehaviour
     [Header("油门")]
     [SerializeField] private float throttleRate = 0.5f;
 
+    [Header("Control Tuning")]
+    [Tooltip("中文名：升降舵中立偏置。负值会给飞机一点抬头趋势，正值会给一点低头趋势。")]
+    [SerializeField, Range(-1f, 1f)] private float elevatorNeutralBias = -0.08f;
+    [Tooltip("中文名：升降舵权限。数值越大，W/S 对俯仰控制越强。")]
+    [SerializeField, Range(0f, 1f)] private float elevatorAuthority = 0.75f;
+    [Tooltip("中文名：副翼权限。数值越大，滚转和转弯建立越快，但太大会不好控制。")]
+    [SerializeField, Range(0f, 1f)] private float aileronAuthority = 0.85f;
+    [Tooltip("中文名：方向舵权限。数值越大，Q/E 的偏航辅助越强，太大会侧滑或把航向拉过头。")]
+    [SerializeField, Range(0f, 1f)] private float rudderAuthority = 0.07f;
+    [Tooltip("中文名：启用协调转弯辅助。开启后 Q/E 会自动混入副翼，让飞机带坡度转弯并自动回正。")]
+    [SerializeField] private bool coordinatedTurnAssist = true;
+    [Tooltip("中文名：偏航转副翼备用混合。没有 JSBSim 状态数据时使用，正常飞行时主要由坡度保持控制接管。")]
+    [SerializeField, Range(0f, 1f)] private float yawToAileron = 0.15f;
+    [Tooltip("中文名：转弯方向舵输入上限。限制 Q/E 按住时方向舵最多打多少，避免偏航过猛。")]
+    [SerializeField, Range(0f, 1f)] private float maxTurnRudderInput = 0.42f;
+    [Tooltip("中文名：目标坡度角。Q/E 按住时希望飞机达到的最大倾斜角，越大转弯越快但越难控。")]
+    [SerializeField] private float coordinatedTurnBankDeg = 42f;
+    [Tooltip("中文名：坡度保持增益。数值越大越积极追目标坡度，太大容易左右晃或过冲。")]
+    [SerializeField] private float bankHoldGain = 0.014f;
+    [Tooltip("中文名：目标坡度变化速度。数值越大，按下 Q/E 后越快进入倾斜。")]
+    [SerializeField] private float bankTargetSlewRate = 45f;
+    [Tooltip("中文名：滚转阻尼。数值越大越会压住滚转速度，减少过冲和机翼立起来。")]
+    [SerializeField] private float rollRateDamping = 0.03f;
+    [Tooltip("中文名：协调转弯死区。Q/E 输入小于这个值时不会触发自动转弯辅助。")]
+    [SerializeField, Range(0f, 0.5f)] private float coordinatedTurnDeadzone = 0.08f;
+    [Tooltip("中文名：转弯副翼补偿上限。限制自动转弯时副翼最多补多少，越大滚转越快。")]
+    [SerializeField, Range(0f, 1f)] private float maxCoordinatedAileron = 0.42f;
+    [Tooltip("中文名：回正死区。松开 Q/E 后，坡度小于这个角度就认为基本回正。")]
+    [SerializeField] private float levelBankDeadzoneDeg = 1.5f;
+    [Tooltip("中文名：自动回正副翼上限。松开 Q/E 后用于把飞机扶平的副翼最大补偿。")]
+    [SerializeField, Range(0f, 1f)] private float maxLevelingAileron = 0.28f;
+    [Tooltip("中文名：启用俯仰保持辅助。开启后转弯时会自动给一点抬头补偿，减少掉高度。")]
+    [SerializeField] private bool pitchHoldAssist = true;
+    [Tooltip("中文名：目标俯仰角。俯仰保持辅助希望维持的机头角度。")]
+    [SerializeField] private float pitchHoldDeg = 3f;
+    [Tooltip("中文名：俯仰保持增益。数值越大越积极拉回目标俯仰角，太大容易上下晃。")]
+    [SerializeField] private float pitchHoldGain = 0.03f;
+    [Tooltip("中文名：转弯抬头补偿。坡度越大时给越多抬头，减少大转弯掉高度。")]
+    [SerializeField] private float turnPitchCompensation = 0.012f;
+    [Tooltip("中文名：最大俯仰辅助。限制自动抬头补偿的最大强度，避免机头拉得过猛。")]
+    [SerializeField, Range(0f, 1f)] private float maxPitchAssist = 0.45f;
+
     [Header("发送频率")]
     [Tooltip("每秒向 JSBSim 发送控制命令的次数。50 足够顺滑。")]
     [SerializeField] private float sendRate = 50f;
@@ -38,6 +80,8 @@ public class FlightInput : MonoBehaviour
     private float elevator;
     private float aileron;
     private float rudder;
+    private float turnInput;
+    private float smoothedTurnBankTargetDeg;
     private float throttle = 0f;   // 地面起飞:初始油门怠速 0,推 Shift 才加速
     private float flaps;
     private bool brakes = true;    // 地面起飞:初始刹车锁定,飞机停得住;松刹车(B)再滑跑
@@ -61,15 +105,32 @@ public class FlightInput : MonoBehaviour
 
         // ---- 副翼:A 左滚, D 右滚 ----
         float rollInput = 0f;
-        if (Input.GetKey(KeyCode.D)) rollInput -= 1f;
-        if (Input.GetKey(KeyCode.A)) rollInput += 1f;
+        if (Input.GetKey(KeyCode.D)) rollInput += 1f;
+        if (Input.GetKey(KeyCode.A)) rollInput -= 1f;
         aileron = StepAxis(aileron, rollInput, aileronRate, dt);
 
         // ---- 方向舵:Q 左偏航, E 右偏航 ----
         float yawInput = 0f;
-        if (Input.GetKey(KeyCode.E)) yawInput -= 1f;
-        if (Input.GetKey(KeyCode.Q)) yawInput += 1f;
-        rudder = StepAxis(rudder, yawInput, rudderRate, dt);
+        turnInput = 0f;
+        if (Input.GetKey(KeyCode.E))
+        {
+            yawInput += 1f;
+            turnInput += 1f;
+        }
+        if (Input.GetKey(KeyCode.Q))
+        {
+            yawInput -= 1f;
+            turnInput -= 1f;
+        }
+        if (coordinatedTurnAssist)
+        {
+            float rudderTarget = yawInput * maxTurnRudderInput;
+            rudder = Mathf.MoveTowards(rudder, rudderTarget, rudderRate * dt);
+        }
+        else
+        {
+            rudder = StepAxis(rudder, yawInput, rudderRate, dt);
+        }
 
         // ---- 油门:LeftShift 加, LeftControl 减(保持型)----
         if (Input.GetKey(KeyCode.LeftShift)) throttle += throttleRate * dt;
@@ -117,9 +178,44 @@ public class FlightInput : MonoBehaviour
     private void SendControls()
     {
         if (bridge == null || !bridge.ControlConnected) return;
-        bridge.SetProperty("fcs/elevator-cmd-norm", elevator);
-        bridge.SetProperty("fcs/aileron-cmd-norm", aileron);
-        bridge.SetProperty("fcs/rudder-cmd-norm", rudder);
+        float pitchAssist = CalculatePitchAssist();
+        float coordinatedAileron = aileron;
+        bool hasTurnInput = Mathf.Abs(turnInput) > coordinatedTurnDeadzone;
+        float desiredBankDeg = coordinatedTurnAssist && hasTurnInput
+            ? turnInput * coordinatedTurnBankDeg
+            : 0f;
+
+        smoothedTurnBankTargetDeg = Mathf.MoveTowards(
+            smoothedTurnBankTargetDeg,
+            desiredBankDeg,
+            bankTargetSlewRate * Time.deltaTime);
+
+        if (coordinatedTurnAssist && bridge.HasState &&
+            (hasTurnInput ||
+             Mathf.Abs(bridge.RollDeg) > levelBankDeadzoneDeg ||
+             Mathf.Abs(smoothedTurnBankTargetDeg) > levelBankDeadzoneDeg))
+        {
+            float bankErrorDeg = smoothedTurnBankTargetDeg - bridge.RollDeg;
+            float rollRateDeg = bridge.GetValue("p_rps", 0f) * Mathf.Rad2Deg;
+            float aileronLimit = hasTurnInput ? maxCoordinatedAileron : maxLevelingAileron;
+            float bankCommand = Mathf.Clamp(
+                bankErrorDeg * bankHoldGain - rollRateDeg * rollRateDamping,
+                -aileronLimit,
+                aileronLimit);
+            coordinatedAileron += bankCommand;
+        }
+        else if (coordinatedTurnAssist && hasTurnInput)
+        {
+            coordinatedAileron += turnInput * yawToAileron;
+        }
+
+        float elevatorCommand = Mathf.Clamp(elevator * elevatorAuthority + elevatorNeutralBias + pitchAssist, -1f, 1f);
+        float aileronCommand = Mathf.Clamp(coordinatedAileron * aileronAuthority, -1f, 1f);
+        float rudderCommand = Mathf.Clamp(rudder * rudderAuthority, -1f, 1f);
+
+        bridge.SetProperty("fcs/elevator-cmd-norm", elevatorCommand);
+        bridge.SetProperty("fcs/aileron-cmd-norm", aileronCommand);
+        bridge.SetProperty("fcs/rudder-cmd-norm", rudderCommand);
         bridge.SetProperty("fcs/throttle-cmd-norm[0]", throttle);
         bridge.SetProperty("fcs/throttle-cmd-norm[1]", throttle);
         bridge.SetProperty("fcs/flap-cmd-norm", flaps);
@@ -127,6 +223,17 @@ public class FlightInput : MonoBehaviour
         float b = brakes ? 1f : 0f;
         bridge.SetProperty("fcs/left-brake-cmd-norm", b);
         bridge.SetProperty("fcs/right-brake-cmd-norm", b);
+    }
+
+    private float CalculatePitchAssist()
+    {
+        if (!pitchHoldAssist || bridge == null || !bridge.HasState)
+            return 0f;
+
+        float pitchError = pitchHoldDeg - bridge.PitchDeg;
+        float pitchHold = -pitchError * pitchHoldGain;
+        float turnHold = -Mathf.Abs(bridge.RollDeg) * turnPitchCompensation;
+        return Mathf.Clamp(pitchHold + turnHold, -maxPitchAssist, maxPitchAssist);
     }
 
     // 给 HUD 读取
