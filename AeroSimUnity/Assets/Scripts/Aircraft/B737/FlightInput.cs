@@ -22,8 +22,8 @@ public class FlightInput : MonoBehaviour
 
     [Header("舵面灵敏度(每秒变化量)")]
     [SerializeField] private float elevatorRate = 0.5f;
-    [SerializeField] private float aileronRate = 0.625f;
-    [SerializeField] private float rudderRate = 0.5f;
+    [SerializeField] private float aileronRate = 1.0f;
+    [SerializeField] private float rudderRate = 0.8f;
     [Tooltip("松开按键后舵面回中速度。")]
     [SerializeField] private float centerRate = 0.75f;
 
@@ -36,27 +36,27 @@ public class FlightInput : MonoBehaviour
     [Tooltip("中文名：升降舵权限。数值越大，W/S 对俯仰控制越强。")]
     [SerializeField, Range(0f, 1f)] private float elevatorAuthority = 0.75f;
     [Tooltip("中文名：副翼权限。数值越大，滚转和转弯建立越快，但太大会不好控制。")]
-    [SerializeField, Range(0f, 1f)] private float aileronAuthority = 0.85f;
+    [SerializeField, Range(0f, 1f)] private float aileronAuthority = 1.0f;
     [Tooltip("中文名：方向舵权限。数值越大，Q/E 的偏航辅助越强，太大会侧滑或把航向拉过头。")]
-    [SerializeField, Range(0f, 1f)] private float rudderAuthority = 0.07f;
+    [SerializeField, Range(0f, 1f)] private float rudderAuthority = 0.3f;
     [Tooltip("中文名：启用协调转弯辅助。开启后 Q/E 会自动混入副翼，让飞机带坡度转弯并自动回正。")]
     [SerializeField] private bool coordinatedTurnAssist = true;
     [Tooltip("中文名：偏航转副翼备用混合。没有 JSBSim 状态数据时使用，正常飞行时主要由坡度保持控制接管。")]
     [SerializeField, Range(0f, 1f)] private float yawToAileron = 0.15f;
     [Tooltip("中文名：转弯方向舵输入上限。限制 Q/E 按住时方向舵最多打多少，避免偏航过猛。")]
-    [SerializeField, Range(0f, 1f)] private float maxTurnRudderInput = 0.42f;
+    [SerializeField, Range(0f, 1f)] private float maxTurnRudderInput = 0.7f;
     [Tooltip("中文名：目标坡度角。Q/E 按住时希望飞机达到的最大倾斜角，越大转弯越快但越难控。")]
-    [SerializeField] private float coordinatedTurnBankDeg = 42f;
+    [SerializeField] private float coordinatedTurnBankDeg = 55f;
     [Tooltip("中文名：坡度保持增益。数值越大越积极追目标坡度，太大容易左右晃或过冲。")]
-    [SerializeField] private float bankHoldGain = 0.014f;
+    [SerializeField] private float bankHoldGain = 0.025f;
     [Tooltip("中文名：目标坡度变化速度。数值越大，按下 Q/E 后越快进入倾斜。")]
-    [SerializeField] private float bankTargetSlewRate = 45f;
+    [SerializeField] private float bankTargetSlewRate = 80f;
     [Tooltip("中文名：滚转阻尼。数值越大越会压住滚转速度，减少过冲和机翼立起来。")]
     [SerializeField] private float rollRateDamping = 0.03f;
     [Tooltip("中文名：协调转弯死区。Q/E 输入小于这个值时不会触发自动转弯辅助。")]
     [SerializeField, Range(0f, 0.5f)] private float coordinatedTurnDeadzone = 0.08f;
     [Tooltip("中文名：转弯副翼补偿上限。限制自动转弯时副翼最多补多少，越大滚转越快。")]
-    [SerializeField, Range(0f, 1f)] private float maxCoordinatedAileron = 0.42f;
+    [SerializeField, Range(0f, 1f)] private float maxCoordinatedAileron = 0.75f;
     [Tooltip("中文名：回正死区。松开 Q/E 后，坡度小于这个角度就认为基本回正。")]
     [SerializeField] private float levelBankDeadzoneDeg = 1.5f;
     [Tooltip("中文名：自动回正副翼上限。松开 Q/E 后用于把飞机扶平的副翼最大补偿。")]
