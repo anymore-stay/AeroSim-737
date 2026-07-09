@@ -170,7 +170,17 @@ AeroSim-737/
 - `*.csproj`
 - `*.sln`
 
-### 7. 修改前优先检查
+### 7. Unity 版本与 Cesium 包一致性
+
+- 仓库推荐版本是 `Unity 2022.3.62f3c1`
+- `2022.3.62` 同家族版本可运行
+  例如：`2022.3.62f1c1`、`2022.3.62f3c1`
+- 如果要改场景、Prefab、材质、ProjectSettings，仍建议尽量使用推荐版本再提交
+- 项目已内置 `AeroSimCesiumPackageGuard`，会在启动时检查版本，并自动把 `CesiumDefaultTilesetMaterial.mat` 同步回团队基线，减少 `immutable package unexpectedly altered` 报错
+- 如果 Console 里再次出现 Cesium 包材质相关错误，可在 Unity 菜单执行 `AeroSim/Cesium/Sync Package Material Baseline`
+- 这个自愈逻辑只修复当前已知的 Cesium 包材质漂移，不代表跨大版本或跨补丁版本可以随意混用
+
+### 8. 修改前优先检查
 
 在动任何资源前，先确认它属于哪一类：
 
@@ -181,7 +191,7 @@ AeroSim-737/
 - 编辑器工具 -> `Assets/Scripts/Editor/B737`
 - 外部桥接文件 -> `JSBSimBridge/`
 
-### 8. 团队协作建议
+### 9. 团队协作建议
 
 - 每次提交只做一类改动
 - 资源整理、脚本改动、材质调整不要混成一个提交
