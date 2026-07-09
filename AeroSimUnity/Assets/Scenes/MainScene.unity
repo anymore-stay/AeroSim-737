@@ -6005,7 +6005,50 @@ PrefabInstance:
         type: 3}
       insertIndex: -1
       addedObject: {fileID: 1661031097}
+    - targetCorrespondingSourceObject: {fileID: 992544609813168307, guid: dc7f122a1e38a1b488913bdc0004b385,
+        type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 2028421776}
   m_SourcePrefab: {fileID: 100100000, guid: dc7f122a1e38a1b488913bdc0004b385, type: 3}
+--- !u!1 &2028421775 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 992544609813168307, guid: dc7f122a1e38a1b488913bdc0004b385,
+    type: 3}
+  m_PrefabInstance: {fileID: 2028421774}
+  m_PrefabAsset: {fileID: 0}
+--- !u!114 &2028421776
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2028421775}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8c63419c1fe1406438ad036dbbf43ae4, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  cycleSeconds: 1
+  pulseSeconds: 0.11
+  fadeSeconds: 0.02
+  phaseOffsetSeconds: 0
+  startOn: 1
+  targetRenderer: {fileID: 0}
+  onColor: {r: 1, g: 0, b: 0, a: 1}
+  offColor: {r: 0.08, g: 0, b: 0, a: 1}
+  emissionIntensity: 14
+  toggleRendererVisibility: 0
+  affectTargetRenderer: 0
+  autoCreateVisual: 1
+  visualRenderer: {fileID: 0}
+  visualRenderers: []
+  visualScale: 0.16
+  visualPeakAlpha: 0.65
+  usePulseLight: 0
+  autoCreatePulseLight: 1
+  pulseLight: {fileID: 0}
+  pulseLightIntensity: 25
+  pulseLightRange: 4
 --- !u!1 &2070957401
 GameObject:
   m_ObjectHideFlags: 0
