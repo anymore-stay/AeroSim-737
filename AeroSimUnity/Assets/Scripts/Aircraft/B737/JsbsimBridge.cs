@@ -5,6 +5,8 @@ using System.Net;
 using System.Net.Sockets;
 using System.Text;
 using System.Threading;
+using CesiumForUnity;
+using Unity.Mathematics;
 using UnityEngine;
 
 /// <summary>
@@ -52,6 +54,12 @@ public class JsbsimBridge : MonoBehaviour
     [Header("平滑")]
     [Tooltip("位置/姿态插值速度。0 表示直接硬切(最跟手),越大越平滑但有延迟。建议 10~20。")]
     [SerializeField] private float smoothing = 15f;
+
+    [Header("Cesium")]
+    [SerializeField] private bool useCesiumGeoreference = true;
+    [SerializeField] private double cesiumOriginShiftDistance = 250.0;
+    [SerializeField] private bool anchorStaticCesiumChildren = true;
+    [SerializeField] private bool preserveStaticCesiumChildRotation = true;
 
     [Header("浮动原点(消除渲染抖动)")]
     [Tooltip("开启后,由 FloatingOriginManager 在飞机远离原点时触发三维原点平移。\n" +
@@ -127,6 +135,7 @@ public class JsbsimBridge : MonoBehaviour
 
     // ---- 场景起飞位置:飞机在编辑器中摆的位置,JSBSim 经纬度原点映射到这里 ----
     private Vector3 sceneStartPos;
+    private Quaternion sceneStartRot = Quaternion.identity;
 
     // 目标位姿(线程收到后,主线程插值逼近)
     private Vector3 targetPos;
@@ -135,6 +144,29 @@ public class JsbsimBridge : MonoBehaviour
 
     // 浮动原点累计偏移:把绝对世界坐标换算到当前已平移的渲染坐标
     private Vector3 accumulatedOriginShift = Vector3.zero;
+
+    private CesiumGeoreference cesiumGeoreference;
+    private CesiumGlobeAnchor cesiumAnchor;
+    private CesiumOriginShift cesiumOriginShift;
+    private bool usingCesiumCoordinates;
+    private double4x4 cesiumStartLocalToEcef = double4x4.identity;
+    private float originHeadingDeg;
+    private float originPitchDeg;
+    private float originRollDeg;
+    private float cesiumHorizontalAlignmentDeg;
+    private bool hasCesiumTarget;
+    private double3 targetCesiumEcefPosition;
+    private double3 currentCesiumEcefPosition;
+    private Quaternion targetCesiumRotation = Quaternion.identity;
+    private Quaternion currentCesiumRotation = Quaternion.identity;
+    private readonly List<StaticCesiumChild> staticCesiumChildren = new List<StaticCesiumChild>();
+
+    private struct StaticCesiumChild
+    {
+        public Transform transform;
+        public Quaternion localRotation;
+        public Vector3 localScale;
+    }
 
     private void Awake()
     {
@@ -151,20 +183,27 @@ public class JsbsimBridge : MonoBehaviour
         // 记录飞机在编辑器中的位置,JSBSim 首帧经纬度原点映射到这里,
         // 飞机在 Unity 场景中摆在哪就从哪起飞。
         sceneStartPos = aircraft.position;
+        sceneStartRot = aircraft.rotation;
 
-        EnsureFloatingOriginManager();
+        ConfigureCesiumCoordinates();
+        if (!usingCesiumCoordinates)
+            EnsureFloatingOriginManager();
     }
 
     private void OnEnable()
     {
-        FloatingOriginManager.OriginShifted += HandleOriginShift;
+        if (!usingCesiumCoordinates)
+            FloatingOriginManager.OriginShifted += HandleOriginShift;
         StartUdpReceiver();
         StartTcpControl();
     }
 
     private void OnDisable()
     {
-        FloatingOriginManager.OriginShifted -= HandleOriginShift;
+        if (cesiumGeoreference != null)
+            cesiumGeoreference.changed -= HandleCesiumGeoreferenceChanged;
+        if (!usingCesiumCoordinates)
+            FloatingOriginManager.OriginShifted -= HandleOriginShift;
         StopAll();
         if (Instance == this) Instance = null;
     }
@@ -295,7 +334,7 @@ public class JsbsimBridge : MonoBehaviour
             OnStateUpdated?.Invoke();
         }
 
-        if (HasState)
+        if (HasState && !usingCesiumCoordinates)
         {
             if (firstPose || smoothing <= 0f)
             {
@@ -309,6 +348,153 @@ public class JsbsimBridge : MonoBehaviour
                 aircraft.position = Vector3.Lerp(aircraft.position, targetPos, t);
                 aircraft.rotation = Quaternion.Slerp(aircraft.rotation, targetRot, t);
             }
+        }
+        else if (HasState && hasCesiumTarget && cesiumAnchor != null)
+        {
+            if (firstPose || smoothing <= 0f)
+            {
+                currentCesiumEcefPosition = targetCesiumEcefPosition;
+                currentCesiumRotation = targetCesiumRotation;
+            }
+            else
+            {
+                float t = 1f - Mathf.Exp(-smoothing * Time.deltaTime);
+                currentCesiumEcefPosition = math.lerp(currentCesiumEcefPosition, targetCesiumEcefPosition, t);
+                currentCesiumRotation = Quaternion.Slerp(currentCesiumRotation, targetCesiumRotation, t);
+            }
+
+            ApplyCesiumPose(currentCesiumEcefPosition, currentCesiumRotation);
+            firstPose = false;
+        }
+    }
+
+    private void ApplyCesiumPose(double3 ecefPosition, Quaternion rotation)
+    {
+        cesiumAnchor.positionGlobeFixed = ecefPosition;
+        cesiumAnchor.rotationEastUpNorth = new quaternion(
+            rotation.x,
+            rotation.y,
+            rotation.z,
+            rotation.w);
+    }
+
+    private float CalculateCesiumHorizontalAlignment()
+    {
+        Vector3 sceneNose = sceneStartRot * Vector3.back;
+        sceneNose.y = 0f;
+        if (sceneNose.sqrMagnitude < 0.0001f)
+            return 0f;
+
+        float headingRad = originHeadingDeg * Mathf.Deg2Rad;
+        Vector3 jsbsimStartDirection = new Vector3(-Mathf.Sin(headingRad), 0f, -Mathf.Cos(headingRad));
+        return Vector3.SignedAngle(jsbsimStartDirection.normalized, sceneNose.normalized, Vector3.up);
+    }
+
+    private void ConfigureCesiumCoordinates()
+    {
+        if (!useCesiumGeoreference || aircraft == null) return;
+
+        cesiumGeoreference = aircraft.GetComponentInParent<CesiumGeoreference>();
+        if (cesiumGeoreference == null)
+            cesiumGeoreference = FindObjectOfType<CesiumGeoreference>();
+        if (cesiumGeoreference == null) return;
+
+        if (aircraft.GetComponentInParent<CesiumGeoreference>() == null)
+            aircraft.SetParent(cesiumGeoreference.transform, true);
+
+        sceneStartPos = aircraft.localPosition;
+        sceneStartRot = aircraft.localRotation;
+
+        cesiumGeoreference.Initialize();
+        cesiumStartLocalToEcef = cesiumGeoreference.localToEcefMatrix;
+
+        cesiumAnchor = aircraft.GetComponent<CesiumGlobeAnchor>();
+        if (cesiumAnchor == null)
+            cesiumAnchor = aircraft.gameObject.AddComponent<CesiumGlobeAnchor>();
+        cesiumAnchor.detectTransformChanges = false;
+        cesiumAnchor.adjustOrientationForGlobeWhenMoving = false;
+
+        cesiumOriginShift = aircraft.GetComponent<CesiumOriginShift>();
+        if (cesiumOriginShift == null)
+            cesiumOriginShift = aircraft.gameObject.AddComponent<CesiumOriginShift>();
+        cesiumOriginShift.distance = cesiumOriginShiftDistance;
+
+        usingCesiumCoordinates = true;
+        NeutralizeLegacyFloatingOriginForCesium();
+
+        AnchorStaticCesiumChildren();
+    }
+
+    private void NeutralizeLegacyFloatingOriginForCesium()
+    {
+        FloatingOriginManager.OriginShifted -= HandleOriginShift;
+        accumulatedOriginShift = Vector3.zero;
+
+        FloatingOriginManager manager = aircraft.GetComponent<FloatingOriginManager>();
+        if (manager != null && manager.Target == aircraft)
+            manager.SetTarget(null);
+
+        if (cesiumGeoreference == null) return;
+
+        FloatingOriginObject[] floatingObjects = cesiumGeoreference.GetComponentsInChildren<FloatingOriginObject>(true);
+        for (int i = 0; i < floatingObjects.Length; i++)
+        {
+            if (floatingObjects[i] == null) continue;
+            Destroy(floatingObjects[i]);
+        }
+    }
+
+    private void AnchorStaticCesiumChildren()
+    {
+        if (!anchorStaticCesiumChildren || cesiumGeoreference == null) return;
+
+        staticCesiumChildren.Clear();
+        cesiumGeoreference.changed -= HandleCesiumGeoreferenceChanged;
+
+        for (int i = 0; i < cesiumGeoreference.transform.childCount; i++)
+        {
+            Transform child = cesiumGeoreference.transform.GetChild(i);
+            if (child == null || child == aircraft) continue;
+            if (child.GetComponent<Cesium3DTileset>() != null) continue;
+            if (child.GetComponent<CesiumGlobeAnchor>() != null) continue;
+
+            Quaternion originalRotation = child.localRotation;
+            Vector3 originalScale = child.localScale;
+            CesiumGlobeAnchor anchor = child.GetComponent<CesiumGlobeAnchor>();
+            if (anchor == null)
+                anchor = child.gameObject.AddComponent<CesiumGlobeAnchor>();
+
+            anchor.detectTransformChanges = false;
+            anchor.adjustOrientationForGlobeWhenMoving = false;
+            anchor.Sync();
+            child.localRotation = originalRotation;
+            child.localScale = originalScale;
+
+            staticCesiumChildren.Add(new StaticCesiumChild
+            {
+                transform = child,
+                localRotation = originalRotation,
+                localScale = originalScale
+            });
+        }
+
+        if (staticCesiumChildren.Count > 0)
+            cesiumGeoreference.changed += HandleCesiumGeoreferenceChanged;
+
+        HandleCesiumGeoreferenceChanged();
+    }
+
+    private void HandleCesiumGeoreferenceChanged()
+    {
+        if (!preserveStaticCesiumChildRotation) return;
+
+        for (int i = 0; i < staticCesiumChildren.Count; i++)
+        {
+            StaticCesiumChild child = staticCesiumChildren[i];
+            if (child.transform == null) continue;
+
+            child.transform.localRotation = child.localRotation;
+            child.transform.localScale = child.localScale;
         }
     }
 
@@ -376,6 +562,10 @@ public class JsbsimBridge : MonoBehaviour
         {
             originLatRad = latRad;
             originLonRad = lonRad;
+            originHeadingDeg = HeadingDeg;
+            originPitchDeg = PitchDeg;
+            originRollDeg = RollDeg;
+            cesiumHorizontalAlignmentDeg = CalculateCesiumHorizontalAlignment();
             originAltM = AltitudeFt * feetToMeters; // 首帧海拔作为地面基准
             originSet = true;
         }
@@ -383,14 +573,32 @@ public class JsbsimBridge : MonoBehaviour
         double north = EarthRadiusM * (latRad - originLatRad);
         double east = EarthRadiusM * (lonRad - originLonRad) * Math.Cos(originLatRad);
         float altM = AltitudeFt * feetToMeters;
+        float verticalOffsetM = altM - originAltM;
+
+        float northFt;
+        float eastFt;
+        float upFt;
+        if (s.TryGetValue("position_from_start_neu_n_ft", out northFt) &&
+            s.TryGetValue("position_from_start_neu_e_ft", out eastFt) &&
+            s.TryGetValue("position_from_start_neu_u_ft", out upFt))
+        {
+            north = northFt * feetToMeters;
+            east = eastFt * feetToMeters;
+            verticalOffsetM = upFt * feetToMeters;
+        }
 
         // Unity: X=East, Y=Up, Z=North (标准约定)
         // 但本项目模型机头朝 -Z(机尾朝 +Z),如果用标准约定则飞机"机尾朝前"移动。
         // 修正方案:翻转位移方向(north→-Z, east→-X),让飞机向北飞时往 -Z 走,
         // 天然对齐模型机头方向,不需要旋转父物体(避免子物体 localPos 偏移导致视觉跳变)。
-        targetPos = sceneStartPos
-                    + new Vector3(-(float)east, altM - originAltM, -(float)north)
-                    + accumulatedOriginShift;
+        Vector3 horizontalOffset = new Vector3(-(float)east, 0f, -(float)north);
+        if (usingCesiumCoordinates)
+            horizontalOffset = Quaternion.Euler(0f, cesiumHorizontalAlignmentDeg, 0f) * horizontalOffset;
+
+        Vector3 unshiftedTargetPos = sceneStartPos
+                                     + horizontalOffset
+                                     + new Vector3(0f, verticalOffsetM, 0f);
+        targetPos = unshiftedTargetPos + accumulatedOriginShift;
 
         // ---- 姿态:NED 欧拉角 -> Unity 四元数 ----
         // 位移已翻转(north→-Z, east→-X),等价于把世界坐标系绕 Y 轴镜像 180°,
@@ -399,7 +607,28 @@ public class JsbsimBridge : MonoBehaviour
         // RollDeg(绕 Z 轴):Z 轴翻了,但 JSBSim phi>0 是右滚,Unity 绕 +Z 是左滚,
         //   两个翻转抵消,符号仍为 -RollDeg。
         // HeadingDeg:Y 轴未变,模型自身机头朝 -Z 抵消了 180°,直接用 HeadingDeg。
-        targetRot = Quaternion.Euler(PitchDeg, HeadingDeg, -RollDeg);
+        targetRot = Quaternion.Euler(PitchDeg, HeadingDeg, RollDeg);
+
+        if (usingCesiumCoordinates && cesiumAnchor != null)
+        {
+            Vector3 cesiumLocalTargetPos = unshiftedTargetPos;
+            double3 localPosition = new double3(
+                cesiumLocalTargetPos.x,
+                cesiumLocalTargetPos.y,
+                cesiumLocalTargetPos.z);
+            double3 ecefPosition = math.mul(
+                cesiumStartLocalToEcef,
+                new double4(localPosition, 1.0)).xyz;
+            float deltaPitchDeg = Mathf.DeltaAngle(originPitchDeg, PitchDeg);
+            float deltaHeadingDeg = Mathf.DeltaAngle(originHeadingDeg, HeadingDeg);
+            float deltaRollDeg = Mathf.DeltaAngle(originRollDeg, RollDeg);
+            Quaternion cesiumRotation = sceneStartRot
+                                        * Quaternion.Euler(deltaPitchDeg, deltaHeadingDeg, deltaRollDeg);
+
+            targetCesiumEcefPosition = ecefPosition;
+            targetCesiumRotation = cesiumRotation;
+            hasCesiumTarget = true;
+        }
 
         if (logState)
             Debug.Log(string.Format("[JSBSim] alt={0:F0}ft spd={1:F0}kt hdg={2:F0} pitch={3:F1} roll={4:F1}",
