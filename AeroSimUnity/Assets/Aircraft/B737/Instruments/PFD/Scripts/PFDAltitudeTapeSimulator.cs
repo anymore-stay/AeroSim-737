@@ -15,6 +15,8 @@ public class PFDAltitudeTapeSimulator : MonoBehaviour
     [SerializeField] private float automaticMaximumAltitudeFt = 10000f;
     [SerializeField, Min(0.1f)] private float automaticRoundTripSeconds = 12f;
 
+    private float automaticStartTime;
+
     /// <summary>
     /// 计算自动模式在指定时间点的模拟高度，一个周期完成一次往返。
     /// </summary>
@@ -37,12 +39,22 @@ public class PFDAltitudeTapeSimulator : MonoBehaviour
         return minimum + Mathf.PingPong(distance, range);
     }
 
+    private void OnEnable()
+    {
+        // 每次开始预览时都从自动区间的最低高度重新起步。
+        mode = SimulationMode.Automatic;
+        automaticStartTime = Time.time;
+        EnsureController();
+
+        if (controller != null)
+        {
+            controller.SetAltitude(automaticMinimumAltitudeFt);
+        }
+    }
+
     private void Update()
     {
-        if (controller == null)
-        {
-            controller = GetComponent<PFDAltitudeTapeController>();
-        }
+        EnsureController();
 
         if (controller == null)
         {
@@ -52,11 +64,19 @@ public class PFDAltitudeTapeSimulator : MonoBehaviour
         float altitudeFt = mode == SimulationMode.Manual
             ? simulatedAltitudeFt
             : EvaluateAutomaticAltitude(
-                Time.time,
+                Time.time - automaticStartTime,
                 automaticMinimumAltitudeFt,
                 automaticMaximumAltitudeFt,
                 automaticRoundTripSeconds);
 
         controller.SetAltitude(altitudeFt);
+    }
+
+    private void EnsureController()
+    {
+        if (controller == null)
+        {
+            controller = GetComponent<PFDAltitudeTapeController>();
+        }
     }
 }

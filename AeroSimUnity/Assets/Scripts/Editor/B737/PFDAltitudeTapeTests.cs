@@ -125,6 +125,42 @@ public class PFDAltitudeTapeTests
         Assert.That(end, Is.EqualTo(0f).Within(0.001f));
     }
 
+    [Test]
+    public void 模拟器启用时会自动切换到自动模式并从零高度开始()
+    {
+        GameObject root = new GameObject("PFD_Root");
+        GameObject guideObject = new GameObject("Guide_AltitudeTapeContent", typeof(RectTransform));
+
+        try
+        {
+            guideObject.transform.SetParent(root.transform, false);
+            RectTransform guide = guideObject.GetComponent<RectTransform>();
+            guide.anchoredPosition = new Vector2(0f, -452.8f);
+
+            Type controllerType = 获取运行时类型("PFDAltitudeTapeController");
+            root.AddComponent(controllerType);
+
+            Type simulatorType = 获取运行时类型("PFDAltitudeTapeSimulator");
+            Component simulator = root.AddComponent(simulatorType);
+            MethodInfo onEnable = simulatorType.GetMethod(
+                "OnEnable",
+                BindingFlags.NonPublic | BindingFlags.Instance);
+            Assert.That(onEnable, Is.Not.Null, "OnEnable 方法不存在。");
+
+            onEnable.Invoke(simulator, null);
+
+            FieldInfo modeField = simulatorType.GetField(
+                "mode",
+                BindingFlags.NonPublic | BindingFlags.Instance);
+            Assert.That(modeField.GetValue(simulator).ToString(), Is.EqualTo("Automatic"));
+            Assert.That(guide.anchoredPosition.y, Is.EqualTo(-452.8f).Within(0.001f));
+        }
+        finally
+        {
+            UnityEngine.Object.DestroyImmediate(root);
+        }
+    }
+
     private static Type 获取运行时类型(string typeName)
     {
         Type type = Type.GetType(typeName + ", Assembly-CSharp");
