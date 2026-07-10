@@ -99,6 +99,8 @@ PFD_PreviewGuide
 
 现有 `PFDLayerGeneratorEditor` 会复制预览层，将 `Guide_` 前缀改为 `Final_`，并把 `PreviewRGB` Sprite 替换成相同路径结构下的 `Used` Sprite，因此不需要为最终层另写一套生成逻辑。
 
+最终层生成后，根节点上的高度带控制器同时保存 `Guide_AltitudeTapeContent` 和 `Final_AltitudeTapeContent` 引用，并同步移动两个 Content。这样无论当前显示预览层还是最终层，刻度位置都保持一致。该处理方式与现有 `PFDHorizonController` 同时驱动 Guide 和 Final 的结构一致。
+
 ## 5. 图片拼接规则
 
 相邻贴图在边界处包含重复高度刻度。例如一张图片顶部和下一张图片底部可能同时包含 `3600` 刻度。因此拼接时需要允许相邻图片重叠，不能只按图片外框紧贴。
@@ -125,8 +127,8 @@ PFD_PreviewGuide
 
 主要职责：
 
-- 保存 Viewport、Content 和高度带图片引用；
-- 根据高度计算 Content 的目标 Y 坐标；
+- 保存预览层与最终层的 Viewport、Content 和高度带图片引用；
+- 根据高度计算 Content 的目标 Y 坐标，并同步应用到 Guide 与 Final；
 - 将高度限制在贴图支持范围内；
 - 提供图片重新排列入口；
 - 提供人工校准参数；
@@ -157,7 +159,7 @@ public void SetAltitude(float altitudeFt)
 目标位置Y = 参考位置Y + 有方向符号的滚动距离
 ```
 
-控制器只改变 Content 的 Y 坐标，不改变 Content 的 X 坐标、缩放和 Viewport 尺寸，保证人工布局调整不会被运行时代码覆盖。
+控制器只改变 Guide 与 Final Content 的 Y 坐标，不改变它们的 X 坐标、缩放和 Viewport 尺寸，保证人工布局调整不会被运行时代码覆盖。Final 尚未生成或暂时未绑定时，Guide 仍可独立调试；Final 生成后控制器会同步驱动两者。
 
 ### 6.2 PFDAltitudeTapeSimulator
 
@@ -211,6 +213,7 @@ Prefab 与画面验证：
 - 手动输入 `0、1000、3600、8200 ft` 时，对应刻度可以校准到中央指示位置；
 - 自动模式经过所有选定测试接缝时连续、无闪烁、无明显跳动；
 - 修改 Viewport 尺寸后滚动逻辑仍然有效；
+- 在 Preview 与 Final 之间切换时，高度刻度位置保持一致；
 - 重新生成 `PFD_Final` 后，节点命名和 PreviewRGB 到 Used 的 Sprite 替换正确；
 - Unity Console 中没有新增错误。
 
