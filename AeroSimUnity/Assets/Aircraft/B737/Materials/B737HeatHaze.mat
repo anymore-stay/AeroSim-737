@@ -26,7 +26,7 @@ Material:
     m_TexEnvs: []
     m_Ints: []
     m_Floats:
-    - _BlurPixels: 6
+    - _BlurPixels: 1.65
     - _DistortionStrength: 0.0577
     - _NoiseScale: 23.4
     - _NoiseSpeed: 7.04
