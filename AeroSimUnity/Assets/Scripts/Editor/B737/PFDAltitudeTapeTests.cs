@@ -74,6 +74,21 @@ public class PFDAltitudeTapeTests
         }
     }
 
+    [Test]
+    public void 自动模拟会在一个周期内往返最低和最高高度()
+    {
+        Type simulatorType = 获取运行时类型("PFDAltitudeTapeSimulator");
+        MethodInfo method = 获取公开静态方法(simulatorType, "EvaluateAutomaticAltitude");
+
+        float start = (float)method.Invoke(null, new object[] { 0f, 0f, 10000f, 8f });
+        float peak = (float)method.Invoke(null, new object[] { 4f, 0f, 10000f, 8f });
+        float end = (float)method.Invoke(null, new object[] { 8f, 0f, 10000f, 8f });
+
+        Assert.That(start, Is.EqualTo(0f).Within(0.001f));
+        Assert.That(peak, Is.EqualTo(10000f).Within(0.001f));
+        Assert.That(end, Is.EqualTo(0f).Within(0.001f));
+    }
+
     private static Type 获取运行时类型(string typeName)
     {
         Type type = Type.GetType(typeName + ", Assembly-CSharp");
