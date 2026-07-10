@@ -75,6 +75,42 @@ public class PFDAltitudeTapeTests
     }
 
     [Test]
+    public void 零高度会保留Prefab中校准好的内容层位置()
+    {
+        GameObject root = new GameObject("PFD_Root");
+        GameObject guideObject = new GameObject("Guide_AltitudeTapeContent", typeof(RectTransform));
+        GameObject finalObject = new GameObject("Final_AltitudeTapeContent", typeof(RectTransform));
+
+        try
+        {
+            guideObject.transform.SetParent(root.transform, false);
+            finalObject.transform.SetParent(root.transform, false);
+
+            RectTransform guide = guideObject.GetComponent<RectTransform>();
+            RectTransform final = finalObject.GetComponent<RectTransform>();
+            guide.anchoredPosition = new Vector2(3f, -452.8f);
+            final.anchoredPosition = new Vector2(-2f, -452.8f);
+
+            Type controllerType = 获取运行时类型("PFDAltitudeTapeController");
+            Component controller = root.AddComponent(controllerType);
+            MethodInfo setAltitude = controllerType.GetMethod(
+                "SetAltitude",
+                BindingFlags.Public | BindingFlags.Instance);
+
+            setAltitude.Invoke(controller, new object[] { 0f });
+
+            Assert.That(guide.anchoredPosition.x, Is.EqualTo(3f).Within(0.001f));
+            Assert.That(final.anchoredPosition.x, Is.EqualTo(-2f).Within(0.001f));
+            Assert.That(guide.anchoredPosition.y, Is.EqualTo(-452.8f).Within(0.001f));
+            Assert.That(final.anchoredPosition.y, Is.EqualTo(-452.8f).Within(0.001f));
+        }
+        finally
+        {
+            UnityEngine.Object.DestroyImmediate(root);
+        }
+    }
+
+    [Test]
     public void 自动模拟会在一个周期内往返最低和最高高度()
     {
         Type simulatorType = 获取运行时类型("PFDAltitudeTapeSimulator");

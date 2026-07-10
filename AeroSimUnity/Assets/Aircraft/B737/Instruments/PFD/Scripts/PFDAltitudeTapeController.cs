@@ -22,7 +22,6 @@ public class PFDAltitudeTapeController : MonoBehaviour
     [SerializeField] private float maximumAltitudeFt = 50000f;
     [SerializeField, Min(0.0001f)] private float pixelsPerFoot = 0.44f;
     [SerializeField] private float referenceAltitudeFt;
-    [SerializeField] private float referenceContentY;
     [SerializeField] private bool invertDirection;
 
     [Header("预览层图片拼接")]
@@ -30,6 +29,10 @@ public class PFDAltitudeTapeController : MonoBehaviour
     [SerializeField] private TapeSegment[] guideSegments = Array.Empty<TapeSegment>();
 
     private bool hasWarnedInvalidPixelsPerFoot;
+    private RectTransform cachedGuideContent;
+    private RectTransform cachedFinalContent;
+    private float guideReferenceContentY;
+    private float finalReferenceContentY;
 
     /// <summary>
     /// 设置当前高度，并同步移动预览层与最终层的高度带。
@@ -50,17 +53,17 @@ public class PFDAltitudeTapeController : MonoBehaviour
         }
 
         hasWarnedInvalidPixelsPerFoot = false;
-        float targetY = PFDAltitudeTapeMath.CalculateContentY(
+        float contentOffsetY = PFDAltitudeTapeMath.CalculateContentY(
             altitudeFt,
             minimumAltitudeFt,
             maximumAltitudeFt,
             pixelsPerFoot,
             referenceAltitudeFt,
-            referenceContentY,
+            0f,
             invertDirection);
 
-        ApplyContentY(guideContent, targetY);
-        ApplyContentY(finalContent, targetY);
+        ApplyContentY(guideContent, guideReferenceContentY + contentOffsetY);
+        ApplyContentY(finalContent, finalReferenceContentY + contentOffsetY);
     }
 
     /// <summary>
@@ -106,22 +109,33 @@ public class PFDAltitudeTapeController : MonoBehaviour
 
     private void EnsureBindings()
     {
-        if (guideContent != null && finalContent != null)
+        if (guideContent == null || finalContent == null)
         {
-            return;
+            RectTransform[] descendants = GetComponentsInChildren<RectTransform>(true);
+            foreach (RectTransform descendant in descendants)
+            {
+                if (guideContent == null && descendant.name == "Guide_AltitudeTapeContent")
+                {
+                    guideContent = descendant;
+                }
+                else if (finalContent == null && descendant.name == "Final_AltitudeTapeContent")
+                {
+                    finalContent = descendant;
+                }
+            }
         }
 
-        RectTransform[] descendants = GetComponentsInChildren<RectTransform>(true);
-        foreach (RectTransform descendant in descendants)
+        // Content 引用发生变化时，读取 Prefab 中人工校准好的纵向位置作为参考基准。
+        if (guideContent != cachedGuideContent)
         {
-            if (guideContent == null && descendant.name == "Guide_AltitudeTapeContent")
-            {
-                guideContent = descendant;
-            }
-            else if (finalContent == null && descendant.name == "Final_AltitudeTapeContent")
-            {
-                finalContent = descendant;
-            }
+            cachedGuideContent = guideContent;
+            guideReferenceContentY = guideContent == null ? 0f : guideContent.anchoredPosition.y;
+        }
+
+        if (finalContent != cachedFinalContent)
+        {
+            cachedFinalContent = finalContent;
+            finalReferenceContentY = finalContent == null ? 0f : finalContent.anchoredPosition.y;
         }
     }
 
