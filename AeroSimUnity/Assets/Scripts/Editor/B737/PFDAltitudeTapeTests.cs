@@ -126,7 +126,7 @@ public class PFDAltitudeTapeTests
     }
 
     [Test]
-    public void 模拟器启用时会自动切换到自动模式并从零高度开始()
+    public void 模拟器启用时会保留Inspector参数并从自动区间最低高度开始()
     {
         GameObject root = new GameObject("PFD_Root");
         GameObject guideObject = new GameObject("Guide_AltitudeTapeContent", typeof(RectTransform));
@@ -142,6 +142,15 @@ public class PFDAltitudeTapeTests
 
             Type simulatorType = 获取运行时类型("PFDAltitudeTapeSimulator");
             Component simulator = root.AddComponent(simulatorType);
+            FieldInfo modeField = simulatorType.GetField(
+                "mode",
+                BindingFlags.NonPublic | BindingFlags.Instance);
+            FieldInfo roundTripField = simulatorType.GetField(
+                "automaticRoundTripSeconds",
+                BindingFlags.NonPublic | BindingFlags.Instance);
+            modeField.SetValue(simulator, Enum.Parse(modeField.FieldType, "Automatic"));
+            roundTripField.SetValue(simulator, 45f);
+
             MethodInfo onEnable = simulatorType.GetMethod(
                 "OnEnable",
                 BindingFlags.NonPublic | BindingFlags.Instance);
@@ -149,14 +158,8 @@ public class PFDAltitudeTapeTests
 
             onEnable.Invoke(simulator, null);
 
-            FieldInfo modeField = simulatorType.GetField(
-                "mode",
-                BindingFlags.NonPublic | BindingFlags.Instance);
-            FieldInfo roundTripField = simulatorType.GetField(
-                "automaticRoundTripSeconds",
-                BindingFlags.NonPublic | BindingFlags.Instance);
             Assert.That(modeField.GetValue(simulator).ToString(), Is.EqualTo("Automatic"));
-            Assert.That((float)roundTripField.GetValue(simulator), Is.EqualTo(120f).Within(0.001f));
+            Assert.That((float)roundTripField.GetValue(simulator), Is.EqualTo(45f).Within(0.001f));
             Assert.That(guide.anchoredPosition.y, Is.EqualTo(-452.8f).Within(0.001f));
         }
         finally

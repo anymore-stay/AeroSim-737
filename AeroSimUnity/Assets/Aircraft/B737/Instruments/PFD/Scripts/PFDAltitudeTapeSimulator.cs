@@ -43,15 +43,16 @@ public class PFDAltitudeTapeSimulator : MonoBehaviour
 
     private void OnEnable()
     {
-        // 每次开始预览时都从自动区间的最低高度重新起步。
-        mode = SimulationMode.Automatic;
-        automaticRoundTripSeconds = PreviewRoundTripSeconds;
+        // 保留 Inspector 中设置的模式和速度，只重置本次自动预览的计时起点。
         automaticStartTime = Time.time;
         EnsureController();
 
         if (controller != null)
         {
-            controller.SetAltitude(automaticMinimumAltitudeFt);
+            float startingAltitudeFt = mode == SimulationMode.Manual
+                ? simulatedAltitudeFt
+                : automaticMinimumAltitudeFt;
+            controller.SetAltitude(startingAltitudeFt);
         }
     }
 
