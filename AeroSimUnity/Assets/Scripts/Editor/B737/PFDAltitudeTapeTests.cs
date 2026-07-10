@@ -1,6 +1,7 @@
 using System;
 using System.Reflection;
 using NUnit.Framework;
+using UnityEngine;
 
 public class PFDAltitudeTapeTests
 {
@@ -39,6 +40,38 @@ public class PFDAltitudeTapeTests
             new object[] { 1000f, -1000f, 50000f, 0.44f, 0f, 12f, true });
 
         Assert.That(result, Is.EqualTo(-428f).Within(0.001f));
+    }
+
+    [Test]
+    public void 控制器会同步移动预览层和最终层()
+    {
+        GameObject root = new GameObject("PFD_Root");
+        GameObject guideObject = new GameObject("Guide_AltitudeTapeContent", typeof(RectTransform));
+        GameObject finalObject = new GameObject("Final_AltitudeTapeContent", typeof(RectTransform));
+
+        try
+        {
+            guideObject.transform.SetParent(root.transform, false);
+            finalObject.transform.SetParent(root.transform, false);
+
+            Type controllerType = 获取运行时类型("PFDAltitudeTapeController");
+            Component controller = root.AddComponent(controllerType);
+            MethodInfo setAltitude = controllerType.GetMethod(
+                "SetAltitude",
+                BindingFlags.Public | BindingFlags.Instance);
+            Assert.That(setAltitude, Is.Not.Null, "SetAltitude 公开实例方法不存在。");
+
+            setAltitude.Invoke(controller, new object[] { 1000f });
+
+            RectTransform guide = guideObject.GetComponent<RectTransform>();
+            RectTransform final = finalObject.GetComponent<RectTransform>();
+            Assert.That(guide.anchoredPosition.y, Is.EqualTo(final.anchoredPosition.y).Within(0.001f));
+            Assert.That(guide.anchoredPosition.y, Is.Not.EqualTo(0f));
+        }
+        finally
+        {
+            UnityEngine.Object.DestroyImmediate(root);
+        }
     }
 
     private static Type 获取运行时类型(string typeName)
