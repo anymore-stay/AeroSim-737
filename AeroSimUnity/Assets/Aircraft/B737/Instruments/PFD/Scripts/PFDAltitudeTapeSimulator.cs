@@ -2,6 +2,8 @@ using UnityEngine;
 
 public class PFDAltitudeTapeSimulator : MonoBehaviour
 {
+    private const float PreviewRoundTripSeconds = 120f;
+
     public enum SimulationMode
     {
         Manual,
@@ -13,7 +15,7 @@ public class PFDAltitudeTapeSimulator : MonoBehaviour
     [SerializeField, Range(-1000f, 50000f)] private float simulatedAltitudeFt;
     [SerializeField] private float automaticMinimumAltitudeFt;
     [SerializeField] private float automaticMaximumAltitudeFt = 10000f;
-    [SerializeField, Min(0.1f)] private float automaticRoundTripSeconds = 12f;
+    [SerializeField, Min(0.1f)] private float automaticRoundTripSeconds = PreviewRoundTripSeconds;
 
     private float automaticStartTime;
 
@@ -43,6 +45,7 @@ public class PFDAltitudeTapeSimulator : MonoBehaviour
     {
         // 每次开始预览时都从自动区间的最低高度重新起步。
         mode = SimulationMode.Automatic;
+        automaticRoundTripSeconds = PreviewRoundTripSeconds;
         automaticStartTime = Time.time;
         EnsureController();
 

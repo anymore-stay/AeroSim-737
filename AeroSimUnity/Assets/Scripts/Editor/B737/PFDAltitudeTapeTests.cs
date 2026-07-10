@@ -152,7 +152,11 @@ public class PFDAltitudeTapeTests
             FieldInfo modeField = simulatorType.GetField(
                 "mode",
                 BindingFlags.NonPublic | BindingFlags.Instance);
+            FieldInfo roundTripField = simulatorType.GetField(
+                "automaticRoundTripSeconds",
+                BindingFlags.NonPublic | BindingFlags.Instance);
             Assert.That(modeField.GetValue(simulator).ToString(), Is.EqualTo("Automatic"));
+            Assert.That((float)roundTripField.GetValue(simulator), Is.EqualTo(120f).Within(0.001f));
             Assert.That(guide.anchoredPosition.y, Is.EqualTo(-452.8f).Within(0.001f));
         }
         finally
