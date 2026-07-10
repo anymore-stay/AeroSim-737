@@ -131,13 +131,16 @@ public class FlightHud : MonoBehaviour
             sb.AppendLine(string.Format("升降舵: {0,5:F2}", input.Elevator));
             sb.AppendLine(string.Format("副翼  : {0,5:F2}", input.Aileron));
             sb.AppendLine(string.Format("方向舵: {0,5:F2}", input.Rudder));
-            sb.AppendLine(string.Format("襟翼  : {0,5:P0}", input.Flaps));
+            sb.AppendLine(string.Format("襟翼  : {0}/{1}  {2,4:P0}", input.FlapStep, input.FlapStepCount, input.Flaps));
+            sb.AppendLine(string.Format("扰流板: {0}/{1}  {2,4:P0}", input.SpoilerStep, input.SpoilerStepCount, input.Spoilers));
+            sb.AppendLine(string.Format("起落架: {0}", input.GearDown ? "已放下" : "已收起"));
             sb.AppendLine(string.Format("刹车  : {0}", input.Brakes ? "已锁定 (按 B 松)" : "已松开"));
         }
         sb.AppendLine("---- 飞行按键 ----");
         sb.AppendLine("W/S 俯仰   A/D 滚转   Q/E 偏航");
         sb.AppendLine("Shift/Ctrl 油门加减");
-        sb.AppendLine("B 刹车开关   F 襟翼");
+        sb.AppendLine("F/V 襟翼增减  R/T 扰流板增减");
+        sb.AppendLine("G 起落架收放  B 刹车开关  Esc 暂停");
         sb.AppendLine("---- 相机按键 ----");
         sb.AppendLine("Shift+7 客舱  Shift+8 驾驶舱  Shift+9 第三人称");
         sb.AppendLine("右键拖动 转视角   方向键 移动视角");

@@ -19,6 +19,11 @@ public class FlightInput : MonoBehaviour
 {
     [Header("引用")]
     [SerializeField] private JsbsimBridge bridge;
+    [SerializeField] private B737FlapController flapController;
+    [SerializeField] private B737MechanicalController mechanicalController;
+
+    [Header("Pause")]
+    [SerializeField] private bool enableEscapePause = true;
 
     [Header("舵面灵敏度(每秒变化量)")]
     [SerializeField] private float elevatorRate = 0.5f;
@@ -30,6 +35,10 @@ public class FlightInput : MonoBehaviour
     [Header("油门")]
     [SerializeField] private float throttleRate = 0.5f;
 
+    [Header("High Lift and Drag Controls")]
+    [SerializeField, Min(1)] private int flapStepCount = 4;
+    [SerializeField, Min(1)] private int spoilerStepCount = 4;
+    [SerializeField, Min(0f)] private float minimumGearRetractionAglFt = 10f;
     [Header("Control Tuning")]
     [Tooltip("中文名：升降舵中立偏置。负值会给飞机一点抬头趋势，正值会给一点低头趋势。")]
     [SerializeField, Range(-1f, 1f)] private float elevatorNeutralBias = -0.08f;
@@ -83,18 +92,32 @@ public class FlightInput : MonoBehaviour
     private float turnInput;
     private float smoothedTurnBankTargetDeg;
     private float throttle = 0f;   // 地面起飞:初始油门怠速 0,推 Shift 才加速
-    private float flaps;
+    private int flapStep;
+    private int spoilerStep;
+    private bool gearDown = true;
     private bool brakes = true;    // 地面起飞:初始刹车锁定,飞机停得住;松刹车(B)再滑跑
 
     private float sendTimer;
+    private bool escapePaused;
+    private float timeScaleBeforePause = 1f;
 
     private void Awake()
     {
         if (bridge == null) bridge = GetComponent<JsbsimBridge>();
+        if (flapController == null) flapController = GetComponent<B737FlapController>();
+        if (mechanicalController == null) mechanicalController = GetComponent<B737MechanicalController>();
     }
 
     private void Update()
     {
+        if (enableEscapePause && Input.GetKeyDown(KeyCode.Escape))
+        {
+            SetEscapePaused(!escapePaused);
+            return;
+        }
+
+        if (escapePaused) return;
+
         float dt = Time.deltaTime;
 
         // ---- 升降舵:S 拉杆抬头, W 推杆低头 ----
@@ -137,14 +160,36 @@ public class FlightInput : MonoBehaviour
         if (Input.GetKey(KeyCode.LeftControl)) throttle -= throttleRate * dt;
         throttle = Mathf.Clamp01(throttle);
 
-        // ---- 襟翼:F 键循环 0 -> 0.5 -> 1 -> 0 ----
+        // ---- 襟翼:F 增加一级,V 减少一级 ----
         if (Input.GetKeyDown(KeyCode.F))
-        {
-            if (flaps < 0.25f) flaps = 0.5f;
-            else if (flaps < 0.75f) flaps = 1f;
-            else flaps = 0f;
-        }
+            flapStep = Mathf.Min(flapStep + 1, flapStepCount);
+        if (Input.GetKeyDown(KeyCode.V))
+            flapStep = Mathf.Max(flapStep - 1, 0);
 
+        // ---- 扰流板:R 增加一级,T 减少一级 ----
+        if (Input.GetKeyDown(KeyCode.R))
+            spoilerStep = Mathf.Min(spoilerStep + 1, spoilerStepCount);
+        if (Input.GetKeyDown(KeyCode.T))
+            spoilerStep = Mathf.Max(spoilerStep - 1, 0);
+
+        // ---- 起落架:G 切换,默认开始为放下 ----
+        if (Input.GetKeyDown(KeyCode.G))
+        {
+            if (!gearDown)
+            {
+                gearDown = true;
+            }
+            else if (CanRetractGear())
+            {
+                gearDown = false;
+            }
+            else
+            {
+                Debug.LogWarning(string.Format(
+                    "[FlightInput] 起落架收起被阻止：飞机尚未离地 {0:F0} ft。",
+                    minimumGearRetractionAglFt));
+            }
+        }
         // ---- 机轮刹车:B 键切换。地面停靠/防止怠速蠕动;起飞前松开 ----
         if (Input.GetKeyDown(KeyCode.B))
         {
@@ -163,6 +208,43 @@ public class FlightInput : MonoBehaviour
             sendTimer = 0f;
             SendControls();
         }
+    }
+
+    private bool CanRetractGear()
+    {
+        return bridge != null &&
+               bridge.HasState &&
+               bridge.AglFt >= minimumGearRetractionAglFt;
+    }
+    private void LateUpdate()
+    {
+        flapController?.SetFlapInput(Flaps);
+        mechanicalController?.SetGearExtended(gearDown);
+    }
+    private void SetEscapePaused(bool paused)
+    {
+        escapePaused = paused;
+
+        if (paused)
+        {
+            if (Time.timeScale > 0f)
+                timeScaleBeforePause = Time.timeScale;
+            Time.timeScale = 0f;
+        }
+        else
+        {
+            Time.timeScale = timeScaleBeforePause > 0f ? timeScaleBeforePause : 1f;
+        }
+
+        bridge?.RequestJsbsimPause(paused);
+    }
+
+    private void OnDisable()
+    {
+        if (!escapePaused) return;
+        escapePaused = false;
+        Time.timeScale = timeScaleBeforePause > 0f ? timeScaleBeforePause : 1f;
+        bridge?.RequestJsbsimPause(false);
     }
 
     /// <summary>有输入时朝输入方向加速,无输入时回中。</summary>
@@ -218,7 +300,9 @@ public class FlightInput : MonoBehaviour
         bridge.SetProperty("fcs/rudder-cmd-norm", rudderCommand);
         bridge.SetProperty("fcs/throttle-cmd-norm[0]", throttle);
         bridge.SetProperty("fcs/throttle-cmd-norm[1]", throttle);
-        bridge.SetProperty("fcs/flap-cmd-norm", flaps);
+        bridge.SetProperty("fcs/flap-cmd-norm", Flaps);
+        bridge.SetProperty("fcs/speedbrake-cmd-norm", Spoilers);
+        bridge.SetProperty("gear/gear-cmd-norm", gearDown ? 1f : 0f);
         // 机轮刹车:左右主轮(737 前轮无刹车)。1=全刹,0=松开
         float b = brakes ? 1f : 0f;
         bridge.SetProperty("fcs/left-brake-cmd-norm", b);
@@ -241,6 +325,13 @@ public class FlightInput : MonoBehaviour
     public float Aileron => aileron;
     public float Rudder => rudder;
     public float Throttle => throttle;
-    public float Flaps => flaps;
+    public float Flaps => flapStepCount > 0 ? (float)flapStep / flapStepCount : 0f;
+    public int FlapStep => flapStep;
+    public int FlapStepCount => flapStepCount;
+    public float Spoilers => spoilerStepCount > 0 ? (float)spoilerStep / spoilerStepCount : 0f;
+    public int SpoilerStep => spoilerStep;
+    public int SpoilerStepCount => spoilerStepCount;
+    public bool GearDown => gearDown;
     public bool Brakes => brakes;
+    public bool IsPaused => escapePaused;
 }

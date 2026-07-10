@@ -8,6 +8,9 @@ using System.Threading;
 using CesiumForUnity;
 using Unity.Mathematics;
 using UnityEngine;
+#if UNITY_EDITOR
+using UnityEditor;
+#endif
 
 /// <summary>
 /// JSBSim <-> Unity 桥接核心。
@@ -83,7 +86,7 @@ public class JsbsimBridge : MonoBehaviour
     public float PitchDeg { get; private set; }       // theta
     public float RollDeg { get; private set; }        // phi
     public float Rpm { get; private set; }
-    public bool ControlConnected { get; private set; }
+    public bool ControlConnected => controlConnected;
 
     public event Action OnStateUpdated;
 
@@ -124,7 +127,14 @@ public class JsbsimBridge : MonoBehaviour
     private TcpClient tcpClient;
     private NetworkStream tcpStream;
     private Thread tcpConnectThread;
-    private Thread tcpDrainThread;
+    private readonly object tcpLock = new object();
+    private volatile bool controlConnected;
+    private volatile bool jsbsimPauseRequested;
+    private bool timeScalePaused;
+    private bool applicationPaused;
+#if UNITY_EDITOR
+    private bool editorPaused;
+#endif
 
     // ---- 经纬度原点(首帧锚定) ----
     private bool originSet;
@@ -194,12 +204,24 @@ public class JsbsimBridge : MonoBehaviour
     {
         if (!usingCesiumCoordinates)
             FloatingOriginManager.OriginShifted += HandleOriginShift;
+#if UNITY_EDITOR
+        EditorApplication.pauseStateChanged += HandleEditorPauseStateChanged;
+        editorPaused = EditorApplication.isPaused;
+#endif
+        timeScalePaused = Mathf.Approximately(Time.timeScale, 0f);
+        applicationPaused = false;
+        UpdateJsbsimPauseRequest();
+        running = true;
         StartUdpReceiver();
         StartTcpControl();
     }
 
     private void OnDisable()
     {
+#if UNITY_EDITOR
+        EditorApplication.pauseStateChanged -= HandleEditorPauseStateChanged;
+#endif
+        RequestJsbsimPause(true);
         if (cesiumGeoreference != null)
             cesiumGeoreference.changed -= HandleCesiumGeoreferenceChanged;
         if (!usingCesiumCoordinates)
@@ -210,8 +232,23 @@ public class JsbsimBridge : MonoBehaviour
 
     private void OnApplicationQuit()
     {
+        RequestJsbsimPause(true);
         StopAll();
     }
+
+    private void OnApplicationPause(bool pauseStatus)
+    {
+        applicationPaused = pauseStatus;
+        UpdateJsbsimPauseRequest();
+    }
+
+#if UNITY_EDITOR
+    private void HandleEditorPauseStateChanged(PauseState state)
+    {
+        editorPaused = state == PauseState.Paused;
+        UpdateJsbsimPauseRequest();
+    }
+#endif
 
     // ====================== UDP 接收 ======================
 
@@ -219,35 +256,37 @@ public class JsbsimBridge : MonoBehaviour
     {
         try
         {
-            udpClient = new UdpClient();
-            udpClient.Client.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReuseAddress, true);
+            udpClient = new UdpClient(AddressFamily.InterNetwork);
+            udpClient.Client.ExclusiveAddressUse = true;
             udpClient.Client.Bind(new IPEndPoint(IPAddress.Any, stateUdpPort));
-            running = true;
-            udpThread = new Thread(UdpLoop) { IsBackground = true };
+            UdpClient receiver = udpClient;
+            udpThread = new Thread(() => UdpLoop(receiver)) { IsBackground = true };
             udpThread.Start();
             Debug.Log("[JSBSim] UDP 状态接收已启动,端口 " + stateUdpPort);
         }
         catch (Exception e)
         {
+            try { udpClient?.Close(); } catch { }
+            udpClient = null;
             Debug.LogError("[JSBSim] UDP 启动失败: " + e.Message);
         }
     }
 
-    private void UdpLoop()
+    private void UdpLoop(UdpClient receiver)
     {
         IPEndPoint remote = new IPEndPoint(IPAddress.Any, 0);
-        while (running)
+        while (running && ReferenceEquals(receiver, udpClient))
         {
             try
             {
-                byte[] data = udpClient.Receive(ref remote);
+                byte[] data = receiver.Receive(ref remote);
                 string text = Encoding.ASCII.GetString(data).Trim();
                 ParsePacket(text);
             }
             catch (SocketException)
             {
                 // 关闭时会抛异常,正常退出
-                if (!running) break;
+                if (!running || !ReferenceEquals(receiver, udpClient)) break;
             }
             catch (Exception e)
             {
@@ -315,6 +354,13 @@ public class JsbsimBridge : MonoBehaviour
 
     private void Update()
     {
+        bool isTimeScalePaused = Mathf.Approximately(Time.timeScale, 0f);
+        if (timeScalePaused != isTimeScalePaused)
+        {
+            timeScalePaused = isTimeScalePaused;
+            UpdateJsbsimPauseRequest();
+        }
+
         bool hasNewState;
         lock (stateLock)
         {
@@ -639,68 +685,123 @@ public class JsbsimBridge : MonoBehaviour
 
     private void StartTcpControl()
     {
+        if (tcpConnectThread != null && tcpConnectThread.IsAlive) return;
         tcpConnectThread = new Thread(ConnectTcpLoop) { IsBackground = true };
         tcpConnectThread.Start();
     }
 
     private void ConnectTcpLoop()
     {
-        while (running || !ControlConnected)
+        while (running)
         {
-            if (!running) { }
+            TcpClient connectedClient = null;
+            NetworkStream connectedStream = null;
+
             try
             {
-                tcpClient = new TcpClient();
-                tcpClient.Connect(controlHost, controlTcpPort);
-                tcpStream = tcpClient.GetStream();
-                ControlConnected = true;
+                connectedClient = new TcpClient(AddressFamily.InterNetwork);
+                connectedClient.NoDelay = true;
+                connectedClient.Connect(controlHost, controlTcpPort);
+                connectedStream = connectedClient.GetStream();
+
+                lock (tcpLock)
+                {
+                    if (!running) return;
+                    tcpClient = connectedClient;
+                    tcpStream = connectedStream;
+                    controlConnected = true;
+                }
+
                 Debug.Log("[JSBSim] 控制通道已连接 TCP " + controlHost + ":" + controlTcpPort);
-                // 启动回显读取线程:JSBSim telnet 会回 "JSBSim>" 提示符等文本,
-                // 若不读走,JSBSim 端发送缓冲会出错并刷 "Socket error in Reply"。
-                tcpDrainThread = new Thread(DrainTcpLoop) { IsBackground = true };
-                tcpDrainThread.Start();
-                return;
+                SendPauseCommand(jsbsimPauseRequested);
+                byte[] buffer = new byte[1024];
+                while (running)
+                {
+                    int count = connectedStream.Read(buffer, 0, buffer.Length);
+                    if (count <= 0) break;
+                }
             }
-            catch (Exception)
+            catch (Exception e)
             {
-                ControlConnected = false;
-                Thread.Sleep(1000); // JSBSim 还没起,稍后重试
+                if (running && controlConnected)
+                    Debug.LogWarning("[JSBSim] TCP 控制通道断开: " + e.Message);
             }
-            if (!running) return;
+            finally
+            {
+                lock (tcpLock)
+                {
+                    if (ReferenceEquals(tcpStream, connectedStream))
+                    {
+                        tcpStream = null;
+                        tcpClient = null;
+                        controlConnected = false;
+                    }
+                }
+
+                try { connectedStream?.Close(); } catch { }
+                try { connectedClient?.Close(); } catch { }
+            }
+
+            if (running) Thread.Sleep(1000);
         }
     }
 
     /// <summary>设置 JSBSim 的某个属性(归一化控制量等)。线程安全。</summary>
-    public void SetProperty(string property, float value)
+    private void UpdateJsbsimPauseRequest()
     {
-        if (!ControlConnected || tcpStream == null) return;
-        try
-        {
-            string cmd = "set " + property + " " + value.ToString("F4", CultureInfo.InvariantCulture) + "\n";
-            byte[] bytes = Encoding.ASCII.GetBytes(cmd);
-            tcpStream.Write(bytes, 0, bytes.Length);
-        }
-        catch (Exception e)
-        {
-            Debug.LogWarning("[JSBSim] 发送控制失败: " + e.Message);
-            ControlConnected = false;
-        }
+#if UNITY_EDITOR
+        bool shouldPause = editorPaused || timeScalePaused || applicationPaused;
+#else
+        bool shouldPause = timeScalePaused || applicationPaused;
+#endif
+        RequestJsbsimPause(shouldPause);
     }
 
-    /// <summary>持续读走 JSBSim 的 telnet 回显并丢弃,防止其发送缓冲堵塞报错。</summary>
-    private void DrainTcpLoop()
+    public void RequestJsbsimPause(bool pause)
     {
-        byte[] buf = new byte[1024];
-        while (running && tcpClient != null && tcpClient.Connected)
+        jsbsimPauseRequested = pause;
+        SendPauseCommand(pause);
+    }
+
+    private void SendPauseCommand(bool pause)
+    {
+        lock (tcpLock)
         {
+            if (!controlConnected || tcpStream == null) return;
+
             try
             {
-                int n = tcpStream.Read(buf, 0, buf.Length);
-                if (n <= 0) break; // 对端关闭
+                byte[] command = Encoding.ASCII.GetBytes(pause ? "hold\n" : "resume\n");
+                tcpStream.Write(command, 0, command.Length);
+                tcpStream.Flush();
             }
-            catch (Exception)
+            catch (Exception e)
             {
-                break; // 关闭或出错时退出
+                Debug.LogWarning("[JSBSim] 发送暂停状态失败: " + e.Message);
+                controlConnected = false;
+                try { tcpStream?.Close(); } catch { }
+                try { tcpClient?.Close(); } catch { }
+            }
+        }
+    }
+    public void SetProperty(string property, float value)
+    {
+        lock (tcpLock)
+        {
+            if (!controlConnected || tcpStream == null) return;
+
+            try
+            {
+                string cmd = "set " + property + " " + value.ToString("F4", CultureInfo.InvariantCulture) + "\n";
+                byte[] bytes = Encoding.ASCII.GetBytes(cmd);
+                tcpStream.Write(bytes, 0, bytes.Length);
+            }
+            catch (Exception e)
+            {
+                Debug.LogWarning("[JSBSim] 发送控制失败: " + e.Message);
+                controlConnected = false;
+                try { tcpStream?.Close(); } catch { }
+                try { tcpClient?.Close(); } catch { }
             }
         }
     }
@@ -711,11 +812,15 @@ public class JsbsimBridge : MonoBehaviour
     {
         running = false;
         try { udpClient?.Close(); } catch { }
-        try { tcpStream?.Close(); } catch { }
-        try { tcpClient?.Close(); } catch { }
         udpClient = null;
-        tcpClient = null;
-        tcpStream = null;
-        ControlConnected = false;
+
+        lock (tcpLock)
+        {
+            controlConnected = false;
+            try { tcpStream?.Close(); } catch { }
+            try { tcpClient?.Close(); } catch { }
+            tcpClient = null;
+            tcpStream = null;
+        }
     }
 }

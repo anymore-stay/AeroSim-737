@@ -1807,7 +1807,7 @@ MonoBehaviour:
   _ionAssetID: 2275207
   _ionAccessToken: 
   _ionServer: {fileID: 11400000, guid: e9b5e2b18ca77784eaf64c31bdb94bbf, type: 2}
-  _maximumScreenSpaceError: 16
+  _maximumScreenSpaceError: 48
   _preloadAncestors: 1
   _preloadSiblings: 1
   _forbidHoles: 1
@@ -1845,7 +1845,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   _materialKey: Clipping
   _showCreditsOnScreen: 0
-  _maximumScreenSpaceError: 48
+  _maximumScreenSpaceError: 32
   _maximumTextureSize: 2048
   _maximumSimultaneousTileLoads: 20
   _subTileCacheBytes: 16777216
@@ -7395,9 +7395,9 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 2132091607}
   serializedVersion: 2
-  m_LocalRotation: {x: 0.0018863922, y: 0.83581364, z: 0.0012349534, w: -0.54900867}
+  m_LocalRotation: {x: 0.0018863922, y: 0.83581364, z: 0.0012349531, w: -0.54900867}
   m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 1.0000507, y: 1, z: 1.0000507}
+  m_LocalScale: {x: 1.000051, y: 1, z: 1.000051}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 2070957404}
@@ -7538,19 +7538,19 @@ MonoBehaviour:
   _detectTransformChanges: 1
   _localToGlobeFixedMatrix:
     c0:
-      x: 0.5978868914576762
-      y: -0.23590555653323275
-      z: 0.7661468842513528
+      x: 0.5978871051047198
+      y: -0.23590564061956804
+      z: 0.7661471584436614
       w: 0
     c1:
-      x: -0.42451219891575537
-      y: 0.7175278052438553
-      z: 0.5522166618950749
+      x: -0.4245121987480453
+      y: 0.7175278057169276
+      z: 0.55221666140931
       w: 0
     c2:
-      x: 0.6800026713791639
-      y: 0.6554018017873193
-      z: -0.3288556825717424
+      x: 0.6800029148014916
+      y: 0.6554020357458359
+      z: -0.32885580049616725
       w: 0
     c3:
       x: -2685526.499470502
