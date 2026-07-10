@@ -51,6 +51,9 @@ public class B737EngineSpinner : MonoBehaviour
 
     private bool rigBuilt;
 
+    public EngineSide LeftEngine => leftEngine;
+    public EngineSide RightEngine => rightEngine;
+
     private void Awake()
     {
         if (bridge == null)
