@@ -10,7 +10,6 @@ public class PFDAirspeedTapeController : MonoBehaviour
     [SerializeField] private float minimumAirspeedKts = 40f;
     [SerializeField] private float maximumAirspeedKts = 440f;
     [SerializeField, Min(0.0001f)] private float pixelsPerKnot = 3.05f;
-    [SerializeField] private float referenceAirspeedKts = 120f;
     [SerializeField] private bool invertDirection = true;
 
     private RectTransform cachedGuideContent;
@@ -44,7 +43,7 @@ public class PFDAirspeedTapeController : MonoBehaviour
             minimumAirspeedKts,
             maximumAirspeedKts,
             pixelsPerKnot,
-            referenceAirspeedKts,
+            minimumAirspeedKts,
             invertDirection);
 
         ApplyContentY(guideContent, guideReferenceContentY + contentOffsetY);

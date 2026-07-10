@@ -30,7 +30,7 @@ public class PFDAirspeedTapeTests
     }
 
     [Test]
-    public void 控制器会基于Prefab校准位置同步移动Guide和Final()
+    public void 控制器会把Prefab校准位置作为四十节基准同步滚动()
     {
         GameObject root = new GameObject("PFD_Root");
         GameObject guideObject = new GameObject("Guide_AirSpeedTapeContent", typeof(RectTransform));
@@ -43,8 +43,8 @@ public class PFDAirspeedTapeTests
 
             RectTransform guide = guideObject.GetComponent<RectTransform>();
             RectTransform final = finalObject.GetComponent<RectTransform>();
-            guide.anchoredPosition = new Vector2(2f, -276f);
-            final.anchoredPosition = new Vector2(-3f, -276f);
+            guide.anchoredPosition = new Vector2(2f, -52f);
+            final.anchoredPosition = new Vector2(-3f, -52f);
 
             Type controllerType = 获取运行时类型("PFDAirspeedTapeController");
             Component controller = root.AddComponent(controllerType);
@@ -53,12 +53,17 @@ public class PFDAirspeedTapeTests
                 BindingFlags.Public | BindingFlags.Instance);
             Assert.That(setAirspeed, Is.Not.Null, "SetAirspeed 公开实例方法不存在。");
 
-            setAirspeed.Invoke(controller, new object[] { 160f });
+            setAirspeed.Invoke(controller, new object[] { 40f });
 
             Assert.That(guide.anchoredPosition.x, Is.EqualTo(2f).Within(0.001f));
             Assert.That(final.anchoredPosition.x, Is.EqualTo(-3f).Within(0.001f));
-            Assert.That(guide.anchoredPosition.y, Is.EqualTo(-398f).Within(0.001f));
-            Assert.That(final.anchoredPosition.y, Is.EqualTo(-398f).Within(0.001f));
+            Assert.That(guide.anchoredPosition.y, Is.EqualTo(-52f).Within(0.001f));
+            Assert.That(final.anchoredPosition.y, Is.EqualTo(-52f).Within(0.001f));
+
+            setAirspeed.Invoke(controller, new object[] { 160f });
+
+            Assert.That(guide.anchoredPosition.y, Is.EqualTo(-418f).Within(0.001f));
+            Assert.That(final.anchoredPosition.y, Is.EqualTo(-418f).Within(0.001f));
         }
         finally
         {
@@ -91,7 +96,7 @@ public class PFDAirspeedTapeTests
         {
             guideObject.transform.SetParent(root.transform, false);
             RectTransform guide = guideObject.GetComponent<RectTransform>();
-            guide.anchoredPosition = new Vector2(0f, -276f);
+            guide.anchoredPosition = new Vector2(0f, -52f);
 
             Type controllerType = 获取运行时类型("PFDAirspeedTapeController");
             root.AddComponent(controllerType);
@@ -105,7 +110,7 @@ public class PFDAirspeedTapeTests
 
             onEnable.Invoke(simulator, null);
 
-            Assert.That(guide.anchoredPosition.y, Is.EqualTo(-32f).Within(0.001f));
+            Assert.That(guide.anchoredPosition.y, Is.EqualTo(-52f).Within(0.001f));
         }
         finally
         {
