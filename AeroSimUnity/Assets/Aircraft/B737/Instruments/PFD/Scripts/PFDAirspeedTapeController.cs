@@ -8,6 +8,7 @@ public class PFDAirspeedTapeController : MonoBehaviour
     [Header("空速带内容层")]
     [SerializeField] private RectTransform guideContent;
     [SerializeField] private RectTransform finalContent;
+    [SerializeField] private PFDRollingNumberController rollingNumberController;
 
     [Header("空速范围与校准")]
     [SerializeField] private float minimumAirspeedKts = 40f;
@@ -36,6 +37,12 @@ public class PFDAirspeedTapeController : MonoBehaviour
 
         ApplyContentY(guideContent, guideReferenceContentY + contentOffsetY);
         ApplyContentY(finalContent, finalReferenceContentY + contentOffsetY);
+
+        EnsureRollingNumberController();
+        if (rollingNumberController != null)
+        {
+            rollingNumberController.SetAirspeed(airspeedKts);
+        }
     }
 
     private void EnsureBindings()
@@ -80,5 +87,13 @@ public class PFDAirspeedTapeController : MonoBehaviour
         Vector2 position = content.anchoredPosition;
         position.y = targetY;
         content.anchoredPosition = position;
+    }
+
+    private void EnsureRollingNumberController()
+    {
+        if (rollingNumberController == null)
+        {
+            rollingNumberController = GetComponent<PFDRollingNumberController>();
+        }
     }
 }

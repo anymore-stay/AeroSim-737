@@ -16,6 +16,7 @@ public class PFDAltitudeTapeController : MonoBehaviour
     [Header("高度带内容层")]
     [SerializeField] private RectTransform guideContent;
     [SerializeField] private RectTransform finalContent;
+    [SerializeField] private PFDRollingNumberController rollingNumberController;
 
     [Header("高度范围与校准")]
     [SerializeField] private float minimumAltitudeFt = -1000f;
@@ -64,6 +65,12 @@ public class PFDAltitudeTapeController : MonoBehaviour
 
         ApplyContentY(guideContent, guideReferenceContentY + contentOffsetY);
         ApplyContentY(finalContent, finalReferenceContentY + contentOffsetY);
+
+        EnsureRollingNumberController();
+        if (rollingNumberController != null)
+        {
+            rollingNumberController.SetAltitude(altitudeFt);
+        }
     }
 
     /// <summary>
@@ -149,5 +156,13 @@ public class PFDAltitudeTapeController : MonoBehaviour
         Vector2 position = content.anchoredPosition;
         position.y = targetY;
         content.anchoredPosition = position;
+    }
+
+    private void EnsureRollingNumberController()
+    {
+        if (rollingNumberController == null)
+        {
+            rollingNumberController = GetComponent<PFDRollingNumberController>();
+        }
     }
 }
