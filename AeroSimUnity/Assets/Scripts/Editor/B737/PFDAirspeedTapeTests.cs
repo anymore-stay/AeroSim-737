@@ -24,9 +24,9 @@ public class PFDAirspeedTapeTests
 
         float result = (float)method.Invoke(
             null,
-            new object[] { 160f, 40f, 440f, 3.05f, 120f, true });
+            new object[] { 160f, 40f, 440f, 3f, 120f, true });
 
-        Assert.That(result, Is.EqualTo(-122f).Within(0.001f));
+        Assert.That(result, Is.EqualTo(-120f).Within(0.001f));
     }
 
     [Test]
@@ -62,8 +62,8 @@ public class PFDAirspeedTapeTests
 
             setAirspeed.Invoke(controller, new object[] { 160f });
 
-            Assert.That(guide.anchoredPosition.y, Is.EqualTo(-418f).Within(0.001f));
-            Assert.That(final.anchoredPosition.y, Is.EqualTo(-418f).Within(0.001f));
+            Assert.That(guide.anchoredPosition.y, Is.EqualTo(-412f).Within(0.001f));
+            Assert.That(final.anchoredPosition.y, Is.EqualTo(-412f).Within(0.001f));
         }
         finally
         {

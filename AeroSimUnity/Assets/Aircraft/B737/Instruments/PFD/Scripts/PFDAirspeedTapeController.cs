@@ -2,6 +2,9 @@ using UnityEngine;
 
 public class PFDAirspeedTapeController : MonoBehaviour
 {
+    // speed_tape-1.png 相邻 10 节刻度线中心距离为 30 像素。
+    private const float PixelsPerKnot = 3f;
+
     [Header("空速带内容层")]
     [SerializeField] private RectTransform guideContent;
     [SerializeField] private RectTransform finalContent;
@@ -9,14 +12,12 @@ public class PFDAirspeedTapeController : MonoBehaviour
     [Header("空速范围与校准")]
     [SerializeField] private float minimumAirspeedKts = 40f;
     [SerializeField] private float maximumAirspeedKts = 440f;
-    [SerializeField, Min(0.0001f)] private float pixelsPerKnot = 3.05f;
     [SerializeField] private bool invertDirection = true;
 
     private RectTransform cachedGuideContent;
     private RectTransform cachedFinalContent;
     private float guideReferenceContentY;
     private float finalReferenceContentY;
-    private bool hasWarnedInvalidPixelsPerKnot;
 
     /// <summary>
     /// 设置当前空速，并同步移动预览层与最终层的空速带。
@@ -25,24 +26,11 @@ public class PFDAirspeedTapeController : MonoBehaviour
     public void SetAirspeed(float airspeedKts)
     {
         EnsureBindings();
-
-        if (pixelsPerKnot <= 0f)
-        {
-            if (!hasWarnedInvalidPixelsPerKnot)
-            {
-                Debug.LogWarning("PFD 空速带的每节像素数必须大于零。", this);
-                hasWarnedInvalidPixelsPerKnot = true;
-            }
-
-            return;
-        }
-
-        hasWarnedInvalidPixelsPerKnot = false;
         float contentOffsetY = PFDAirspeedTapeMath.CalculateContentOffsetY(
             airspeedKts,
             minimumAirspeedKts,
             maximumAirspeedKts,
-            pixelsPerKnot,
+            PixelsPerKnot,
             minimumAirspeedKts,
             invertDirection);
 
