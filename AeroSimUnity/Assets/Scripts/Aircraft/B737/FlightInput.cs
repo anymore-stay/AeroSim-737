@@ -175,7 +175,11 @@ public class FlightInput : MonoBehaviour
         // ---- 起落架:G 切换,默认开始为放下 ----
         if (Input.GetKeyDown(KeyCode.G))
         {
-            if (!gearDown)
+            if (!LandingGearToggleGate.CanUseToggleInputThisFrame)
+            {
+                Debug.Log("[FlightInput] Landing gear toggle ignored while gear animation is running.");
+            }
+            else if (!gearDown)
             {
                 gearDown = true;
             }

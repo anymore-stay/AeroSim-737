@@ -79,6 +79,9 @@ public class CockpitCameraController : MonoBehaviour
     [Tooltip("用于计算飞机包围盒和防穿模的飞机根节点。为空时自动使用本相机所在 prefab 的根节点。")]
     public Transform aircraftRoot;
 
+    [Tooltip("第三人称视角为空 Orbit Target 时，启动时固定一次观察点，避免轮子等动画部件改变 Renderer Bounds 后造成相机抖动。")]
+    public bool useStableInitialBoundsTarget = true;
+
     [Header("第三人称环绕")]
     [Tooltip("第三人称初始距离。进入视角时会夹在最小/最大距离之间。")]
     public float thirdPersonDistance = 48f;
@@ -148,6 +151,9 @@ public class CockpitCameraController : MonoBehaviour
 
     private bool hasAircraftBounds;
     private Bounds aircraftBounds;
+    private bool hasStableOrbitTarget;
+    private Transform stableOrbitRoot;
+    private Vector3 stableOrbitTargetLocalPoint;
     private float orbitYaw;
     private float orbitPitch;
     private float orbitDistance;
@@ -167,6 +173,7 @@ public class CockpitCameraController : MonoBehaviour
 
         if (cameraMode == CameraMode.ThirdPerson)
         {
+            CaptureStableOrbitTarget();
             InitializeThirdPersonOrbit();
         }
 
@@ -401,6 +408,11 @@ public class CockpitCameraController : MonoBehaviour
             return orbitTarget.TransformPoint(orbitTargetOffset);
         }
 
+        if (useStableInitialBoundsTarget && hasStableOrbitTarget && stableOrbitRoot != null)
+        {
+            return stableOrbitRoot.TransformPoint(stableOrbitTargetLocalPoint) + orbitTargetOffset;
+        }
+
         if (!hasAircraftBounds)
         {
             CacheAircraftBounds();
@@ -418,6 +430,34 @@ public class CockpitCameraController : MonoBehaviour
         }
 
         return transform.position + orbitTargetOffset;
+    }
+
+    private void CaptureStableOrbitTarget()
+    {
+        if (!useStableInitialBoundsTarget || orbitTarget != null)
+        {
+            return;
+        }
+
+        Transform root = aircraftRoot != null ? aircraftRoot : transform.root;
+        if (root == null)
+        {
+            return;
+        }
+
+        if (!hasAircraftBounds)
+        {
+            CacheAircraftBounds();
+        }
+
+        if (!hasAircraftBounds)
+        {
+            return;
+        }
+
+        stableOrbitRoot = root;
+        stableOrbitTargetLocalPoint = root.InverseTransformPoint(aircraftBounds.center);
+        hasStableOrbitTarget = true;
     }
 
     private Vector3 ResolveThirdPersonObstruction(Vector3 targetPoint, Vector3 desiredPosition)

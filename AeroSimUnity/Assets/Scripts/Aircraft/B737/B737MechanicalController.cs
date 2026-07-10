@@ -73,6 +73,7 @@ public class B737MechanicalController : MonoBehaviour
     [SerializeField] private KeyAxis pitchKeys = new KeyAxis { negativeKey = KeyCode.W, positiveKey = KeyCode.S };
     [SerializeField] private KeyAxis rollKeys = new KeyAxis { negativeKey = KeyCode.A, positiveKey = KeyCode.D };
     [SerializeField] private KeyAxis yawKeys = new KeyAxis { negativeKey = KeyCode.Q, positiveKey = KeyCode.E };
+    [SerializeField] private bool useKeyboardGearToggle = true;
     [SerializeField] private KeyCode toggleGearKey = KeyCode.G;
     [SerializeField] private float axisResponseSpeed = 3.5f;
     [SerializeField] private float axisReturnSpeed = 2.5f;
@@ -126,7 +127,9 @@ public class B737MechanicalController : MonoBehaviour
             UpdateKeyboardInput();
         }
 
-        if (Input.GetKeyDown(toggleGearKey))
+        if (useKeyboardGearToggle &&
+            Input.GetKeyDown(toggleGearKey) &&
+            LandingGearToggleGate.CanUseToggleInputThisFrame)
         {
             ToggleGear();
         }
