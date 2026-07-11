@@ -10,6 +10,8 @@ public class StandbyDisplayControllerTests
     private RectTransform speedTape;
     private RectTransform altitudeTape;
     private RectTransform horizon;
+    private RectTransform bankPointerGroup;
+    private RectTransform headingRose;
     private RawImage[] speedWheels;
     private RawImage[] altitudeWheels;
     private RawImage altitudePairWheel;
@@ -22,6 +24,8 @@ public class StandbyDisplayControllerTests
         speedTape = CreateRect("速度带");
         altitudeTape = CreateRect("高度带");
         horizon = CreateRect("地平线");
+        bankPointerGroup = CreateRect("滚转指针组");
+        headingRose = CreateRect("航向盘");
         speedWheels = CreateRawImages("空速", 3);
         altitudeWheels = CreateRawImages("高度", 3);
         altitudePairWheel = CreateRawImage("高度末两位");
@@ -30,6 +34,8 @@ public class StandbyDisplayControllerTests
         serialized.FindProperty("speedTapeContent").objectReferenceValue = speedTape;
         serialized.FindProperty("altitudeTapeContent").objectReferenceValue = altitudeTape;
         serialized.FindProperty("horizonContent").objectReferenceValue = horizon;
+        serialized.FindProperty("bankPointerGroup").objectReferenceValue = bankPointerGroup;
+        serialized.FindProperty("headingRose").objectReferenceValue = headingRose;
         SetObjectArray(serialized.FindProperty("airspeedDigitWheels"), speedWheels);
         SetObjectArray(serialized.FindProperty("altitudeMainDigitWheels"), altitudeWheels);
         serialized.FindProperty("altitudePairWheel").objectReferenceValue = altitudePairWheel;
@@ -59,6 +65,45 @@ public class StandbyDisplayControllerTests
     }
 
     [Test]
+    public void SetAirspeedAlignsTapeOffsetToWholePixels()
+    {
+        controller.SetAirspeedKnots(40.4f);
+
+        Assert.That(speedTape.anchoredPosition.y, Is.EqualTo(1f).Within(0.001f));
+    }
+
+    [Test]
+    public void AirspeedTapeStaysAtBaselineUntilSpeedExceedsFortyKnots()
+    {
+        controller.SetAirspeedKnots(0f);
+        Assert.That(controller.AirspeedKnots, Is.EqualTo(0f));
+        Assert.That(speedTape.anchoredPosition.y, Is.EqualTo(0f).Within(0.001f));
+
+        controller.SetAirspeedKnots(40f);
+        Assert.That(speedTape.anchoredPosition.y, Is.EqualTo(0f).Within(0.001f));
+
+        controller.SetAirspeedKnots(41f);
+        Assert.That(speedTape.anchoredPosition.y, Is.EqualTo(3f).Within(0.001f));
+    }
+
+    [Test]
+    public void DemoDataSourceStartsAtZeroKnots()
+    {
+        GameObject dataSourceObject = new GameObject("Standby模拟数据测试");
+        try
+        {
+            StandbyDemoDataSource dataSource = dataSourceObject.AddComponent<StandbyDemoDataSource>();
+            SerializedObject serialized = new SerializedObject(dataSource);
+
+            Assert.That(serialized.FindProperty("speedMinimumKnots").floatValue, Is.EqualTo(0f));
+        }
+        finally
+        {
+            Object.DestroyImmediate(dataSourceObject);
+        }
+    }
+
+    [Test]
     public void SetAltitudeMovesTapeAndUpdatesMainAndPairWheels()
     {
         controller.SetAltitudeFeet(1280f);
@@ -66,6 +111,16 @@ public class StandbyDisplayControllerTests
         Assert.That(altitudeTape.anchoredPosition.y, Is.EqualTo(358.4f).Within(0.001f));
         Rect expectedPairUv = StandbyDisplayMath.CalculateAltitudePairUv(4f, 37f, 136f);
         Assert.That(altitudePairWheel.uvRect.y, Is.EqualTo(expectedPairUv.y).Within(0.001f));
+    }
+
+    [Test]
+    public void ZeroAltitudeUsesCalibratedHundredsWheelUvOrigin()
+    {
+        controller.SetAltitudeFeet(0f);
+
+        Assert.That(
+            altitudeWheels[2].uvRect.y,
+            Is.EqualTo(0.04881633f).Within(0.000001f));
     }
 
     [Test]
@@ -83,6 +138,16 @@ public class StandbyDisplayControllerTests
         Assert.That(horizon.anchoredPosition.x, Is.EqualTo(expectedPosition.x).Within(0.001f));
         Assert.That(horizon.anchoredPosition.y, Is.EqualTo(expectedPosition.y).Within(0.001f));
         Assert.That(horizon.localEulerAngles.z, Is.EqualTo(20f).Within(0.001f));
+        Assert.That(bankPointerGroup.localEulerAngles.z, Is.EqualTo(20f).Within(0.001f));
+    }
+
+    [Test]
+    public void SetMagneticHeadingRotatesRoseCounterClockwise()
+    {
+        controller.SetMagneticHeadingDegrees(90f);
+
+        Assert.That(Mathf.DeltaAngle(0f, headingRose.localEulerAngles.z), Is.EqualTo(-90f).Within(0.001f));
+        Assert.That(controller.MagneticHeadingDegrees, Is.EqualTo(90f).Within(0.001f));
     }
 
     private RectTransform CreateRect(string objectName)

@@ -152,7 +152,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   displayController: {fileID: 8274135663128449135}
-  speedMinimumKnots: 40
+  speedMinimumKnots: 0
   speedMaximumKnots: 240
   speedCycleSeconds: 120
   altitudeMinimumFeet: 0
@@ -161,6 +161,7 @@ MonoBehaviour:
   maximumPitchDegrees: 18
   maximumRollDegrees: 35
   attitudeCycleSeconds: 36
+  headingCycleSeconds: 60
 --- !u!4 &296695143
 Transform:
   m_ObjectHideFlags: 0
@@ -306,6 +307,7 @@ GameObject:
   - component: {fileID: 974702727}
   - component: {fileID: 974702726}
   - component: {fileID: 974702729}
+  - component: {fileID: 974702730}
   m_Layer: 0
   m_Name: Main Camera
   m_TagString: MainCamera
@@ -355,8 +357,8 @@ Camera:
   near clip plane: 0.3
   far clip plane: 1000
   field of view: 60
-  orthographic: 0
-  orthographic size: 5
+  orthographic: 1
+  orthographic size: 336
   m_Depth: -1
   m_CullingMask:
     serializedVersion: 2
@@ -431,6 +433,20 @@ MonoBehaviour:
     m_MipBias: 0
     m_VarianceClampScale: 0.9
     m_ContrastAdaptiveSharpening: 0
+--- !u!114 &974702730
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 974702725}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8fc7dbfbc0984d32916e611d80b4a227, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  pixelsPerUnit: 1
+  minimumOrthographicSize: 139
 --- !u!1 &1692748628
 GameObject:
   m_ObjectHideFlags: 0
