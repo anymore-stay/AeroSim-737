@@ -88,6 +88,7 @@ public class B737MechanicalController : MonoBehaviour
     [SerializeField] private ControlSurfacePart[] rudders = Array.Empty<ControlSurfacePart>();
 
     [Header("Landing Gear")]
+    [SerializeField] private bool useLegacyLandingGearAnimation;
     [SerializeField] private LandingGearPart[] landingGearParts = Array.Empty<LandingGearPart>();
 
     [Header("Cockpit")]
@@ -127,14 +128,19 @@ public class B737MechanicalController : MonoBehaviour
             UpdateKeyboardInput();
         }
 
-        if (useKeyboardGearToggle &&
+        if (useLegacyLandingGearAnimation &&
+            useKeyboardGearToggle &&
             Input.GetKeyDown(toggleGearKey) &&
             LandingGearToggleGate.CanUseToggleInputThisFrame)
         {
             ToggleGear();
         }
 
-        UpdateGear();
+        if (useLegacyLandingGearAnimation)
+        {
+            UpdateGear();
+        }
+
         ApplyAll();
     }
 
@@ -164,7 +170,7 @@ public class B737MechanicalController : MonoBehaviour
     public void SetGearExtended(bool extended, bool snapImmediately = false)
     {
         gearExtended = extended;
-        if (snapImmediately)
+        if (useLegacyLandingGearAnimation && snapImmediately)
         {
             gearBlend = gearExtended ? 0f : 1f;
             ApplyAll();
@@ -210,7 +216,11 @@ public class B737MechanicalController : MonoBehaviour
         ApplyControlSurfaceGroup(ailerons, rollInput);
         ApplyControlSurfaceGroup(elevators, pitchInput);
         ApplyControlSurfaceGroup(rudders, yawInput);
-        ApplyLandingGear();
+        if (useLegacyLandingGearAnimation)
+        {
+            ApplyLandingGear();
+        }
+
         ApplyCockpitYokes();
     }
 
