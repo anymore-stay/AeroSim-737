@@ -13,7 +13,9 @@ public class StandbyDisplayController : MonoBehaviour
     [SerializeField] private RectTransform speedTapeContent;
     [SerializeField] private RectTransform altitudeTapeContent;
     [SerializeField] private RectTransform attitudeRollGroup;
+    [SerializeField] private RectTransform bankPointerGroup;
     [SerializeField] private RectTransform horizonContent;
+    [SerializeField] private RectTransform headingRose;
 
     [Header("空速数字滚轮")]
     [SerializeField] private RawImage[] airspeedDigitWheels = new RawImage[3];
@@ -21,6 +23,7 @@ public class StandbyDisplayController : MonoBehaviour
     [Header("高度数字滚轮")]
     [SerializeField] private RawImage[] altitudeMainDigitWheels = new RawImage[3];
     [SerializeField] private RawImage altitudePairWheel;
+    [SerializeField] private float altitudeHundredsWheelUvOffsetY = 0.008f;
 
     [Header("空速带校准")]
     [SerializeField] private float minimumSpeedKnots = 0f;
@@ -41,23 +44,30 @@ public class StandbyDisplayController : MonoBehaviour
     [SerializeField] private bool invertPitch;
     [SerializeField] private bool invertRoll;
 
+    [Header("航向校准")]
+    [SerializeField] private bool invertHeading = true;
+
     [Header("当前数据")]
     [SerializeField] private float airspeedKnots = 40f;
     [SerializeField] private float altitudeFeet;
     [SerializeField] private float pitchDegrees;
     [SerializeField] private float rollDegrees;
+    [SerializeField] private float magneticHeadingDegrees;
 
     private Vector2 speedTapeBasePosition;
     private Vector2 altitudeTapeBasePosition;
     private Vector2 horizonBasePosition;
     private float attitudeRollBaseRotationZ;
+    private float bankPointerBaseRotationZ;
     private float horizonBaseRotationZ;
+    private float headingBaseRotationZ;
     private bool basePoseReady;
 
     public float AirspeedKnots => airspeedKnots;
     public float AltitudeFeet => altitudeFeet;
     public float PitchDegrees => pitchDegrees;
     public float RollDegrees => rollDegrees;
+    public float MagneticHeadingDegrees => magneticHeadingDegrees;
 
     private void Awake()
     {
@@ -76,7 +86,11 @@ public class StandbyDisplayController : MonoBehaviour
         attitudeRollBaseRotationZ = attitudeRollGroup != null
             ? NormalizeAngle(attitudeRollGroup.localEulerAngles.z)
             : 0f;
+        bankPointerBaseRotationZ = bankPointerGroup != null
+            ? NormalizeAngle(bankPointerGroup.localEulerAngles.z)
+            : 0f;
         horizonBaseRotationZ = horizonContent != null ? NormalizeAngle(horizonContent.localEulerAngles.z) : 0f;
+        headingBaseRotationZ = headingRose != null ? NormalizeAngle(headingRose.localEulerAngles.z) : 0f;
         basePoseReady = true;
     }
 
@@ -87,11 +101,16 @@ public class StandbyDisplayController : MonoBehaviour
 
         if (speedTapeContent != null)
         {
+            // 低于基准速度时保持刻度带静止，数字仍显示真实的 0～40 节。
+            float tapeSpeedKnots = Mathf.Max(airspeedKnots, speedReferenceKnots);
             float offset = StandbyDisplayMath.CalculateTapeOffset(
-                airspeedKnots,
+                tapeSpeedKnots,
                 speedReferenceKnots,
                 speedPixelsPerKnot,
                 invertSpeedTape);
+
+            // 速度带贴图使用 Point 采样；对齐位移量可避免小数像素移动时出现闪动。
+            offset = Mathf.Round(offset);
             speedTapeContent.anchoredPosition = speedTapeBasePosition + Vector2.up * offset;
         }
 
@@ -153,6 +172,31 @@ public class StandbyDisplayController : MonoBehaviour
                 invertRoll);
             horizonContent.localRotation = Quaternion.Euler(0f, 0f, rotationZ);
         }
+
+        if (bankPointerGroup != null)
+        {
+            float pointerRotation = StandbyDisplayMath.CalculateHorizonRotation(
+                bankPointerBaseRotationZ,
+                rollDegrees,
+                invertRoll);
+            bankPointerGroup.localRotation = Quaternion.Euler(0f, 0f, pointerRotation);
+        }
+    }
+
+    public void SetMagneticHeadingDegrees(float value)
+    {
+        EnsureBasePose();
+        magneticHeadingDegrees = Mathf.Repeat(value, 360f);
+        if (headingRose == null)
+        {
+            return;
+        }
+
+        float direction = invertHeading ? -1f : 1f;
+        headingRose.localRotation = Quaternion.Euler(
+            0f,
+            0f,
+            headingBaseRotationZ + magneticHeadingDegrees * direction);
     }
 
     public void RefreshAll()
@@ -160,6 +204,7 @@ public class StandbyDisplayController : MonoBehaviour
         SetAirspeedKnots(airspeedKnots);
         SetAltitudeFeet(altitudeFeet);
         SetAttitudeDegrees(pitchDegrees, rollDegrees);
+        SetMagneticHeadingDegrees(magneticHeadingDegrees);
     }
 
     private void UpdateAirspeedWheels()
@@ -200,12 +245,20 @@ public class StandbyDisplayController : MonoBehaviour
                 value,
                 AltitudePlaces[i],
                 20f);
-            altitudeMainDigitWheels[i].uvRect = StandbyDisplayMath.CalculateDigitStripUv(
+            Rect uvRect = StandbyDisplayMath.CalculateDigitStripUv(
                 wheelValue,
                 i,
                 3,
                 39f,
                 294f);
+
+            // 原始高度数字图集的百位列零点比前两列高 0.008 UV，需要单独校准。
+            if (i == 2)
+            {
+                uvRect.y += altitudeHundredsWheelUvOffsetY;
+            }
+
+            altitudeMainDigitWheels[i].uvRect = uvRect;
         }
 
         if (altitudePairWheel != null)

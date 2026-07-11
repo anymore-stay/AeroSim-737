@@ -6,7 +6,7 @@ using UnityEngine;
 public class StandbyDemoDataSource : MonoBehaviour
 {
     [SerializeField] private StandbyDisplayController displayController;
-    [SerializeField] private float speedMinimumKnots = 40f;
+    [SerializeField] private float speedMinimumKnots;
     [SerializeField] private float speedMaximumKnots = 240f;
     [SerializeField] private float speedCycleSeconds = 30f;
     [SerializeField] private float altitudeMinimumFeet;
@@ -15,6 +15,7 @@ public class StandbyDemoDataSource : MonoBehaviour
     [SerializeField] private float maximumPitchDegrees = 18f;
     [SerializeField] private float maximumRollDegrees = 35f;
     [SerializeField] private float attitudeCycleSeconds = 24f;
+    [SerializeField] private float headingCycleSeconds = 60f;
 
     private float elapsedSeconds;
 
@@ -45,6 +46,8 @@ public class StandbyDemoDataSource : MonoBehaviour
         displayController.SetAttitudeDegrees(
             Mathf.Sin(attitudePhase) * maximumPitchDegrees,
             Mathf.Sin(attitudePhase * 0.73f) * maximumRollDegrees);
+        displayController.SetMagneticHeadingDegrees(
+            Mathf.Repeat(elapsedSeconds / Mathf.Max(1f, headingCycleSeconds) * 360f, 360f));
     }
 
     private void ApplyInitialValues()
@@ -57,6 +60,7 @@ public class StandbyDemoDataSource : MonoBehaviour
         displayController.SetAirspeedKnots(speedMinimumKnots);
         displayController.SetAltitudeFeet(altitudeMinimumFeet);
         displayController.SetAttitudeDegrees(0f, 0f);
+        displayController.SetMagneticHeadingDegrees(0f);
     }
 
     private static float SmoothPingPong(float elapsed, float cycleSeconds)
