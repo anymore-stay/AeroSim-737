@@ -143,6 +143,7 @@ public class FlightHud : MonoBehaviour
         sb.AppendLine("G 起落架收放  B 刹车开关  Esc 暂停");
         sb.AppendLine("---- 相机按键 ----");
         sb.AppendLine("Shift+7 客舱  Shift+8 驾驶舱  Shift+9 第三人称");
+        sb.AppendLine("1 操纵杆显示/隐藏（仅驾驶舱）");
         sb.AppendLine("右键拖动 转视角   方向键 移动视角");
         sb.AppendLine("滚轮 第三人称缩放");
         sb.AppendLine("---- 起飞提示 ----");
