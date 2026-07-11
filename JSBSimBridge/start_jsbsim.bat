@@ -8,7 +8,7 @@ REM  Order: click Play in Unity FIRST, then run this file.
 REM  Close this window to stop the sim.
 REM ============================================================
 
-set "JSBSIM_DIR=D:\jsbsim\JSBSim"
+if not defined JSBSIM_DIR set "JSBSIM_DIR=D:\jsbsim\JSBSim"
 set "BRIDGE=%~dp0"
 set "SCRIPT=%BRIDGE%b737_unity.xml"
 set "OUTCFG=%BRIDGE%unity_output.xml"
