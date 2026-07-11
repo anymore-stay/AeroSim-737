@@ -85,6 +85,7 @@ public class JsbsimBridge : MonoBehaviour
     public float HeadingDeg { get; private set; }     // psi
     public float PitchDeg { get; private set; }       // theta
     public float RollDeg { get; private set; }        // phi
+    public float AngleOfAttackDeg { get; private set; }
     public float Rpm { get; private set; }
     public bool ControlConnected => controlConnected;
 
@@ -595,6 +596,7 @@ public class JsbsimBridge : MonoBehaviour
         SpeedKts = Get("vc_kts");
         TrueSpeedKts = Get("vtrue_kts");
         VerticalSpeedFps = Get("hdot_fps");
+        AngleOfAttackDeg = Get("aero_alpha_deg");
         Rpm = Get("rpm");
 
         RollDeg = phi * Mathf.Rad2Deg;
