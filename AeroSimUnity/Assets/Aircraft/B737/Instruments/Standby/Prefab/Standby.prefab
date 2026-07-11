@@ -1066,7 +1066,7 @@ MonoBehaviour:
   pitchPixelsPerDegree: 4.8
   invertPitch: 0
   invertRoll: 0
-  invertHeading: 0
+  invertHeading: 1
   airspeedKnots: 0
   altitudeFeet: 0
   pitchDegrees: 0

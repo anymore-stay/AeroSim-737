@@ -31,6 +31,7 @@ public class StandbyDisplayController : MonoBehaviour
     [SerializeField] private float speedReferenceKnots = 40f;
     [SerializeField] private float speedPixelsPerKnot = 2.8f;
     [SerializeField] private bool invertSpeedTape;
+    [SerializeField, Min(0.01f)] private float speedTapeSmoothTime = 0.08f;
 
     [Header("高度带校准")]
     [SerializeField] private float minimumAltitudeFeet = -1000f;
@@ -62,6 +63,9 @@ public class StandbyDisplayController : MonoBehaviour
     private float horizonBaseRotationZ;
     private float headingBaseRotationZ;
     private bool basePoseReady;
+    private float targetSpeedTapeOffset;
+    private float displayedSpeedTapeOffset;
+    private float speedTapeVelocity;
 
     public float AirspeedKnots => airspeedKnots;
     public float AltitudeFeet => altitudeFeet;
@@ -73,6 +77,11 @@ public class StandbyDisplayController : MonoBehaviour
     {
         RebuildBasePose();
         RefreshAll();
+    }
+
+    private void LateUpdate()
+    {
+        AdvanceSpeedTape(Time.unscaledDeltaTime);
     }
 
     /// <summary>
@@ -99,22 +108,37 @@ public class StandbyDisplayController : MonoBehaviour
         EnsureBasePose();
         airspeedKnots = Mathf.Clamp(value, minimumSpeedKnots, maximumSpeedKnots);
 
-        if (speedTapeContent != null)
-        {
-            // 低于基准速度时保持刻度带静止，数字仍显示真实的 0～40 节。
-            float tapeSpeedKnots = Mathf.Max(airspeedKnots, speedReferenceKnots);
-            float offset = StandbyDisplayMath.CalculateTapeOffset(
-                tapeSpeedKnots,
-                speedReferenceKnots,
-                speedPixelsPerKnot,
-                invertSpeedTape);
-
-            // 速度带贴图使用 Point 采样；对齐位移量可避免小数像素移动时出现闪动。
-            offset = Mathf.Round(offset);
-            speedTapeContent.anchoredPosition = speedTapeBasePosition + Vector2.up * offset;
-        }
+        // 数据更新只计算目标位置，实际位移在每个渲染帧平滑追踪，避免低频数据造成跳动。
+        float tapeSpeedKnots = Mathf.Max(airspeedKnots, speedReferenceKnots);
+        targetSpeedTapeOffset = StandbyDisplayMath.CalculateTapeOffset(
+            tapeSpeedKnots,
+            speedReferenceKnots,
+            speedPixelsPerKnot,
+            invertSpeedTape);
 
         UpdateAirspeedWheels();
+    }
+
+    /// <summary>
+    /// 推进空速带的平滑动画。公开此方法便于编辑器测试验证不同帧率下的运动。
+    /// </summary>
+    public void AdvanceSpeedTape(float deltaTime)
+    {
+        EnsureBasePose();
+        if (speedTapeContent == null || deltaTime <= 0f)
+        {
+            return;
+        }
+
+        displayedSpeedTapeOffset = Mathf.SmoothDamp(
+            displayedSpeedTapeOffset,
+            targetSpeedTapeOffset,
+            ref speedTapeVelocity,
+            speedTapeSmoothTime,
+            Mathf.Infinity,
+            deltaTime);
+        speedTapeContent.anchoredPosition = speedTapeBasePosition
+            + Vector2.up * displayedSpeedTapeOffset;
     }
 
     public void SetAltitudeFeet(float value)

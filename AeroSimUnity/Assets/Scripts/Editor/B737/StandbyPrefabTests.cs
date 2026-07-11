@@ -67,7 +67,7 @@ public class StandbyPrefabTests
         AssertReference(serialized, "altitudePairWheel");
         Assert.That(serialized.FindProperty("airspeedDigitWheels").arraySize, Is.EqualTo(3));
         Assert.That(serialized.FindProperty("altitudeMainDigitWheels").arraySize, Is.EqualTo(3));
-        Assert.That(serialized.FindProperty("invertHeading").boolValue, Is.False);
+        Assert.That(serialized.FindProperty("invertHeading").boolValue, Is.True);
         Assert.That(serialized.FindProperty("minimumSpeedKnots").floatValue, Is.EqualTo(0f));
     }
 

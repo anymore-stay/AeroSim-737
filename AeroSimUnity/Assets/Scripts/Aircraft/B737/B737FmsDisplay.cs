@@ -52,12 +52,21 @@ public class B737FmsDisplay : MonoBehaviour
     private void Awake()
     {
         currentPage = initialPage;
-        RebuildDisplay();
+        if (!ShouldSuppressEditorRebuild())
+        {
+            RebuildDisplay();
+        }
     }
 
     private void OnValidate()
     {
         displaySize = new Vector2(Mathf.Max(1f, displaySize.x), Mathf.Max(1f, displaySize.y));
+        // Prefab 反序列化早期不重建 UI，避免生成游离的 Prefab 根节点。
+        if (ShouldSuppressEditorRebuild() || !gameObject.scene.IsValid())
+        {
+            return;
+        }
+
         if (isActiveAndEnabled)
         {
             RebuildDisplay();
@@ -66,6 +75,11 @@ public class B737FmsDisplay : MonoBehaviour
 
     private void OnEnable()
     {
+        if (ShouldSuppressEditorRebuild())
+        {
+            return;
+        }
+
         RebuildDisplay();
 
         if (Application.isPlaying)
@@ -74,6 +88,16 @@ public class B737FmsDisplay : MonoBehaviour
         }
 
         Refresh();
+    }
+
+    private bool ShouldSuppressEditorRebuild()
+    {
+#if UNITY_EDITOR
+        return B737FmsDisplayRig.SuppressEditorRebuild
+            || UnityEditor.SceneManagement.EditorSceneManager.IsPreviewScene(gameObject.scene);
+#else
+        return false;
+#endif
     }
 
     private void OnDisable()

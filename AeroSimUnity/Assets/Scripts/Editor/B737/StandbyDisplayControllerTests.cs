@@ -58,6 +58,10 @@ public class StandbyDisplayControllerTests
     public void SetAirspeedMovesTapeAndUpdatesAllThreeDigits()
     {
         controller.SetAirspeedKnots(145f);
+        for (int i = 0; i < 120; i++)
+        {
+            controller.AdvanceSpeedTape(1f / 60f);
+        }
 
         Assert.That(speedTape.anchoredPosition.y, Is.EqualTo(294f).Within(0.001f));
         Assert.That(speedWheels[0].uvRect.y, Is.Not.EqualTo(speedWheels[1].uvRect.y));
@@ -65,11 +69,14 @@ public class StandbyDisplayControllerTests
     }
 
     [Test]
-    public void SetAirspeedAlignsTapeOffsetToWholePixels()
+    public void AirspeedTapeUsesContinuousSubPixelMotion()
     {
         controller.SetAirspeedKnots(40.4f);
+        controller.AdvanceSpeedTape(1f / 60f);
 
-        Assert.That(speedTape.anchoredPosition.y, Is.EqualTo(1f).Within(0.001f));
+        Assert.That(speedTape.anchoredPosition.y, Is.GreaterThan(0f));
+        Assert.That(speedTape.anchoredPosition.y, Is.LessThan(1.12f));
+        Assert.That(speedTape.anchoredPosition.y, Is.Not.EqualTo(Mathf.Round(speedTape.anchoredPosition.y)));
     }
 
     [Test]
@@ -83,7 +90,9 @@ public class StandbyDisplayControllerTests
         Assert.That(speedTape.anchoredPosition.y, Is.EqualTo(0f).Within(0.001f));
 
         controller.SetAirspeedKnots(41f);
-        Assert.That(speedTape.anchoredPosition.y, Is.EqualTo(3f).Within(0.001f));
+        controller.AdvanceSpeedTape(1f / 60f);
+        Assert.That(speedTape.anchoredPosition.y, Is.GreaterThan(0f));
+        Assert.That(speedTape.anchoredPosition.y, Is.LessThan(2.8f));
     }
 
     [Test]

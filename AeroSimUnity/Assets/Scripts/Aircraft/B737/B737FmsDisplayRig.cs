@@ -8,6 +8,8 @@ using UnityEngine.UI;
 [DisallowMultipleComponent]
 public class B737FmsDisplayRig : MonoBehaviour
 {
+    /// <summary>编辑器批量处理 B737 Prefab 时临时阻止 OnValidate 生成对象。</summary>
+    public static bool SuppressEditorRebuild { get; set; }
     [Header("Assets")]
     [SerializeField] private RenderTexture targetTexture;
     [SerializeField] private Material displayMaterial;
@@ -90,7 +92,7 @@ public class B737FmsDisplayRig : MonoBehaviour
 
     private void Awake()
     {
-        if (buildOnAwake)
+        if (!ShouldSuppressEditorRebuild() && buildOnAwake)
         {
             EnsureRig();
         }
@@ -98,12 +100,18 @@ public class B737FmsDisplayRig : MonoBehaviour
 
     private void Start()
     {
-        EnsureRig();
+        if (!ShouldSuppressEditorRebuild())
+        {
+            EnsureRig();
+        }
     }
 
     private void OnEnable()
     {
-        EnsureRig();
+        if (!ShouldSuppressEditorRebuild())
+        {
+            EnsureRig();
+        }
     }
 
     private void LateUpdate()
@@ -140,11 +148,28 @@ public class B737FmsDisplayRig : MonoBehaviour
         textureSize.x = Mathf.Max(64, textureSize.x);
         textureSize.y = Mathf.Max(64, textureSize.y);
 
+        // Prefab 反序列化早期对象尚未进入有效场景，此时生成子节点会产生额外 Prefab 根节点。
+        if (ShouldSuppressEditorRebuild() || !gameObject.scene.IsValid())
+        {
+            return;
+        }
+
         if (isActiveAndEnabled)
         {
             EnsureRig();
             RenderPreview();
         }
+    }
+
+    /// <summary>判断当前是否处在只读 Prefab 预览场景，避免编辑器加载资产时生成对象。</summary>
+    public bool ShouldSuppressEditorRebuild()
+    {
+#if UNITY_EDITOR
+        return SuppressEditorRebuild
+            || UnityEditor.SceneManagement.EditorSceneManager.IsPreviewScene(gameObject.scene);
+#else
+        return false;
+#endif
     }
 
     private void OnDestroy()
@@ -221,6 +246,8 @@ public class B737FmsDisplayRig : MonoBehaviour
             useMipMap = false,
             autoGenerateMips = false
         };
+        targetTexture.filterMode = FilterMode.Bilinear;
+        targetTexture.wrapMode = TextureWrapMode.Clamp;
         targetTexture.Create();
         ownsRuntimeTexture = true;
     }
@@ -407,11 +434,31 @@ public class B737FmsDisplayRig : MonoBehaviour
 
         if (displayMaterial.HasProperty("_EmissionColor"))
         {
-            displayMaterial.SetColor("_EmissionColor", Color.white * 0.65f);
+            displayMaterial.SetColor("_EmissionColor", new Color(0.55f, 0.55f, 0.55f, 1f));
+        }
+
+        if (displayMaterial.HasProperty("_Smoothness"))
+        {
+            displayMaterial.SetFloat("_Smoothness", 0.35f);
+        }
+
+        if (displayMaterial.HasProperty("_Metallic"))
+        {
+            displayMaterial.SetFloat("_Metallic", 0f);
+        }
+
+        if (displayMaterial.HasProperty("_EnvironmentReflections"))
+        {
+            displayMaterial.SetFloat("_EnvironmentReflections", 1f);
+        }
+
+        if (displayMaterial.HasProperty("_SpecularHighlights"))
+        {
+            displayMaterial.SetFloat("_SpecularHighlights", 1f);
         }
 
         displayMaterial.EnableKeyword("_EMISSION");
-        displayMaterial.globalIlluminationFlags = MaterialGlobalIlluminationFlags.RealtimeEmissive;
+        displayMaterial.globalIlluminationFlags = MaterialGlobalIlluminationFlags.None;
     }
 
     private void ApplyMaterialToScreens()

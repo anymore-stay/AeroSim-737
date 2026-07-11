@@ -10,6 +10,15 @@ public static class B737FmsDisplayEditorUtility
     private const string LeftScreenName = "FMS_screens__ImpMesh.000_x345_69206";
     private const string RightScreenName = "FMS_screens__ImpMesh.001_x345_12570";
 
+    [MenuItem("Tools/B737/Instruments/刷新 FMS 屏幕玻璃材质")]
+    public static void RefreshFmsScreenMaterial()
+    {
+        RenderTexture renderTexture = EnsureRenderTexture();
+        EnsureMaterial(renderTexture);
+        AssetDatabase.SaveAssets();
+        Debug.Log("[B737 FMS] 已刷新 FMS 屏幕的柔化与微反光材质。");
+    }
+
     [MenuItem("Tools/B737/Instruments/Install FMS Display On Selected B737")]
     public static void InstallFmsDisplayOnSelectedB737()
     {
@@ -69,6 +78,9 @@ public static class B737FmsDisplayEditorUtility
         RenderTexture renderTexture = AssetDatabase.LoadAssetAtPath<RenderTexture>(RenderTexturePath);
         if (renderTexture != null)
         {
+            renderTexture.filterMode = FilterMode.Bilinear;
+            renderTexture.wrapMode = TextureWrapMode.Clamp;
+            EditorUtility.SetDirty(renderTexture);
             return renderTexture;
         }
 
@@ -80,6 +92,9 @@ public static class B737FmsDisplayEditorUtility
             useMipMap = false,
             autoGenerateMips = false
         };
+
+        renderTexture.filterMode = FilterMode.Bilinear;
+        renderTexture.wrapMode = TextureWrapMode.Clamp;
 
         AssetDatabase.CreateAsset(renderTexture, RenderTexturePath);
         AssetDatabase.SaveAssets();
@@ -107,6 +122,8 @@ public static class B737FmsDisplayEditorUtility
             AssetDatabase.SaveAssets();
         }
 
+        renderTexture.filterMode = FilterMode.Bilinear;
+        renderTexture.wrapMode = TextureWrapMode.Clamp;
         AssignTexture(material, renderTexture);
         EditorUtility.SetDirty(material);
         return material;
@@ -131,11 +148,31 @@ public static class B737FmsDisplayEditorUtility
 
         if (material.HasProperty("_EmissionColor"))
         {
-            material.SetColor("_EmissionColor", Color.white * 0.65f);
+            material.SetColor("_EmissionColor", new Color(0.55f, 0.55f, 0.55f, 1f));
+        }
+
+        if (material.HasProperty("_Smoothness"))
+        {
+            material.SetFloat("_Smoothness", 0.35f);
+        }
+
+        if (material.HasProperty("_Metallic"))
+        {
+            material.SetFloat("_Metallic", 0f);
+        }
+
+        if (material.HasProperty("_EnvironmentReflections"))
+        {
+            material.SetFloat("_EnvironmentReflections", 1f);
+        }
+
+        if (material.HasProperty("_SpecularHighlights"))
+        {
+            material.SetFloat("_SpecularHighlights", 1f);
         }
 
         material.EnableKeyword("_EMISSION");
-        material.globalIlluminationFlags = MaterialGlobalIlluminationFlags.RealtimeEmissive;
+        material.globalIlluminationFlags = MaterialGlobalIlluminationFlags.None;
     }
 
     private static MeshRenderer FindRenderer(Transform root, string targetName)

@@ -18,7 +18,6 @@ public static class StandbyInstrumentBuilder
     private const string GeneratedTextureRoot = StandbyRoot + "/Textures/Generated";
     private const string ConvertedTextureRoot = StandbyRoot + "/Textures/Standby";
 
-    [MenuItem("工具/B737/Standby/生成初版仪表")]
     public static void BuildStandbyDemo()
     {
         ConfigureTextureImporters();
@@ -29,7 +28,6 @@ public static class StandbyInstrumentBuilder
         Debug.Log("Standby 初版仪表已生成并绑定到 Standby_demo。请进入 Play 检查模拟数据。");
     }
 
-    [MenuItem("工具/B737/Standby/修复当前视觉资源")]
     public static void ApplyCurrentVisualDefaults()
     {
         ConfigureTextureImporters();
@@ -74,7 +72,6 @@ public static class StandbyInstrumentBuilder
         Debug.Log("Standby 当前视觉资源已修复：保留布局，恢复原图颜色并补齐灰色底板。");
     }
 
-    [MenuItem("工具/B737/Standby/同步当前空速起点")]
     public static void ApplyCurrentAirspeedStart()
     {
         GameObject prefabRoot = PrefabUtility.LoadPrefabContents(PrefabPath);
@@ -272,8 +269,8 @@ public static class StandbyInstrumentBuilder
             serializedController.FindProperty("altitudePixelsPerFoot").floatValue = 0.28f;
             serializedController.FindProperty("invertAltitudeTape").boolValue = true;
             serializedController.FindProperty("pitchPixelsPerDegree").floatValue = 4.8f;
-            // Canvas 使用 X 镜像面对 Demo 相机，航向圆盘需要在本地使用相反方向抵消镜像。
-            serializedController.FindProperty("invertHeading").boolValue = false;
+            // 实机 RenderTexture 与显示平面还会经过一次方向转换，这里反转圆盘以匹配 PFD。
+            serializedController.FindProperty("invertHeading").boolValue = true;
             serializedController.ApplyModifiedPropertiesWithoutUndo();
             controller.RebuildBasePose();
             controller.RefreshAll();
