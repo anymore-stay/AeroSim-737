@@ -73,6 +73,8 @@ public class B737EngineHeatHaze : MonoBehaviour
     [SerializeField] private float particleLifetime = 0.75f;
     [SerializeField] private float shapeRadius = 0.28f;
     [SerializeField] private float shapeAngle = 10f;
+    [Tooltip("热浪透明粒子的渲染排序。保持比航迹云低，让热浪先渲染，避免盖住后方烟雾。")]
+    [SerializeField] private int heatHazeSortingOrder = -20;
 
     [Header("调试")]
     [SerializeField] private bool logMissingRoots;
@@ -326,7 +328,8 @@ public class B737EngineHeatHaze : MonoBehaviour
 
         engine.renderer.renderMode = ParticleSystemRenderMode.Billboard;
         engine.renderer.alignment = ParticleSystemRenderSpace.View;
-        engine.renderer.sortingFudge = 4f;
+        engine.renderer.sortingOrder = heatHazeSortingOrder;
+        engine.renderer.sortingFudge = -4f;
         engine.renderer.sharedMaterial = material;
     }
 

@@ -88,6 +88,8 @@ public class JsbsimBridge : MonoBehaviour
     public float AngleOfAttackDeg { get; private set; }
     public float Rpm { get; private set; }
     public bool ControlConnected => controlConnected;
+    public Transform Aircraft => aircraft;
+
 
     public event Action OnStateUpdated;
 
