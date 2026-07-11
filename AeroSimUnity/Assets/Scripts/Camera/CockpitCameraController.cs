@@ -570,7 +570,7 @@ public class CockpitCameraController : MonoBehaviour
 
         foreach (Renderer rendererComponent in renderers)
         {
-            if (rendererComponent == null || rendererComponent is ParticleSystemRenderer)
+            if (rendererComponent == null || rendererComponent is ParticleSystemRenderer || rendererComponent is TrailRenderer || rendererComponent is LineRenderer)
             {
                 continue;
             }

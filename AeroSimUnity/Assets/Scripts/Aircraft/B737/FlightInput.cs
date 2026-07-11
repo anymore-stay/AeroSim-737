@@ -41,7 +41,7 @@ public class FlightInput : MonoBehaviour
     [SerializeField, Min(0f)] private float minimumGearRetractionAglFt = 10f;
     [Header("Control Tuning")]
     [Tooltip("中文名：升降舵中立偏置。负值会给飞机一点抬头趋势，正值会给一点低头趋势。")]
-    [SerializeField, Range(-1f, 1f)] private float elevatorNeutralBias = -0.08f;
+    [SerializeField, Range(-1f, 1f)] private float elevatorNeutralBias = 0f;
     [Tooltip("中文名：升降舵权限。数值越大，W/S 对俯仰控制越强。")]
     [SerializeField, Range(0f, 1f)] private float elevatorAuthority = 0.75f;
     [Tooltip("中文名：副翼权限。数值越大，滚转和转弯建立越快，但太大会不好控制。")]
@@ -73,7 +73,7 @@ public class FlightInput : MonoBehaviour
     [Tooltip("中文名：启用俯仰保持辅助。开启后转弯时会自动给一点抬头补偿，减少掉高度。")]
     [SerializeField] private bool pitchHoldAssist = true;
     [Tooltip("中文名：目标俯仰角。俯仰保持辅助希望维持的机头角度。")]
-    [SerializeField] private float pitchHoldDeg = 3f;
+    [SerializeField] private float pitchHoldDeg = 0f;
     [Tooltip("中文名：俯仰保持增益。数值越大越积极拉回目标俯仰角，太大容易上下晃。")]
     [SerializeField] private float pitchHoldGain = 0.03f;
     [Tooltip("中文名：转弯抬头补偿。坡度越大时给越多抬头，减少大转弯掉高度。")]

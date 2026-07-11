@@ -10,9 +10,18 @@ REM ============================================================
 
 set "DEFAULT_JSBSIM_DIR=D:\jsbsim\JSBSim"
 if not defined JSBSIM_DIR set "JSBSIM_DIR=%DEFAULT_JSBSIM_DIR%"
+set "JSBSIM_ROOT=%JSBSIM_DIR%"
+set "JSBSIM_EXE=%JSBSIM_DIR%\JSBSim.exe"
+for %%F in ("%JSBSIM_DIR%") do if /I "%%~xF"==".exe" (
+    set "JSBSIM_EXE=%JSBSIM_DIR%"
+    set "JSBSIM_ROOT=%%~dpF"
+)
+if "%JSBSIM_ROOT:~-1%"=="\" set "JSBSIM_ROOT=%JSBSIM_ROOT:~0,-1%"
 set "BRIDGE=%~dp0"
 set "SCRIPT=%BRIDGE%b737_unity.xml"
 set "OUTCFG=%BRIDGE%unity_output.xml"
+set "INIT_SRC=%BRIDGE%unity_air.xml"
+set "INIT_DST=%JSBSIM_ROOT%\aircraft\737\unity_air.xml"
 
 echo ============================================
 echo   JSBSim realtime sim starting (Boeing 737)
@@ -22,9 +31,9 @@ echo   Close this window to stop the sim
 echo ============================================
 echo.
 
-if not exist "%JSBSIM_DIR%\JSBSim.exe" (
-    echo [ERROR] JSBSim.exe not found at: %JSBSIM_DIR%
-    echo Set the JSBSIM_DIR environment variable to the folder that contains JSBSim.exe.
+if not exist "%JSBSIM_EXE%" (
+    echo [ERROR] JSBSim.exe not found: %JSBSIM_EXE%
+    echo Set JSBSIM_DIR to either the JSBSim folder or JSBSim.exe.
     echo Or edit DEFAULT_JSBSIM_DIR near the top of this bat file.
     goto end
 )
@@ -32,6 +41,24 @@ if not exist "%SCRIPT%" (
     echo [ERROR] Script not found: %SCRIPT%
     goto end
 )
+if not exist "%INIT_SRC%" (
+    echo [ERROR] Initial condition file not found: %INIT_SRC%
+    goto end
+)
+if not exist "%JSBSIM_ROOT%\aircraft\737" (
+    echo [ERROR] JSBSim 737 aircraft folder not found: %JSBSIM_ROOT%\aircraft\737
+    goto end
+)
+
+echo Syncing initial condition:
+echo   %INIT_SRC%
+echo   -^> %INIT_DST%
+copy /Y "%INIT_SRC%" "%INIT_DST%" >nul
+if errorlevel 1 (
+    echo [ERROR] Failed to sync initial condition file.
+    goto end
+)
+echo.
 
 set "UNITY_WAIT_SECONDS=30"
 echo Waiting for Unity UDP listener on port 5501...
@@ -49,8 +76,8 @@ goto end
 echo Unity UDP listener is ready.
 echo.
 
-cd /d "%JSBSIM_DIR%"
-"%JSBSIM_DIR%\JSBSim.exe" --realtime --root="%JSBSIM_DIR%" --script="%SCRIPT%" "%OUTCFG%"
+cd /d "%JSBSIM_ROOT%"
+"%JSBSIM_EXE%" --realtime --root="%JSBSIM_ROOT%" --script="%SCRIPT%" "%OUTCFG%"
 
 echo.
 echo ============================================
