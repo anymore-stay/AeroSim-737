@@ -47,7 +47,7 @@ public class JsbsimBridge : MonoBehaviour
     [Header("世界缩放")]
     [Tooltip("英尺转米。1 英尺 = 0.3048 米。")]
     [SerializeField] private float feetToMeters = 0.3048f;
-    [Tooltip("把飞机放到场景里的高度偏移(米),用于让飞机出现在地形之上便于观察。")]
+    [Tooltip("在 JSBSim 高度基础上额外施加的垂直偏移(米)。正值抬高飞机，负值降低飞机。")]
     [SerializeField] private float altitudeOffset = 0f;
 
     [Header("模型朝向修正")]
@@ -645,9 +645,11 @@ public class JsbsimBridge : MonoBehaviour
         if (usingCesiumCoordinates)
             horizontalOffset = Quaternion.Euler(0f, cesiumHorizontalAlignmentDeg, 0f) * horizontalOffset;
 
-        Vector3 unshiftedTargetPos = sceneStartPos
-                                     + horizontalOffset
-                                     + new Vector3(0f, verticalOffsetM, 0f);
+        Vector3 unshiftedTargetPos = CalculateTargetPosition(
+            sceneStartPos,
+            horizontalOffset,
+            verticalOffsetM,
+            altitudeOffset);
         targetPos = unshiftedTargetPos + accumulatedOriginShift;
 
         // ---- 姿态:NED 欧拉角 -> Unity 四元数 ----
@@ -683,6 +685,20 @@ public class JsbsimBridge : MonoBehaviour
         if (logState)
             Debug.Log(string.Format("[JSBSim] alt={0:F0}ft spd={1:F0}kt hdg={2:F0} pitch={3:F1} roll={4:F1}",
                 AltitudeFt, SpeedKts, HeadingDeg, PitchDeg, RollDeg));
+    }
+
+    /// <summary>
+    /// 将 JSBSim 的相对位移和临时高度校准量转换为 Unity 目标位置。
+    /// </summary>
+    private static Vector3 CalculateTargetPosition(
+        Vector3 sceneStartPosition,
+        Vector3 horizontalOffset,
+        float verticalOffsetM,
+        float altitudeOffsetM)
+    {
+        return sceneStartPosition
+               + horizontalOffset
+               + new Vector3(0f, verticalOffsetM + altitudeOffsetM, 0f);
     }
 
     // ====================== TCP 控制发送 ======================

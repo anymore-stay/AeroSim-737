@@ -1,6 +1,7 @@
 using System;
 using System.Reflection;
 using NUnit.Framework;
+using UnityEngine;
 
 public class PFDJsbsimDataDriverTests
 {
@@ -38,6 +39,27 @@ public class PFDJsbsimDataDriverTests
         Assert.That(property.CanRead, Is.True);
         Assert.That(property.SetMethod, Is.Not.Null);
         Assert.That(property.SetMethod.IsPublic, Is.False, "AngleOfAttackDeg 不应允许外部写入。");
+    }
+
+    [Test]
+    public void JsbsimBridgeTargetPositionAppliesAltitudeOffsetOnlyToVerticalAxis()
+    {
+        Type bridgeType = GetRuntimeType("JsbsimBridge");
+        MethodInfo method = bridgeType.GetMethod(
+            "CalculateTargetPosition",
+            BindingFlags.NonPublic | BindingFlags.Static);
+
+        Assert.That(method, Is.Not.Null, "JsbsimBridge 缺少高度偏移位置计算方法。");
+
+        Vector3 targetPosition = (Vector3)method.Invoke(null, new object[]
+        {
+            new Vector3(10f, 20f, 30f),
+            new Vector3(5f, 0f, 7f),
+            2f,
+            -3f
+        });
+
+        Assert.That(targetPosition, Is.EqualTo(new Vector3(15f, 19f, 37f)));
     }
 
     [Test]
