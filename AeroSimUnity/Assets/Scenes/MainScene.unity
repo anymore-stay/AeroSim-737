@@ -1615,7 +1615,6 @@ GameObject:
   m_Component:
   - component: {fileID: 230163547}
   - component: {fileID: 230163546}
-  - component: {fileID: 230163545}
   - component: {fileID: 230163544}
   m_Layer: 6
   m_Name: EICAS1_Camera
@@ -1668,14 +1667,6 @@ MonoBehaviour:
     m_MipBias: 0
     m_VarianceClampScale: 0.9
     m_ContrastAdaptiveSharpening: 0
---- !u!81 &230163545
-AudioListener:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 230163543}
-  m_Enabled: 1
 --- !u!20 &230163546
 Camera:
   m_ObjectHideFlags: 0
@@ -7858,7 +7849,6 @@ GameObject:
   m_Component:
   - component: {fileID: 1403350587}
   - component: {fileID: 1403350584}
-  - component: {fileID: 1403350586}
   - component: {fileID: 1403350585}
   m_Layer: 7
   m_Name: EICAS2_Camera
@@ -7962,14 +7952,6 @@ MonoBehaviour:
     m_MipBias: 0
     m_VarianceClampScale: 0.9
     m_ContrastAdaptiveSharpening: 0
---- !u!81 &1403350586
-AudioListener:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1403350583}
-  m_Enabled: 1
 --- !u!4 &1403350587
 Transform:
   m_ObjectHideFlags: 0

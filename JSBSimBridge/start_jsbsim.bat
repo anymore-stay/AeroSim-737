@@ -8,7 +8,8 @@ REM  Order: click Play in Unity FIRST, then run this file.
 REM  Close this window to stop the sim.
 REM ============================================================
 
-if not defined JSBSIM_DIR set "JSBSIM_DIR=D:\jsbsim\JSBSim"
+set "DEFAULT_JSBSIM_DIR=D:\jsbsim\JSBSim"
+if not defined JSBSIM_DIR set "JSBSIM_DIR=%DEFAULT_JSBSIM_DIR%"
 set "BRIDGE=%~dp0"
 set "SCRIPT=%BRIDGE%b737_unity.xml"
 set "OUTCFG=%BRIDGE%unity_output.xml"
@@ -23,7 +24,8 @@ echo.
 
 if not exist "%JSBSIM_DIR%\JSBSim.exe" (
     echo [ERROR] JSBSim.exe not found at: %JSBSIM_DIR%
-    echo Edit JSBSIM_DIR on line 12 of this bat file.
+    echo Set the JSBSIM_DIR environment variable to the folder that contains JSBSim.exe.
+    echo Or edit DEFAULT_JSBSIM_DIR near the top of this bat file.
     goto end
 )
 if not exist "%SCRIPT%" (
