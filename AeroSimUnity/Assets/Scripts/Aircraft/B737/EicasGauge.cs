@@ -1,3 +1,4 @@
+using System.Globalization;
 using TMPro;
 using UnityEngine;
 
@@ -7,6 +8,8 @@ using UnityEngine;
 [ExecuteAlways]
 public class EicasGauge : MonoBehaviour
 {
+    private int lastDisplayedValue = int.MinValue;
+    private string lastNumberFormat;
     [Header("UI")]
     [Tooltip("要旋转的指针 RectTransform。通常是白色指针图片或细线。")]
     [SerializeField]
@@ -125,25 +128,42 @@ public class EicasGauge : MonoBehaviour
         {
             if (controlNeedleTransform)
             {
-                needle.anchoredPosition = needleAnchoredPosition;
-                needle.sizeDelta = new Vector2(Mathf.Max(0f, needleLength), Mathf.Max(0.5f, needleThickness));
+                Vector2 size = new Vector2(Mathf.Max(0f, needleLength), Mathf.Max(0.5f, needleThickness));
+                if (needle.anchoredPosition != needleAnchoredPosition)
+                {
+                    needle.anchoredPosition = needleAnchoredPosition;
+                }
+                if (needle.sizeDelta != size)
+                {
+                    needle.sizeDelta = size;
+                }
             }
 
-            needle.localEulerAngles = new Vector3(0f, 0f, angle);
+            if (Mathf.Abs(Mathf.DeltaAngle(needle.localEulerAngles.z, angle)) > 0.01f)
+            {
+                needle.localRotation = Quaternion.Euler(0f, 0f, angle);
+            }
         }
 
         if (fill != null)
         {
             if (syncFillCenterToNeedlePivot && needle != null)
             {
-                fill.rectTransform.anchoredPosition = needle.anchoredPosition;
+                if (fill.rectTransform.anchoredPosition != needle.anchoredPosition)
+                {
+                    fill.rectTransform.anchoredPosition = needle.anchoredPosition;
+                }
             }
 
             if (syncFillRadiusToNeedleLength && needle != null)
             {
                 float radius = Mathf.Max(0f, needle.rect.width + fillRadiusOffset);
                 fill.OuterRadius = radius;
-                fill.rectTransform.sizeDelta = new Vector2(radius * 2f + 8f, radius * 2f + 8f);
+                Vector2 fillSize = new Vector2(radius * 2f + 8f, radius * 2f + 8f);
+                if (fill.rectTransform.sizeDelta != fillSize)
+                {
+                    fill.rectTransform.sizeDelta = fillSize;
+                }
             }
 
             fill.StartAngle = startAngle;
@@ -153,8 +173,33 @@ public class EicasGauge : MonoBehaviour
 
         if (valueText != null)
         {
-            valueText.text = value.ToString(numberFormat);
+            int scale = GetDisplayScale(numberFormat);
+            int displayedValue = Mathf.RoundToInt(value * scale);
+            if (displayedValue != lastDisplayedValue || lastNumberFormat != numberFormat)
+            {
+                lastDisplayedValue = displayedValue;
+                lastNumberFormat = numberFormat;
+                valueText.text = (displayedValue / (float)scale).ToString(
+                    numberFormat,
+                    CultureInfo.InvariantCulture);
+            }
         }
+    }
+
+    private static int GetDisplayScale(string format)
+    {
+        int decimalPoint = string.IsNullOrEmpty(format) ? -1 : format.IndexOf('.');
+        if (decimalPoint < 0)
+        {
+            return 1;
+        }
+
+        int scale = 1;
+        for (int i = decimalPoint + 1; i < format.Length && (format[i] == '0' || format[i] == '#'); i++)
+        {
+            scale *= 10;
+        }
+        return scale;
     }
 
 #if UNITY_EDITOR

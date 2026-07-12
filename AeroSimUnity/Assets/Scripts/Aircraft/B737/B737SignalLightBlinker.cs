@@ -301,6 +301,7 @@ public class B737SignalLightBlinker : MonoBehaviour
             renderer.enabled = intensity > 0.001f;
         }
 
+        EnsurePropertyBlock();
         Color visibleColor = Color.Lerp(offColor, onColor, intensity);
         renderer.GetPropertyBlock(propertyBlock);
         propertyBlock.SetColor(BaseColorId, visibleColor);
@@ -331,12 +332,21 @@ public class B737SignalLightBlinker : MonoBehaviour
             return;
         }
 
+        EnsurePropertyBlock();
         Color overlayColor = EvaluateVisualOverlayColor(onColor, intensity, visualPeakAlpha);
         renderer.GetPropertyBlock(propertyBlock);
         propertyBlock.SetColor(BaseColorId, overlayColor);
         propertyBlock.SetColor(ColorId, overlayColor);
         propertyBlock.SetColor(EmissionColorId, onColor * (emissionIntensity * intensity));
         renderer.SetPropertyBlock(propertyBlock);
+    }
+
+    private void EnsurePropertyBlock()
+    {
+        if (propertyBlock == null)
+        {
+            propertyBlock = new MaterialPropertyBlock();
+        }
     }
 
     private void InitializeVisualRenderer()

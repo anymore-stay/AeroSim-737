@@ -33,6 +33,7 @@ public sealed class AircraftViewCullingOptimizer : MonoBehaviour
         public Renderer Renderer;
         public InteriorSection Section;
         public bool OriginalEnabled;
+        public bool VisibleFromExterior;
         public ShadowCastingMode OriginalShadowCastingMode;
     }
 
@@ -168,6 +169,7 @@ public sealed class AircraftViewCullingOptimizer : MonoBehaviour
                 Renderer = renderer,
                 Section = section,
                 OriginalEnabled = renderer.enabled,
+                VisibleFromExterior = ShouldShowFromExterior(sectionRoot, renderer.transform, section),
                 OriginalShadowCastingMode = renderer.shadowCastingMode
             };
             managedRenderers.Add(managed);
@@ -236,6 +238,38 @@ public sealed class AircraftViewCullingOptimizer : MonoBehaviour
         return true;
     }
 
+    private static bool ShouldShowFromExterior(
+        Transform sectionRoot,
+        Transform rendererTransform,
+        InteriorSection section)
+    {
+        string groupName = GetDirectChildName(sectionRoot, rendererTransform);
+        if (section == InteriorSection.Cabin)
+        {
+            return groupName != "\u8d27\u8231";
+        }
+
+        return groupName != "\u9876\u677f1"
+               && groupName != "\u9876\u677f2"
+               && groupName != "\u4eea\u8868"
+               && groupName != "\u5f00\u5173"
+               && groupName != "\u811a\u8235"
+               && groupName != "\u64cd\u7eb5\u6746"
+               && groupName != "FMS\u5c4f\u5e55"
+               && groupName != "\u5c4f\u5e55\u6c61\u6e0d";
+    }
+
+    private static string GetDirectChildName(Transform sectionRoot, Transform descendant)
+    {
+        Transform current = descendant;
+        while (current != null && current.parent != sectionRoot)
+        {
+            current = current.parent;
+        }
+
+        return current != null ? current.name : string.Empty;
+    }
+
     private static Mesh GetRendererMesh(Renderer renderer)
     {
         SkinnedMeshRenderer skinned = renderer as SkinnedMeshRenderer;
@@ -259,6 +293,8 @@ public sealed class AircraftViewCullingOptimizer : MonoBehaviour
             }
 
             bool sectionVisible = currentView == ViewMode.Unknown
+                                  || (currentView == ViewMode.ThirdPerson
+                                      && managed.VisibleFromExterior)
                                   || (currentView == ViewMode.Cockpit
                                       && managed.Section == InteriorSection.Cockpit)
                                   || (currentView == ViewMode.Cabin

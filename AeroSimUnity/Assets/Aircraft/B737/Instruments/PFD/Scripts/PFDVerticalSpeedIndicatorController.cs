@@ -34,6 +34,7 @@ public class PFDVerticalSpeedIndicatorController : MonoBehaviour
     private Text cachedFinalVerticalSpeedValue;
     private Vector2 guideAscendingValuePosition;
     private Vector2 finalAscendingValuePosition;
+    private int lastDisplayedSpeed = int.MinValue;
 
     private void OnEnable()
     {
@@ -153,7 +154,19 @@ public class PFDVerticalSpeedIndicatorController : MonoBehaviour
 
         float roundedSpeed = Mathf.Round(absoluteSpeed / displayIncrementFpm) * displayIncrementFpm;
         int cappedSpeed = Mathf.Min(Mathf.RoundToInt(roundedSpeed), Mathf.RoundToInt(maximumDisplayFpm));
-        value.text = cappedSpeed.ToString(CultureInfo.InvariantCulture);
+        if (cappedSpeed != lastDisplayedSpeed)
+        {
+            lastDisplayedSpeed = cappedSpeed;
+            string displayedSpeed = cappedSpeed.ToString(CultureInfo.InvariantCulture);
+            if (guideVerticalSpeedValue != null)
+            {
+                guideVerticalSpeedValue.text = displayedSpeed;
+            }
+            if (finalVerticalSpeedValue != null)
+            {
+                finalVerticalSpeedValue.text = displayedSpeed;
+            }
+        }
         value.rectTransform.anchoredPosition = verticalSpeedFpm < 0f
             ? new Vector2(ascendingPosition.x, descendingValueY)
             : ascendingPosition;

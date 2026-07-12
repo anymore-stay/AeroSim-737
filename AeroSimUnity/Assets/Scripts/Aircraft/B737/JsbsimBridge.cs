@@ -121,7 +121,10 @@ public class JsbsimBridge : MonoBehaviour
     private UdpClient udpClient;
     private Thread udpThread;
     private volatile bool running;
+    private readonly byte[] udpReceiveBuffer = new byte[65535];
     private string[] labels;
+    private float[] parsedValues = Array.Empty<float>();
+    private bool[] parsedValueValid = Array.Empty<bool>();
     private readonly object stateLock = new object();
     private Dictionary<string, float> latest = new Dictionary<string, float>();
     private readonly Dictionary<string, float> mainThreadSnapshot = new Dictionary<string, float>();
@@ -263,8 +266,9 @@ public class JsbsimBridge : MonoBehaviour
             udpClient = new UdpClient(AddressFamily.InterNetwork);
             udpClient.Client.ExclusiveAddressUse = true;
             udpClient.Client.Bind(new IPEndPoint(IPAddress.Any, stateUdpPort));
-            UdpClient receiver = udpClient;
-            udpThread = new Thread(() => UdpLoop(receiver)) { IsBackground = true };
+            UdpClient receiverOwner = udpClient;
+            Socket receiver = receiverOwner.Client;
+            udpThread = new Thread(() => UdpLoop(receiverOwner, receiver)) { IsBackground = true };
             udpThread.Start();
             Debug.Log("[JSBSim] UDP 状态接收已启动,端口 " + stateUdpPort);
         }
@@ -276,27 +280,180 @@ public class JsbsimBridge : MonoBehaviour
         }
     }
 
-    private void UdpLoop(UdpClient receiver)
+    private void UdpLoop(UdpClient receiverOwner, Socket receiver)
     {
-        IPEndPoint remote = new IPEndPoint(IPAddress.Any, 0);
-        while (running && ReferenceEquals(receiver, udpClient))
+        EndPoint remote = new IPEndPoint(IPAddress.Any, 0);
+        while (running && ReferenceEquals(receiverOwner, udpClient))
         {
             try
             {
-                byte[] data = receiver.Receive(ref remote);
-                string text = Encoding.ASCII.GetString(data).Trim();
-                ParsePacket(text);
+                int byteCount = receiver.ReceiveFrom(
+                    udpReceiveBuffer,
+                    0,
+                    udpReceiveBuffer.Length,
+                    SocketFlags.None,
+                    ref remote);
+                ParsePacket(udpReceiveBuffer, byteCount);
             }
             catch (SocketException)
             {
                 // 关闭时会抛异常,正常退出
-                if (!running || !ReferenceEquals(receiver, udpClient)) break;
+                if (!running || !ReferenceEquals(receiverOwner, udpClient)) break;
             }
             catch (Exception e)
             {
                 Debug.LogWarning("[JSBSim] UDP 接收异常: " + e.Message);
             }
         }
+    }
+
+    private void ParsePacket(byte[] buffer, int byteCount)
+    {
+        if (buffer == null || byteCount <= 0)
+        {
+            return;
+        }
+
+        int packetEnd = Math.Min(buffer.Length, byteCount);
+        int lineStart = 0;
+        for (int i = 0; i <= packetEnd; i++)
+        {
+            if (i < packetEnd && buffer[i] != (byte)'\n')
+            {
+                continue;
+            }
+
+            ParsePacketLine(buffer, lineStart, i - lineStart);
+            lineStart = i + 1;
+        }
+    }
+
+    private void ParsePacketLine(byte[] buffer, int start, int length)
+    {
+        TrimAsciiWhitespace(buffer, ref start, ref length);
+        if (length <= 0)
+        {
+            return;
+        }
+
+        const string labelsPrefix = "<LABELS>";
+        if (StartsWithAscii(buffer, start, length, labelsPrefix))
+        {
+            start += labelsPrefix.Length;
+            length -= labelsPrefix.Length;
+            TrimAsciiWhitespace(buffer, ref start, ref length);
+            if (length > 0 && buffer[start] == (byte)',')
+            {
+                start++;
+                length--;
+            }
+            ParseLabels(buffer, start, length);
+            return;
+        }
+
+        string[] currentLabels = labels;
+        if (currentLabels == null || currentLabels.Length == 0)
+        {
+            return;
+        }
+
+        int fieldCount = JsbsimAsciiParser.ParseValues(
+            buffer,
+            start,
+            length,
+            parsedValues,
+            parsedValueValid);
+        if (fieldCount != currentLabels.Length)
+        {
+            return;
+        }
+
+        lock (stateLock)
+        {
+            for (int i = 0; i < currentLabels.Length; i++)
+            {
+                if (parsedValueValid[i])
+                {
+                    latest[currentLabels[i]] = parsedValues[i];
+                }
+            }
+            newStateAvailable = true;
+        }
+    }
+
+    private void ParseLabels(byte[] buffer, int start, int length)
+    {
+        TrimAsciiWhitespace(buffer, ref start, ref length);
+        if (length <= 0)
+        {
+            return;
+        }
+
+        int fieldCount = 1;
+        int end = start + length;
+        for (int i = start; i < end; i++)
+        {
+            if (buffer[i] == (byte)',')
+            {
+                fieldCount++;
+            }
+        }
+
+        string[] nextLabels = new string[fieldCount];
+        int fieldIndex = 0;
+        int tokenStart = start;
+        for (int i = start; i <= end; i++)
+        {
+            if (i < end && buffer[i] != (byte)',')
+            {
+                continue;
+            }
+
+            int tokenLength = i - tokenStart;
+            TrimAsciiWhitespace(buffer, ref tokenStart, ref tokenLength);
+            nextLabels[fieldIndex++] = Encoding.ASCII.GetString(buffer, tokenStart, tokenLength);
+            tokenStart = i + 1;
+        }
+
+        labels = nextLabels;
+        parsedValues = new float[fieldCount];
+        parsedValueValid = new bool[fieldCount];
+    }
+
+    private static bool StartsWithAscii(byte[] buffer, int start, int length, string expected)
+    {
+        if (length < expected.Length)
+        {
+            return false;
+        }
+
+        for (int i = 0; i < expected.Length; i++)
+        {
+            if (buffer[start + i] != (byte)expected[i])
+            {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private static void TrimAsciiWhitespace(byte[] buffer, ref int start, ref int length)
+    {
+        int end = start + length;
+        while (start < end && IsAsciiWhitespace(buffer[start]))
+        {
+            start++;
+        }
+        while (end > start && IsAsciiWhitespace(buffer[end - 1]))
+        {
+            end--;
+        }
+        length = end - start;
+    }
+
+    private static bool IsAsciiWhitespace(byte value)
+    {
+        return value == (byte)' ' || value == (byte)'\t' || value == (byte)'\r';
     }
 
     private void ParsePacket(string text)

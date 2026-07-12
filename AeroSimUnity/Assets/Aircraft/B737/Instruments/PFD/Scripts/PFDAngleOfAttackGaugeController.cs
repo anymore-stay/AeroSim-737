@@ -4,6 +4,7 @@ using UnityEngine.UI;
 
 public class PFDAngleOfAttackGaugeController : MonoBehaviour
 {
+    private int lastDisplayedTenths = int.MinValue;
     [Header("迎角有效范围")]
     [SerializeField] private float minimumAoaDeg;
     [SerializeField] private float maximumAoaDeg = 15f;
@@ -39,9 +40,14 @@ public class PFDAngleOfAttackGaugeController : MonoBehaviour
         ApplyPointerRotation(guideAoaPointer, rotationZ);
         ApplyPointerRotation(finalAoaPointer, rotationZ);
 
-        string valueText = displayedAoa.ToString("0.0", CultureInfo.InvariantCulture);
-        ApplyValue(guideAoaValue, valueText);
-        ApplyValue(finalAoaValue, valueText);
+        int displayedTenths = Mathf.RoundToInt(displayedAoa * 10f);
+        if (displayedTenths != lastDisplayedTenths)
+        {
+            lastDisplayedTenths = displayedTenths;
+            string valueText = (displayedTenths * 0.1f).ToString("0.0", CultureInfo.InvariantCulture);
+            ApplyValue(guideAoaValue, valueText);
+            ApplyValue(finalAoaValue, valueText);
+        }
     }
 
     private void EnsureBindings()

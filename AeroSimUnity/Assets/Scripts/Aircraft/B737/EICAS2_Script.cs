@@ -16,6 +16,18 @@ public class EICAS2_Script : MonoBehaviour
     [SerializeField, Min(0.01f)] private float pollInterval = 0.05f;
     private float nextPollTime;
     private bool refreshPending;
+    private int n2LeftDisplay = int.MinValue;
+    private int n2RightDisplay = int.MinValue;
+    private int fuelFlowLeftDisplay = int.MinValue;
+    private int fuelFlowRightDisplay = int.MinValue;
+    private int oilPressLeftDisplay = int.MinValue;
+    private int oilPressRightDisplay = int.MinValue;
+    private int oilTempLeftDisplay = int.MinValue;
+    private int oilTempRightDisplay = int.MinValue;
+    private int oilQtyLeftDisplay = int.MinValue;
+    private int oilQtyRightDisplay = int.MinValue;
+    private int vibrationLeftDisplay = int.MinValue;
+    private int vibrationRightDisplay = int.MinValue;
 
     [Header("Gauges")]
     [SerializeField] private EicasGauge n2LeftGauge;
@@ -136,25 +148,19 @@ public class EICAS2_Script : MonoBehaviour
         float n2Right = Read(engine2N2Key, 0f);
         SetGauge(n2LeftGauge, n2Left);
         SetGauge(n2RightGauge, n2Right);
-        SetText(n2LeftText, n2Left.ToString("0.0", CultureInfo.InvariantCulture));
-        SetText(n2RightText, n2Right.ToString("0.0", CultureInfo.InvariantCulture));
+        SetNumericText(n2LeftText, n2Left, 1, ref n2LeftDisplay);
+        SetNumericText(n2RightText, n2Right, 1, ref n2RightDisplay);
 
-        SetText(fuelFlowLeftText, FormatFuelFlow(Read(engine1FuelFlowPpsKey, 0f)));
-        SetText(fuelFlowRightText, FormatFuelFlow(Read(engine2FuelFlowPpsKey, 0f)));
-        SetText(oilPressLeftText, Read(engine1OilPressureKey, defaultOilPressure).ToString("0", CultureInfo.InvariantCulture));
-        SetText(oilPressRightText, Read(engine2OilPressureKey, defaultOilPressure).ToString("0", CultureInfo.InvariantCulture));
-        SetText(oilTempLeftText, Read(engine1OilTempKey, defaultOilTemp).ToString("0", CultureInfo.InvariantCulture));
-        SetText(oilTempRightText, Read(engine2OilTempKey, defaultOilTemp).ToString("0", CultureInfo.InvariantCulture));
-        SetText(oilQtyLeftText, Read(engine1OilQtyKey, defaultOilQty).ToString("0", CultureInfo.InvariantCulture));
-        SetText(oilQtyRightText, Read(engine2OilQtyKey, defaultOilQty).ToString("0", CultureInfo.InvariantCulture));
-        SetText(vibrationLeftText, Read(engine1VibrationKey, defaultVibration).ToString("0.0", CultureInfo.InvariantCulture));
-        SetText(vibrationRightText, Read(engine2VibrationKey, defaultVibration).ToString("0.0", CultureInfo.InvariantCulture));
-    }
-
-    private string FormatFuelFlow(float poundsPerSecond)
-    {
-        float thousandPoundsPerHour = poundsPerSecond * 3.6f;
-        return thousandPoundsPerHour.ToString("0.00", CultureInfo.InvariantCulture);
+        SetNumericText(fuelFlowLeftText, Read(engine1FuelFlowPpsKey, 0f) * 3.6f, 2, ref fuelFlowLeftDisplay);
+        SetNumericText(fuelFlowRightText, Read(engine2FuelFlowPpsKey, 0f) * 3.6f, 2, ref fuelFlowRightDisplay);
+        SetNumericText(oilPressLeftText, Read(engine1OilPressureKey, defaultOilPressure), 0, ref oilPressLeftDisplay);
+        SetNumericText(oilPressRightText, Read(engine2OilPressureKey, defaultOilPressure), 0, ref oilPressRightDisplay);
+        SetNumericText(oilTempLeftText, Read(engine1OilTempKey, defaultOilTemp), 0, ref oilTempLeftDisplay);
+        SetNumericText(oilTempRightText, Read(engine2OilTempKey, defaultOilTemp), 0, ref oilTempRightDisplay);
+        SetNumericText(oilQtyLeftText, Read(engine1OilQtyKey, defaultOilQty), 0, ref oilQtyLeftDisplay);
+        SetNumericText(oilQtyRightText, Read(engine2OilQtyKey, defaultOilQty), 0, ref oilQtyRightDisplay);
+        SetNumericText(vibrationLeftText, Read(engine1VibrationKey, defaultVibration), 1, ref vibrationLeftDisplay);
+        SetNumericText(vibrationRightText, Read(engine2VibrationKey, defaultVibration), 1, ref vibrationRightDisplay);
     }
 
     private float Read(string key, float fallback)
@@ -175,12 +181,23 @@ public class EICAS2_Script : MonoBehaviour
         }
     }
 
-    private static void SetText(Text text, string value)
+    private static void SetNumericText(Text text, float value, int decimals, ref int cachedValue)
     {
-        if (text != null && text.text != value)
+        if (text == null)
         {
-            text.text = value;
+            return;
         }
+
+        int scale = decimals == 0 ? 1 : decimals == 1 ? 10 : 100;
+        int displayedValue = Mathf.RoundToInt(value * scale);
+        if (displayedValue == cachedValue)
+        {
+            return;
+        }
+
+        cachedValue = displayedValue;
+        string format = decimals == 0 ? "0" : decimals == 1 ? "0.0" : "0.00";
+        text.text = (displayedValue / (float)scale).ToString(format, CultureInfo.InvariantCulture);
     }
 
     private void AutoBind()
