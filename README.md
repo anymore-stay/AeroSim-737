@@ -1,347 +1,120 @@
 # AeroSim-737
 
-基于 Unity 的 Boeing 737-800 飞行模拟项目。当前主工程为 [AeroSimUnity](D:\OneDrive\Desktop\AeroSim-737\AeroSimUnity)，目标是将飞机视觉、场景表现与 JSBSim 飞行物理解耦，通过外部桥接实现可持续维护的团队开发工作流。
+AeroSim-737 是一个基于 Unity 的 Boeing 737-800 飞行模拟项目。项目使用 Unity 负责飞机可视化、驾驶舱/客舱视角、HUD、机场环境、天气系统和仪表界面，使用 JSBSim 作为外部飞行动力学进程，通过本仓库的 `JSBSimBridge/` 与 Unity 主场景通信。
 
-当前机型：`Boeing 737-800`
-当前主场景：`MainScene`
-仓库地址：`https://github.com/anymore-stay/AeroSim-737.git`
-外部物理桥接目录：`JSBSimBridge/`
+项目当前重点是把 737 飞机、北京大兴机场环境、动态天气、驾驶舱仪表和 JSBSim 飞行链路整合成一个可演示、可继续迭代的飞行模拟原型。
 
----
+## 项目概览
 
-## 当前状态
-
-> 阶段：项目结构已定型，当前正在进行功能校正、资源整理与团队规范固化。
-
-已完成：
-- 737 主资源已归档到 `Assets/Aircraft/B737`
-- `Assets/Aircraft/B737/Instruments/` 已建立，作为后续仪表系统入口目录
-- 主 prefab 已统一为 `B737.prefab`
-- 主场景已统一为 `MainScene.unity`
-- JSBSim 外部文件已迁到仓库根下的 `JSBSimBridge/`
-- B737 相关运行时脚本、编辑器工具、第三方插件已按新结构归类
-
-进行中：
-- prefab / 场景引用校正
-- 飞机各部件动画与交互回归验证
-- 材质、贴图、涂装工具路径统一
-- 团队开发规范固化
-
----
-
-## 项目结构
-
-```text
-AeroSim-737/
-├── AeroSimUnity/                         # 正式 Unity 工程根目录
-│   ├── Assets/
-│   │   ├── Aircraft/
-│   │   │   └── B737/
-│   │   │       ├── Prefabs/             # 飞机正式 Prefab
-│   │   │       ├── Models/              # FBX 与 .fbm 模型资源
-│   │   │       ├── Materials/           # 材质资源
-│   │   │       ├── Textures/            # 主贴图资源
-│   │   │       ├── Liveries/            # 涂装资源
-│   │   │       └── Instruments/         # 仪表系统目录，当前为后续开发预留
-│   │   ├── Scenes/                      # 场景资源，当前主场景为 MainScene
-│   │   ├── Scripts/
-│   │   │   ├── Aircraft/B737/           # 所有 B737 专属运行时脚本
-│   │   │   ├── Camera/                  # 通用相机脚本
-│   │   │   ├── World/                   # Floating Origin 等世界脚本
-│   │   │   └── Editor/B737/             # B737 编辑器工具
-│   │   ├── Plugins/ThirdParty/          # 第三方插件
-│   │   ├── Environment/                 # 环境资源
-│   │   └── Settings/                    # 渲染与工程内资源设置
-│   ├── Packages/
-│   └── ProjectSettings/
-├── JSBSimBridge/                        # 外部桥接配置与启动脚本
-├── Docs/                                # 项目文档
-└── README.md
-```
-
----
-
-## 关键资源
-
-- 主场景：
-  [MainScene.unity](D:\OneDrive\Desktop\AeroSim-737\AeroSimUnity\Assets\Scenes\MainScene.unity)
-
-- 主飞机 prefab：
-  [B737.prefab](D:\OneDrive\Desktop\AeroSim-737\AeroSimUnity\Assets\Aircraft\B737\Prefabs\B737.prefab)
-
-- 主模型：
-  [B737_Aircraft.fbx](D:\OneDrive\Desktop\AeroSim-737\AeroSimUnity\Assets\Aircraft\B737\Models\B737_Aircraft.fbx)
-
-- 模型贴图目录：
-  [B737_Aircraft.fbm](D:\OneDrive\Desktop\AeroSim-737\AeroSimUnity\Assets\Aircraft\B737\Models\B737_Aircraft.fbm)
-
-- 仪表系统目录：
-  [Instruments](D:\OneDrive\Desktop\AeroSim-737\AeroSimUnity\Assets\Aircraft\B737\Instruments)
-
-- 外部 JSBSim 配置：
-  [b737_unity.xml](D:\OneDrive\Desktop\AeroSim-737\JSBSimBridge\b737_unity.xml)
-  [unity_output.xml](D:\OneDrive\Desktop\AeroSim-737\JSBSimBridge\unity_output.xml)
-  [start_jsbsim.bat](D:\OneDrive\Desktop\AeroSim-737\JSBSimBridge\start_jsbsim.bat)
-
----
-
-## 脚本归类规范
-
-所有和 737 直接相关的运行时逻辑，统一放在：
-
-- [Assets/Scripts/Aircraft/B737](D:\OneDrive\Desktop\AeroSim-737\AeroSimUnity\Assets\Scripts\Aircraft\B737)
-
-包括但不限于：
-- 飞行动画与控制
-- JSBSim 桥接
-- HUD
-- 发动机旋转
-- 起落架、襟翼、驾驶盘、舵面逻辑
-
-通用脚本按职责分开：
-
-- `Assets/Scripts/Camera`
-  只放相机控制与切换相关脚本
-- `Assets/Scripts/World`
-  只放 Floating Origin 和大世界相关脚本
-- `Assets/Scripts/Editor/B737`
-  只放 B737 编辑器工具
-
-`Assets/Aircraft/B737/Instruments` 单独保留给驾驶舱仪表相关资源、材质、贴图和后续专属脚本；当前阶段可以整理目录和放置占位资源，但默认不接入主飞行流程。
-
----
-
-## 团队开发规范
-
-### 1. 新增资源放哪里
-
-- 新增 737 prefab：放到 `Assets/Aircraft/B737/Prefabs`
-- 新增 737 模型：放到 `Assets/Aircraft/B737/Models`
-- 新增 737 材质：放到 `Assets/Aircraft/B737/Materials`
-- 新增 737 贴图：放到 `Assets/Aircraft/B737/Textures`
-- 新增 737 涂装：放到 `Assets/Aircraft/B737/Liveries/<LiveryName>/objects`
-- 新增仪表相关资源：放到 `Assets/Aircraft/B737/Instruments`
-- 新增 737 运行时脚本：放到 `Assets/Scripts/Aircraft/B737`
-- 新增 B737 编辑器工具：放到 `Assets/Scripts/Editor/B737`
-- 新增通用相机脚本：放到 `Assets/Scripts/Camera`
-- 新增通用世界脚本：放到 `Assets/Scripts/World`
-- 新增第三方插件：放到 `Assets/Plugins/ThirdParty`
-
-### 2. 不要怎么放
-
-- 不要把 737 资源直接丢到 `Assets/` 根目录
-- 不要把运行时脚本混放到 `Editor` 目录
-- 不要把通用脚本和 B737 专属脚本混在一起
-- 不要直接把 `.fbx` 拖进场景长期使用，场景里应优先使用 prefab
-
-### 3. 命名规范
-
-- 脚本文件名与类名一致，使用 `PascalCase`
-  例如：`B737EngineSpinner.cs`
-- Prefab 使用简洁、稳定命名
-  例如：`B737.prefab`
-- 场景使用明确语义命名
-  例如：`MainScene.unity`
-- 贴图和资源文件尽量保留稳定命名，避免大面积断引用
-
-### 4. 修改资源时的原则
-
-- 材质、贴图等资源若无明确必要，不要随意改名，减少引用断裂
-- 如果必须改名，要同时检查：
-  - prefab 引用
-  - scene 引用
-  - editor 工具中的硬编码路径
-  - 相关 `.meta` 是否一起处理
-
-### 5. `.meta` 文件规则
-
-- Unity 资源复制、移动、重命名时必须连同 `.meta` 一起处理
-- 不要手工删除 `.meta`
-- 不要只复制资源文件不复制 `.meta`
-
-### 6. 禁止提交的内容
-
-- `Library/`
-- `Temp/`
-- `Logs/`
-- `obj/`
-- `UserSettings/`
-- `.vs/`
-- `*.csproj`
-- `*.sln`
-
-### 7. Unity 版本与 Cesium 包一致性
-
-- 仓库推荐版本是 `Unity 2022.3.62f3c1`
-- `2022.3.62` 同家族版本可运行
-  例如：`2022.3.62f1c1`、`2022.3.62f3c1`
-- 如果要改场景、Prefab、材质、ProjectSettings，仍建议尽量使用推荐版本再提交
-- 项目已内置 `AeroSimCesiumPackageGuard`，会在启动时检查版本，并自动把 `CesiumDefaultTilesetMaterial.mat` 同步回团队基线，减少 `immutable package unexpectedly altered` 报错
-- 如果 Console 里再次出现 Cesium 包材质相关错误，可在 Unity 菜单执行 `AeroSim/Cesium/Sync Package Material Baseline`
-- 这个自愈逻辑只修复当前已知的 Cesium 包材质漂移，不代表跨大版本或跨补丁版本可以随意混用
-
-### 8. 修改前优先检查
-
-在动任何资源前，先确认它属于哪一类：
-
-- 飞机资源 -> `Assets/Aircraft/B737/...`
-- 仪表资源 -> `Assets/Aircraft/B737/Instruments`
-- 737 脚本 -> `Assets/Scripts/Aircraft/B737`
-- 通用脚本 -> `Assets/Scripts/Camera` 或 `Assets/Scripts/World`
-- 编辑器工具 -> `Assets/Scripts/Editor/B737`
-- 外部桥接文件 -> `JSBSimBridge/`
-
-### 9. 团队协作建议
-
-- 每次提交只做一类改动
-- 资源整理、脚本改动、材质调整不要混成一个提交
-- 先修路径和引用，再做效果优化
-- 改 prefab 或场景后，一定进入 Unity 检查是否有 Missing Script / Missing Reference
-
----
-
-## JSBSim 相关约定
-
-外部桥接文件统一放在：
-
-- [JSBSimBridge](D:\OneDrive\Desktop\AeroSim-737\JSBSimBridge)
-
-不要把这些文件散落进 Unity `Assets/` 目录里。
-Unity 项目通过脚本和端口配置对接它们，仓库根目录只负责集中保存桥接配置与启动脚本。
-
----
-
-## 当前主流程
-
-1. 打开 [AeroSimUnity](D:\OneDrive\Desktop\AeroSim-737\AeroSimUnity)
-2. 加载 [MainScene.unity](D:\OneDrive\Desktop\AeroSim-737\AeroSimUnity\Assets\Scenes\MainScene.unity)
-3. 场景中主飞机实例来自 [B737.prefab](D:\OneDrive\Desktop\AeroSim-737\AeroSimUnity\Assets\Aircraft\B737\Prefabs\B737.prefab)
-4. 如需外部飞行物理，使用 [start_jsbsim.bat](D:\OneDrive\Desktop\AeroSim-737\JSBSimBridge\start_jsbsim.bat)
-
----
-
-## 操作按键
-
-### 飞行控制
-
-| 按键 | 作用 |
+| 项目 | 内容 |
 | --- | --- |
-| `W` | 升降舵前推 / 低头 |
-| `S` | 升降舵后拉 / 抬头 |
-| `A` | 副翼左滚 |
-| `D` | 副翼右滚 |
-| `Q` | 方向舵左偏航 |
-| `E` | 方向舵右偏航 |
-| `LeftShift` | 增加油门 |
-| `LeftControl` | 减少油门 |
-| `B` | 切换轮刹 |
-| `G` | 起落架收放 |
+| 机型 | Boeing 737-800 |
+| 引擎 | Unity 2022.3 LTS |
+| 渲染管线 | URP |
+| 飞行动力学 | JSBSim |
+| 天气系统 | UniStorm URP |
+| 地理/大世界 | Cesium for Unity |
+| 主场景 | `AeroSimUnity/Assets/Scenes/MainScene.unity` |
+| Unity 工程 | `AeroSimUnity/` |
 
-### 襟翼
+## 功能亮点
 
-| 按键 | 作用 |
-| --- | --- |
-| `F` | 放下襟翼 |
-| `V` | 收回襟翼 |
+- 737-800 飞机模型与主 Prefab 管理。
+- 驾驶舱、客舱、第三人称三类视角切换。
+- HUD 实时显示飞行数据、控制状态和操作提示。
+- UniStorm 动态天气：晴天、雨天、雷暴、昼夜和时间调节。
+- 右上角天气/时间菜单，按 `2` 打开，支持中文天气名称和当前时间显示。
+- 北京大兴机场环境，地面材质已按近景飞行视角重新调整。
+- PFD、ND、EICAS、备用仪表等驾驶舱显示系统的基础实现入口。
+- JSBSim 外部飞行动力学桥接，支持 Unity 接收飞行状态并发送控制指令。
+- Cesium 地理参考与大世界坐标支持，用于后续扩展真实地景。
 
-说明：
-- 当前可视襟翼动画按本地键盘控制。
-- 如果后续襟翼逻辑改为完全跟随 JSBSim 控制通道，需要同步更新本节说明。
-
-### 相机切换
-
-| 按键 | 作用 |
-| --- | --- |
-| `Shift + 7` | 客舱视角 |
-| `Shift + 8` | 驾驶舱视角 |
-| `Shift + 9` | 第三人称视角 |
-
-建议：
-- 如果 `LeftShift` 正在用于油门操作，可优先使用 `RightShift + 7/8/9` 切换相机。
-
-### 驾驶舱 / 客舱视角控制
-
-| 按键 | 作用 |
-| --- | --- |
-| `鼠标右键拖动` | 转动视角 |
-| `方向键` | 前后左右移动视角 |
-| `PageUp / PageDown` | 上下移动视角 |
-
-### 第三人称视角控制
-
-| 按键 | 作用 |
-| --- | --- |
-| `鼠标右键拖动` | 环绕飞机旋转视角 |
-| `鼠标滚轮` | 缩放远近 |
-
-### HUD
-
-| 按键 | 作用 |
-| --- | --- |
-| `Tab` | 显示 / 隐藏 HUD |
+> 说明：项目仍在开发中，目前更适合作为飞行模拟原型、课程/小组项目展示和后续开发基础，不是完整商用级飞行模拟器。
 
 ---
 
-## 快速上手
+## 画面展示
 
-仓库地址：
 
-```text
-https://github.com/anymore-stay/AeroSim-737.git
-```
+### 飞行视角
 
-### 第一步：准备环境
+![飞行视角](Pictures/飞行.png)
 
-请先确认本机已安装：
-- Unity 2022.3 LTS
-- Git LFS
-- 可正常运行 `.bat` 脚本
-- JSBSim 1.3.x
+### 驾驶舱
 
-### Git LFS 一键安装与拉取
+![驾驶舱](Pictures/机舱.png)
 
-本项目使用 Git LFS 管理 FBX、贴图、音频、视频、压缩包和文档等大文件。小组成员首次拉取仓库前，建议先安装 Git LFS，否则 Unity 里看到的资源可能只是几行文本指针。
+### 客舱
 
-Windows 推荐在 PowerShell 中执行下面这一条命令：
+![客舱](Pictures/客舱.png)
+
+### 雨天天气
+
+![雨天天气](Pictures/下雨.png)
+
+### 黄昏
+
+![黄昏](Pictures/黄昏.png)
+
+### 夜晚
+
+![夜晚](Pictures/夜晚.png)
+
+### 仪表显示
+
+![仪表显示](Pictures/仪表.png)
+
+### 日落
+
+![日落](Pictures/日落.png)
+
+### 天空与云层
+
+![天空与云层](Pictures/天空.png)
+
+---
+
+## 当前开发状态
+
+当前项目已经完成主场景基本整合：
+
+- 主飞机统一使用 `B737.prefab`。
+- 主场景统一为 `MainScene.unity`。
+- JSBSim 桥接文件集中在 `JSBSimBridge/`。
+- 天气系统已真实合入主场景，不再依赖临时运行时注入。
+- HUD、相机切换、天气菜单、时间调节和基础仪表显示已经接入。
+- 降水天气声音已调整为切换后立即出现，云层和雨滴视觉仍保持自然过渡。
+- 机场地面材质已改为项目内资源路径，避免依赖本机绝对路径。
+
+仍在继续打磨：
+
+- 太阳直射、机舱阴影和整体光照表现。
+- 飞机起飞、地面接触和 JSBSim 姿态同步细节。
+- 仪表数据覆盖和显示精度。
+- 天气、发动机和座舱音频的混音平衡。
+- 场景资源和 Unity 自动脏改动的提交筛选。
+
+---
+
+## 快速开始
+
+### 1. 克隆仓库
 
 ```powershell
-winget install --id GitHub.GitLFS -e --source winget; git lfs install; git clone https://github.com/anymore-stay/AeroSim-737.git; cd AeroSim-737; git lfs pull
+git clone https://github.com/anymore-stay/AeroSim-737.git
+cd AeroSim-737
 ```
 
-如果本机已经安装 Git LFS，也可以直接执行：
+### 2. 拉取 Git LFS 资源
+
+项目中的 FBX、贴图、音频、图片等大文件由 Git LFS 管理。首次打开 Unity 前请执行：
 
 ```powershell
-git lfs install; git clone https://github.com/anymore-stay/AeroSim-737.git; cd AeroSim-737; git lfs pull
+git lfs install
+git lfs pull
 ```
 
-macOS 如果使用 Homebrew，可以执行：
-
-```bash
-brew install git-lfs && git lfs install && git clone https://github.com/anymore-stay/AeroSim-737.git && cd AeroSim-737 && git lfs pull
-```
-
-Linux 如果使用 Debian / Ubuntu，可以执行：
-
-```bash
-sudo apt update && sudo apt install -y git-lfs && git lfs install && git clone https://github.com/anymore-stay/AeroSim-737.git && cd AeroSim-737 && git lfs pull
-```
-
-如果仓库已经 clone 过，但当时没有安装 Git LFS，请在仓库根目录执行：
-
-```powershell
-git lfs install; git lfs pull
-```
-
-验证 Git LFS 是否可用：
-
-```powershell
-git lfs version
-git lfs track
-```
-
-正常情况下，`git lfs track` 会列出 `.gitattributes` 中配置的 `*.fbx`、`*.png`、`*.jpg`、`*.dds`、`*.wav`、`*.mp4`、`*.zip` 等大文件规则。
-
-如果看到资源文件内容类似下面这样，说明 LFS 资源还没真正拉下来：
+如果资源文件打开后只看到类似下面的文本，说明 LFS 文件还没有真正拉下来：
 
 ```text
 version https://git-lfs.github.com/spec/v1
@@ -349,128 +122,233 @@ oid sha256:...
 size ...
 ```
 
-解决方式是在仓库根目录重新执行：
+重新执行 `git lfs pull` 即可。
+
+### 3. 打开 Unity 工程
+
+用 Unity 打开下面这个目录：
+
+```text
+AeroSimUnity/
+```
+
+推荐 Unity 版本：
+
+```text
+Unity 2022.3.62f3c1
+```
+
+首次打开时 Unity 会导入包、编译脚本和重建资源缓存，等待完成即可。
+
+### 4. 打开主场景
+
+主场景路径：
+
+```text
+AeroSimUnity/Assets/Scenes/MainScene.unity
+```
+
+进入 Play 后，如果只想看画面、切相机、调天气和测试部分本地交互，可以不启动 JSBSim。  
+如果要测试真实飞行动力学和 HUD 飞行数据，请继续启动 JSBSim。
+
+### 5. 启动 JSBSim（可选但推荐）
+
+项目提供了启动脚本：
+
+```text
+JSBSimBridge/start_jsbsim.bat
+```
+
+JSBSim 安装包位于：
+
+```text
+JSBSimBridge/Install/JSBSim-1.3.1-1837-setup.exe
+```
+
+如果团队成员本机安装路径不同，推荐设置环境变量：
+
+```text
+JSBSIM_DIR=<包含 JSBSim.exe 的目录>
+```
+
+然后再运行 `start_jsbsim.bat`。
+
+---
+
+## 操作按键
+
+### 飞行控制
+
+| 按键 | 功能 |
+| --- | --- |
+| `W` | 低头 |
+| `S` | 抬头 |
+| `A` | 左滚 |
+| `D` | 右滚 |
+| `Q` | 左偏航 |
+| `E` | 右偏航 |
+| `LeftShift` | 增加油门 |
+| `LeftControl` | 减少油门 |
+| `B` | 切换刹车 |
+| `G` | 起落架收放 |
+| `F` | 放下襟翼 |
+| `V` | 收回襟翼 |
+| `R` | 增加扰流板 |
+| `T` | 减少扰流板 |
+
+### 相机与视角
+
+| 按键 | 功能 |
+| --- | --- |
+| `Shift + 7` | 客舱视角 |
+| `Shift + 8` | 驾驶舱视角 |
+| `Shift + 9` | 第三人称视角 |
+| `鼠标右键拖动` | 转动视角 |
+| `方向键` | 移动视角 |
+| `PageUp / PageDown` | 上下移动视角 |
+| `鼠标滚轮` | 第三人称缩放 |
+
+### 界面与天气
+
+| 按键 | 功能 |
+| --- | --- |
+| `Tab` | 显示 / 隐藏 HUD |
+| `1` | 操纵杆显示 / 隐藏 |
+| `2` | 打开 / 关闭天气和时间选择 |
+
+---
+
+## 项目结构
+
+```text
+AeroSim-737/
+├── AeroSimUnity/                         # Unity 工程
+│   ├── Assets/
+│   │   ├── Aircraft/B737/               # 737 飞机资源、Prefab、仪表资源
+│   │   ├── Environment/                 # 机场与环境资源
+│   │   ├── Scenes/                      # 主场景
+│   │   ├── Scripts/
+│   │   │   ├── Aircraft/B737/           # 737 运行时脚本
+│   │   │   ├── Camera/                  # 相机切换与视角控制
+│   │   │   ├── Map/                     # 地图/航图覆盖层
+│   │   │   ├── World/                   # 大世界与原点管理
+│   │   │   └── Editor/B737/             # 编辑器工具与测试
+│   │   ├── UniStorm Weather System/     # 天气系统资源
+│   │   └── Settings/                    # 渲染和工程内设置
+│   ├── Packages/
+│   └── ProjectSettings/
+├── JSBSimBridge/                        # JSBSim 配置、安装包和启动脚本
+├── Pictures/                            # README 图片
+├── Docs/                                # 项目文档
+├── AGENTS.md                            # Codex 协作说明
+├── CLAUDE.md                            # Claude 协作说明
+└── README.md
+```
+
+---
+
+## 关键文件
+
+| 文件/目录 | 说明 |
+| --- | --- |
+| `AeroSimUnity/Assets/Scenes/MainScene.unity` | Unity 主场景 |
+| `AeroSimUnity/Assets/Aircraft/B737/Prefabs/B737.prefab` | 主飞机 Prefab |
+| `AeroSimUnity/Assets/Scripts/Aircraft/B737/JsbsimBridge.cs` | JSBSim 与 Unity 的状态/控制桥接 |
+| `AeroSimUnity/Assets/Scripts/Aircraft/B737/FlightInput.cs` | 键盘输入与控制发送 |
+| `AeroSimUnity/Assets/Scripts/Aircraft/B737/FlightHud.cs` | HUD 显示 |
+| `AeroSimUnity/Assets/Scripts/Aircraft/B737/B737UniStormWeatherMenuController.cs` | 天气菜单中文化和布局 |
+| `AeroSimUnity/Assets/Scripts/Camera/CameraManager.cs` | 相机切换 |
+| `JSBSimBridge/start_jsbsim.bat` | JSBSim 启动脚本 |
+| `JSBSimBridge/b737_unity.xml` | JSBSim 场景配置 |
+| `JSBSimBridge/unity_output.xml` | JSBSim 输出配置 |
+
+---
+
+## 天气系统
+
+项目当前使用 UniStorm URP 天气系统。主场景中包含：
+
+- `UniStorm URP System`
+- `UniStorm Sun`
+- `UniStorm Moon`
+- `UniStorm Windzone`
+- `UniStorm Volumetric Clouds`
+- `Clouds Shadows`
+- `UniStorm Stars`
+
+天气菜单按 `2` 打开，位于右上角。可以选择天气、调节时间，并直接看到当前时间文本。降水天气的声音会在切换后立即出现，但云层、雨滴和地面湿润效果仍保持逐渐变化，让画面过渡更自然。
+
+---
+
+## JSBSim 桥接
+
+Unity 与 JSBSim 的职责分工如下：
+
+```text
+键盘输入 -> Unity FlightInput -> JSBSim 控制通道
+JSBSim 飞行动力学 -> UDP 状态输出 -> Unity JsbsimBridge -> 飞机姿态/HUD/仪表
+```
+
+常用文件：
+
+- `JSBSimBridge/start_jsbsim.bat`
+- `JSBSimBridge/b737_unity.xml`
+- `JSBSimBridge/unity_output.xml`
+- `AeroSimUnity/Assets/Scripts/Aircraft/B737/JsbsimBridge.cs`
+
+不启动 JSBSim 时，仍可以测试画面、天气、相机、HUD 开关和部分本地动画；启动 JSBSim 后，HUD 和仪表数据会随飞行动力学状态更新。
+
+---
+
+## 开发约定
+
+- 737 运行时脚本放在 `AeroSimUnity/Assets/Scripts/Aircraft/B737/`。
+- 相机脚本放在 `AeroSimUnity/Assets/Scripts/Camera/`。
+- 地图/航图脚本放在 `AeroSimUnity/Assets/Scripts/Map/`。
+- 编辑器工具和编辑器测试放在 `AeroSimUnity/Assets/Scripts/Editor/B737/`。
+- Unity 资源移动、复制、重命名时必须连同 `.meta` 文件一起处理。
+- 修改场景、Prefab、材质后，需要回 Unity 检查 Missing Script / Missing Reference。
+- 提交前请确认 `Library/`、`Temp/`、`Logs/`、`obj/`、`UserSettings/`、`.vs/`、`*.csproj`、`*.sln` 没有被加入版本控制。
+
+---
+
+## 常见问题
+
+### 图片或模型变成文本
+
+这是 Git LFS 资源没有拉下来。执行：
 
 ```powershell
 git lfs pull
 ```
 
-### JSBSim 安装包位置
+### HUD 不显示
 
-项目已经在下面这个目录提供了安装包：
+按 `Tab` 切换 HUD 显示。如果仍然看不到，检查当前相机和 HUD Canvas 是否输出到同一个 Display。
 
-- [Install](D:\OneDrive\Desktop\AeroSim-737\JSBSimBridge\Install)
-- [JSBSim-1.3.1-1837-setup.exe](D:\OneDrive\Desktop\AeroSim-737\JSBSimBridge\Install\JSBSim-1.3.1-1837-setup.exe)
+### 天气菜单打不开
 
-建议每位团队成员先安装 JSBSim，再继续下面的启动步骤。
+按 `2`。如果仍无反应，检查 `UniStorm URP System` 是否启用，以及 Console 是否存在脚本错误。
 
-### 第二步：打开 Unity 工程
+### 下雨没有声音
 
-用 Unity 2022.3 LTS 打开：
+先检查当前相机是否启用了 `AudioListener`。再查看 Play 后 Hierarchy 中 `UniStorm Sounds` 下的雨声 AudioSource 是否正在播放。
 
-- [AeroSimUnity](D:\OneDrive\Desktop\AeroSim-737\AeroSimUnity)
+### JSBSim 没有数据
 
-首次打开时请等待 Unity 完成：
-- Package 导入
-- 脚本编译
-- 资源重导入
+确认：
 
-首次打开时间较长属于正常现象。
-
-### 第三步：打开主场景
-
-主场景：
-
-- [MainScene.unity](D:\OneDrive\Desktop\AeroSim-737\AeroSimUnity\Assets\Scenes\MainScene.unity)
-
-同时确认场景中的主飞机实例来自：
-
-- [B737.prefab](D:\OneDrive\Desktop\AeroSim-737\AeroSimUnity\Assets\Aircraft\B737\Prefabs\B737.prefab)
-
-### 第四步：先安装并确认 JSBSim
-
-如果本机还没有安装 JSBSim，请先使用项目内提供的安装包完成安装：
-
-- [Install](D:\OneDrive\Desktop\AeroSim-737\JSBSimBridge\Install)
-- [JSBSim-1.3.1-1837-setup.exe](D:\OneDrive\Desktop\AeroSim-737\JSBSimBridge\Install\JSBSim-1.3.1-1837-setup.exe)
-
-安装完成后，再确认：
-- `JSBSIM_DIR` 或 `DEFAULT_JSBSIM_DIR` 指向的目录下存在 `JSBSim.exe`
-- 该安装目录的 `aircraft\737\` 下存在 `737.xml` 和 `unity_air.xml`
-
-### 第五步：启动 JSBSim（推荐）
-
-如果需要真实飞行物理和实时飞行数据，请在进入 Unity Play 前先运行：
-
-- [start_jsbsim.bat](D:\OneDrive\Desktop\AeroSim-737\JSBSimBridge\start_jsbsim.bat)
-
-相关配置文件：
-- [b737_unity.xml](D:\OneDrive\Desktop\AeroSim-737\JSBSimBridge\b737_unity.xml)
-- [unity_output.xml](D:\OneDrive\Desktop\AeroSim-737\JSBSimBridge\unity_output.xml)
-
-说明：
-- 不启动 JSBSim 时，部分本地动画、相机和界面功能仍可测试。
-- 启动 JSBSim 后，`JsbsimBridge` 会通过既定端口与 Unity 通信。
-
-### JSBSim 安装路径不一致怎么办
-
-团队里不同成员的机器上，JSBSim 安装路径可能不同。
-当前 [start_jsbsim.bat](D:\OneDrive\Desktop\AeroSim-737\JSBSimBridge\start_jsbsim.bat) 已支持两种方式：
-
-1. 推荐方式：设置 `JSBSIM_DIR` 环境变量
-   例如把它设成你机器上的 `JSBSim.exe` 所在目录。
-
-2. 本地方式：直接修改 `start_jsbsim.bat` 里的 `DEFAULT_JSBSIM_DIR`
-   只改你本机使用的路径，不影响 Unity 工程结构。
-
-要求：
-- `JSBSIM_DIR` 或 `DEFAULT_JSBSIM_DIR` 必须指向 **包含 `JSBSim.exe` 的目录**
-- 不要把这个路径写成仓库里的相对路径伪装成本地安装目录
-
-如果运行 `start_jsbsim.bat` 后提示：
-
-```text
-[ERROR] JSBSim.exe not found at: ...
-```
-
-优先检查：
-- 是否已经安装 JSBSim
-- 安装目录里是否真的存在 `JSBSim.exe`
-- `JSBSIM_DIR` / `DEFAULT_JSBSIM_DIR` 是否指到了正确位置
-
-### 第六步：进入 Play
-
-点击 Unity 顶部 `Play` 后，建议按下面顺序检查：
-
-1. 切到驾驶舱视角或第三人称视角
-2. 确认 HUD 是否显示正常
-3. 测试 `F / V` 襟翼
-4. 测试 `G` 起落架
-5. 测试 `W / S / A / D / Q / E` 飞行控制
-6. 测试 `Shift + 7 / 8 / 9` 相机切换
-7. 如果已启动 JSBSim，确认姿态、高度、空速与 HUD 数据是否持续更新
-
-### 第七步：首次开发前建议检查
-
-在正式开始改动前，建议先检查：
-- Console 是否存在编译错误
-- `B737.prefab` 是否有 Missing Script
-- `MainScene` 中主飞机实例是否引用了正确 prefab
-- 材质与贴图是否完整加载
-- `JSBSimBridge` 目录中的外部文件是否齐全
-
-### 常见情况
-
-- 如果看不到 HUD：先按 `Tab`
-- 如果相机切不动：确认是否按了 `Shift + 数字键`
-- 如果只显示模型但没有飞行数据更新：确认是否已启动 `start_jsbsim.bat`
-- 如果 `start_jsbsim.bat` 报找不到 `JSBSim.exe`：检查 `JSBSIM_DIR` 或 `DEFAULT_JSBSIM_DIR`
-- 如果资源显示为文本指针：重新执行 `git lfs pull`
+- `JSBSimBridge/start_jsbsim.bat` 已运行。
+- `JSBSIM_DIR` 指向包含 `JSBSim.exe` 的目录。
+- Unity Console 没有 UDP/TCP 端口错误。
+- HUD 不再显示“等待 JSBSim 数据”。
 
 ---
 
-## 后续建议
+## 后续计划
 
-- 先做一轮引用体检
-- 再做一轮功能回归检查
-- 最后再继续做材质、动画和交互细调
+- 继续优化太阳方向、机舱阴影和天气光照。
+- 完善仪表数据链路和异常状态显示。
+- 改进起飞、接地、滑跑和姿态同步细节。
+- 继续整理主场景资源，减少 Unity 自动脏改动对协作的影响。
+- 扩展更多飞行流程和演示任务。

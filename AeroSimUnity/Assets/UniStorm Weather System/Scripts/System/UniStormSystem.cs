@@ -2561,7 +2561,15 @@ namespace UniStorm
                     if (A.gameObject.name == CurrentWeatherType.WeatherTypeName + " (UniStorm)")
                     {
                         A.Play();
-                        SoundInCoroutine = StartCoroutine(SoundFadeSequence(10 * TransitionSpeed, CurrentWeatherType.WeatherVolume, A, false));
+                        if (CurrentWeatherType.PrecipitationWeatherType == WeatherType.Yes_No.Yes)
+                        {
+                            // 降水天气的雨声需要在切换后立刻听到，云和雨滴视觉仍按原协程慢慢过渡。
+                            A.volume = CurrentWeatherType.WeatherVolume;
+                        }
+                        else
+                        {
+                            SoundInCoroutine = StartCoroutine(SoundFadeSequence(10 * TransitionSpeed, CurrentWeatherType.WeatherVolume, A, false));
+                        }
                     }
                 }
             }
@@ -3427,14 +3435,9 @@ namespace UniStorm
 
         IEnumerator SoundFadeSequence(float TransitionTime, float MaxValue, AudioSource SourceToFade, bool FadeOut)
         {
-            if (CurrentWeatherType.PrecipitationWeatherType == WeatherType.Yes_No.Yes)
-            {
-                if (QualitySettings.activeColorSpace == ColorSpace.Gamma)
-                    yield return new WaitUntil(() => m_CloudDomeMaterial.GetFloat("_uCloudsCoverage") >= 0.59f);
-                else
-                    yield return new WaitUntil(() => m_CloudDomeMaterial.GetFloat("_uCloudsCoverage") >= m_ReceivedCloudValue);
-            }
-            else if (CurrentWeatherType.WaitForCloudLevel == WeatherType.Yes_No.Yes)
+            // 降水天气的雨声需要在切换后立即出现，云量和雨滴视觉仍由各自协程按原速度过渡。
+            if (CurrentWeatherType.WaitForCloudLevel == WeatherType.Yes_No.Yes &&
+                CurrentWeatherType.PrecipitationWeatherType == WeatherType.Yes_No.No)
             {
                 yield return new WaitUntil(() => m_CloudDomeMaterial.GetFloat("_uCloudsCoverage") >= (m_ReceivedCloudValue - 0.01f));
             }
