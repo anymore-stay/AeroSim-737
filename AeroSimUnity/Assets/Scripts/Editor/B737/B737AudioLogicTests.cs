@@ -244,7 +244,7 @@ public class B737AudioLogicTests
 
         Assert.That(UpdateInt(detector, 0, true, 0.4d, -0.5d), Is.EqualTo(1));
         Assert.That(UpdateInt(detector, 0, true, 3.5d, -3.5d), Is.Zero);
-        Assert.That(UpdateInt(detector, 1, true, 1.2d, -0.5d), Is.EqualTo(2));
+        Assert.That(UpdateInt(detector, 1, true, 1.2d, -0.5d), Is.EqualTo(1));
     }
 
     [Test]
@@ -255,14 +255,18 @@ public class B737AudioLogicTests
 
         Assert.That(UpdateInt(detector, 2, true, 0.2d, -0.2d), Is.EqualTo(1));
         Assert.That(UpdateInt(detector, 2, false, 0d, 0d), Is.Zero);
-        Assert.That(UpdateInt(detector, 2, true, 3.1d, -0.2d), Is.EqualTo(4));
+        Assert.That(UpdateInt(detector, 2, true, 8.1d, -0.2d), Is.EqualTo(5));
     }
 
     [TestCase(0.6d, -0.8d, 1)]
-    [TestCase(-1.0d, 0.2d, 2)]
+    [TestCase(1.2d, 0.2d, 1)]
+    [TestCase(1.25d, 0.2d, 2)]
     [TestCase(0.5d, -2.0d, 3)]
-    [TestCase(3.0d, 0d, 4)]
-    [TestCase(-3.1d, -0.4d, 4)]
+    [TestCase(3.048d, 0d, 3)]
+    [TestCase(5.0d, 0d, 4)]
+    [TestCase(-5.1d, -0.4d, 4)]
+    [TestCase(8.0d, 0d, 5)]
+    [TestCase(-8.1d, -0.4d, 5)]
     public void TouchdownBoomUsesMaximumAbsoluteMetersPerSecond(
         double compressionVelocity,
         double descentRate,
@@ -276,8 +280,62 @@ public class B737AudioLogicTests
             Is.EqualTo(expectedBoom));
     }
 
-    [TestCase(double.NaN, 4d, 4)]
-    [TestCase(4d, double.NaN, 4)]
+    [Test]
+    public void TenFeetPerSecondTouchdownIsHardLandingNotExplosionBoom()
+    {
+        object detector = Create("TouchdownDetector");
+        UpdateInt(detector, 0, false, 0d, 0d);
+
+        Assert.That(
+            UpdateInt(detector, 0, true, 10d * 0.3048d, 0d),
+            Is.EqualTo(3));
+    }
+
+    [Test]
+    public void ShallowRollingTouchdownUsesNormalContactBelowTwoMetersPerSecond()
+    {
+        object detector = Create("TouchdownDetector");
+        UpdateInt(detector, 0, false, 0d, 0d, 0d);
+
+        Assert.That(
+            UpdateInt(detector, 0, true, 1.8d, -0.7d, 70d),
+            Is.EqualTo(1));
+    }
+
+    [Test]
+    public void SteepOrSlowTouchdownDoesNotUseRollingAngleCap()
+    {
+        object detector = Create("TouchdownDetector");
+        UpdateInt(detector, 0, false, 0d, 0d, 0d);
+
+        Assert.That(
+            UpdateInt(detector, 0, true, 1.8d, -0.7d, 2d),
+            Is.EqualTo(2));
+    }
+
+    [Test]
+    public void ShallowRollingTouchdownCanReduceHighBoomButNotSevereCrash()
+    {
+        object detector = Create("TouchdownDetector");
+        UpdateInt(detector, 0, false, 0d, 0d, 0d);
+
+        Assert.That(
+            UpdateInt(detector, 0, true, 3.5d, -1d, 70d),
+            Is.EqualTo(2));
+
+        UpdateInt(detector, 0, false, 0d, 0d, 70d);
+        Assert.That(
+            UpdateInt(detector, 0, true, 5.1d, -1d, 70d),
+            Is.EqualTo(3));
+
+        UpdateInt(detector, 0, false, 0d, 0d, 70d);
+        Assert.That(
+            UpdateInt(detector, 0, true, 8.2d, -1d, 70d),
+            Is.EqualTo(5));
+    }
+
+    [TestCase(double.NaN, 8.2d, 5)]
+    [TestCase(8.2d, double.NaN, 5)]
     [TestCase(double.PositiveInfinity, 0.4d, 1)]
     [TestCase(double.PositiveInfinity, double.NegativeInfinity, 1)]
     public void TouchdownBoomIgnoresNonFiniteVelocityInputs(
@@ -448,7 +506,19 @@ public class B737AudioLogicTests
 
     private static T Invoke<T>(object target, string methodName, params object[] arguments)
     {
-        MethodInfo method = target.GetType().GetMethod(methodName, BindingFlags.Public | BindingFlags.Instance);
+        MethodInfo method = null;
+        MethodInfo[] methods = target.GetType().GetMethods(BindingFlags.Public | BindingFlags.Instance);
+        for (int index = 0; index < methods.Length; index++)
+        {
+            MethodInfo candidate = methods[index];
+            if (candidate.Name == methodName &&
+                candidate.GetParameters().Length == arguments.Length)
+            {
+                method = candidate;
+                break;
+            }
+        }
+
         Assert.That(method, Is.Not.Null);
         return (T)method.Invoke(target, arguments);
     }

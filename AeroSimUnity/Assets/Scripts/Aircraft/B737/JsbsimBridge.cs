@@ -31,6 +31,7 @@ using UnityEditor;
 public class JsbsimBridge : MonoBehaviour
 {
     public static JsbsimBridge Instance { get; private set; }
+    private static readonly RaycastHit[] GroundRaycastHits = new RaycastHit[64];
 
     [Header("网络设置")]
     [Tooltip("接收 JSBSim 状态的 UDP 端口,需与 unity_output.xml 一致。")]
@@ -57,6 +58,22 @@ public class JsbsimBridge : MonoBehaviour
     [Header("平滑")]
     [Tooltip("位置/姿态插值速度。0 表示直接硬切(最跟手),越大越平滑但有延迟。建议 10~20。")]
     [SerializeField] private float smoothing = 15f;
+
+    [Header("地面防穿模")]
+    [Tooltip("开启后,JSBSim 给出的可视位置如果低于 Unity 跑道/地面 Collider,会被夹到地面上方。只修正 Unity 显示高度,不改 JSBSim 飞行动力学。")]
+    [SerializeField] private bool preventGroundClipping = true;
+    [Tooltip("用于地面检测的 Layer。默认检测所有可被 Physics Raycast 命中的层。")]
+    [SerializeField] private LayerMask groundCollisionMask = Physics.DefaultRaycastLayers;
+    [Tooltip("从飞机目标位置上方多高处向下探测地面。")]
+    [SerializeField] private float groundRaycastStartHeight = 120f;
+    [Tooltip("地面向下探测的最大距离。")]
+    [SerializeField] private float groundRaycastDistance = 250f;
+    [Tooltip("飞机根节点必须保持在地面 Collider 上方的最小高度。按当前 B737 模型根节点到最低可见几何约 6.3m 设置,避免机体/轮胎视觉穿入跑道。")]
+    [SerializeField] private float groundClearanceMeters = 6.35f;
+    [Tooltip("防穿地足迹采样半宽/半长。用于在俯仰或滚转时保护机头、机尾和两侧低点不穿过跑道。")]
+    [SerializeField] private Vector2 groundProbeFootprintHalfExtentsMeters = new Vector2(18f, 22f);
+    [Tooltip("防穿地足迹机尾方向(+Z)半长。机尾比机头更容易在抬头接地时穿地，因此单独加长。")]
+    [SerializeField] private float groundProbeTailExtentMeters = 34f;
 
     [Header("Cesium")]
     [SerializeField] private bool useCesiumGeoreference = true;
@@ -159,6 +176,10 @@ public class JsbsimBridge : MonoBehaviour
     private Vector3 targetPos;
     private Quaternion targetRot = Quaternion.identity;
     private bool firstPose = true;
+    private Vector3[] groundProbeLocalPoints;
+    private float cachedGroundProbeClearance = -1f;
+    private Vector2 cachedGroundProbeHalfExtents = new Vector2(-1f, -1f);
+    private float cachedGroundProbeTailExtent = -1f;
 
     // 浮动原点累计偏移:把绝对世界坐标换算到当前已平移的渲染坐标
     private Vector3 accumulatedOriginShift = Vector3.zero;
@@ -547,18 +568,32 @@ public class JsbsimBridge : MonoBehaviour
 
         if (HasState && !usingCesiumCoordinates)
         {
+            Vector3 nextPosition;
+            Quaternion nextRotation;
             if (firstPose || smoothing <= 0f)
             {
-                aircraft.position = targetPos;
-                aircraft.rotation = targetRot;
+                nextPosition = targetPos;
+                nextRotation = targetRot;
                 firstPose = false;
             }
             else
             {
                 float t = 1f - Mathf.Exp(-smoothing * Time.deltaTime);
-                aircraft.position = Vector3.Lerp(aircraft.position, targetPos, t);
-                aircraft.rotation = Quaternion.Slerp(aircraft.rotation, targetRot, t);
+                nextPosition = Vector3.Lerp(aircraft.position, targetPos, t);
+                nextRotation = Quaternion.Slerp(aircraft.rotation, targetRot, t);
             }
+
+            aircraft.position = ClampPositionAboveGround(
+                nextPosition,
+                preventGroundClipping,
+                groundCollisionMask,
+                groundRaycastStartHeight,
+                groundRaycastDistance,
+                groundClearanceMeters,
+                nextRotation,
+                aircraft,
+                GetGroundProbeLocalPoints());
+            aircraft.rotation = nextRotation;
         }
         else if (HasState && hasCesiumTarget && cesiumAnchor != null)
         {
@@ -574,9 +609,48 @@ public class JsbsimBridge : MonoBehaviour
                 currentCesiumRotation = Quaternion.Slerp(currentCesiumRotation, targetCesiumRotation, t);
             }
 
+            currentCesiumEcefPosition = ClampCesiumEcefPositionAboveGround(currentCesiumEcefPosition);
             ApplyCesiumPose(currentCesiumEcefPosition, currentCesiumRotation);
             firstPose = false;
         }
+    }
+
+    private double3 ClampCesiumEcefPositionAboveGround(double3 ecefPosition)
+    {
+        if (!preventGroundClipping || aircraft == null)
+            return ecefPosition;
+
+        double4x4 ecefToStartLocal = math.inverse(cesiumStartLocalToEcef);
+        double3 localPosition = math.mul(ecefToStartLocal, new double4(ecefPosition, 1.0)).xyz;
+        Vector3 localVector = new Vector3(
+            (float)localPosition.x,
+            (float)localPosition.y,
+            (float)localPosition.z);
+        Vector3 worldPosition = aircraft.parent != null
+            ? aircraft.parent.TransformPoint(localVector)
+            : localVector;
+        Vector3 clampedWorldPosition = ClampPositionAboveGround(
+            worldPosition,
+            preventGroundClipping,
+            groundCollisionMask,
+            groundRaycastStartHeight,
+            groundRaycastDistance,
+            groundClearanceMeters,
+            currentCesiumRotation,
+            aircraft,
+            GetGroundProbeLocalPoints());
+
+        if (clampedWorldPosition == worldPosition)
+            return ecefPosition;
+
+        Vector3 clampedLocalVector = aircraft.parent != null
+            ? aircraft.parent.InverseTransformPoint(clampedWorldPosition)
+            : clampedWorldPosition;
+        double3 clampedLocalPosition = new double3(
+            clampedLocalVector.x,
+            clampedLocalVector.y,
+            clampedLocalVector.z);
+        return math.mul(cesiumStartLocalToEcef, new double4(clampedLocalPosition, 1.0)).xyz;
     }
 
     private void ApplyCesiumPose(double3 ecefPosition, Quaternion rotation)
@@ -808,12 +882,23 @@ public class JsbsimBridge : MonoBehaviour
         if (usingCesiumCoordinates)
             horizontalOffset = Quaternion.Euler(0f, cesiumHorizontalAlignmentDeg, 0f) * horizontalOffset;
 
+        targetRot = Quaternion.Euler(PitchDeg, HeadingDeg, RollDeg);
         Vector3 unshiftedTargetPos = CalculateTargetPosition(
             sceneStartPos,
             horizontalOffset,
             verticalOffsetM,
             altitudeOffset);
-        targetPos = unshiftedTargetPos + accumulatedOriginShift;
+        Vector3 visualTargetPos = unshiftedTargetPos + accumulatedOriginShift;
+        targetPos = ClampPositionAboveGround(
+            visualTargetPos,
+            preventGroundClipping,
+            groundCollisionMask,
+            groundRaycastStartHeight,
+            groundRaycastDistance,
+            groundClearanceMeters,
+            targetRot,
+            aircraft,
+            GetGroundProbeLocalPoints());
 
         // ---- 姿态:NED 欧拉角 -> Unity 四元数 ----
         // 位移已翻转(north→-Z, east→-X),等价于把世界坐标系绕 Y 轴镜像 180°,
@@ -822,11 +907,29 @@ public class JsbsimBridge : MonoBehaviour
         // RollDeg(绕 Z 轴):Z 轴翻了,但 JSBSim phi>0 是右滚,Unity 绕 +Z 是左滚,
         //   两个翻转抵消,符号仍为 -RollDeg。
         // HeadingDeg:Y 轴未变,模型自身机头朝 -Z 抵消了 180°,直接用 HeadingDeg。
-        targetRot = Quaternion.Euler(PitchDeg, HeadingDeg, RollDeg);
-
         if (usingCesiumCoordinates && cesiumAnchor != null)
         {
-            Vector3 cesiumLocalTargetPos = unshiftedTargetPos;
+            float deltaPitchDeg = Mathf.DeltaAngle(originPitchDeg, PitchDeg);
+            float deltaHeadingDeg = Mathf.DeltaAngle(originHeadingDeg, HeadingDeg);
+            float deltaRollDeg = Mathf.DeltaAngle(originRollDeg, RollDeg);
+            Quaternion cesiumRotation = sceneStartRot
+                                        * Quaternion.Euler(deltaPitchDeg, deltaHeadingDeg, deltaRollDeg);
+            Vector3 cesiumWorldTargetPos = aircraft.parent != null
+                ? aircraft.parent.TransformPoint(unshiftedTargetPos)
+                : unshiftedTargetPos;
+            Vector3 clampedCesiumWorldTargetPos = ClampPositionAboveGround(
+                cesiumWorldTargetPos,
+                preventGroundClipping,
+                groundCollisionMask,
+                groundRaycastStartHeight,
+                groundRaycastDistance,
+                groundClearanceMeters,
+                cesiumRotation,
+                aircraft,
+                GetGroundProbeLocalPoints());
+            Vector3 cesiumLocalTargetPos = aircraft.parent != null
+                ? aircraft.parent.InverseTransformPoint(clampedCesiumWorldTargetPos)
+                : clampedCesiumWorldTargetPos;
             double3 localPosition = new double3(
                 cesiumLocalTargetPos.x,
                 cesiumLocalTargetPos.y,
@@ -834,11 +937,6 @@ public class JsbsimBridge : MonoBehaviour
             double3 ecefPosition = math.mul(
                 cesiumStartLocalToEcef,
                 new double4(localPosition, 1.0)).xyz;
-            float deltaPitchDeg = Mathf.DeltaAngle(originPitchDeg, PitchDeg);
-            float deltaHeadingDeg = Mathf.DeltaAngle(originHeadingDeg, HeadingDeg);
-            float deltaRollDeg = Mathf.DeltaAngle(originRollDeg, RollDeg);
-            Quaternion cesiumRotation = sceneStartRot
-                                        * Quaternion.Euler(deltaPitchDeg, deltaHeadingDeg, deltaRollDeg);
 
             targetCesiumEcefPosition = ecefPosition;
             targetCesiumRotation = cesiumRotation;
@@ -862,6 +960,163 @@ public class JsbsimBridge : MonoBehaviour
         return sceneStartPosition
                + horizontalOffset
                + new Vector3(0f, verticalOffsetM + altitudeOffsetM, 0f);
+    }
+
+    private Vector3[] GetGroundProbeLocalPoints()
+    {
+        float bottomY = -Mathf.Max(0f, groundClearanceMeters);
+        Vector2 extents = new Vector2(
+            Mathf.Max(0f, groundProbeFootprintHalfExtentsMeters.x),
+            Mathf.Max(0f, groundProbeFootprintHalfExtentsMeters.y));
+        float tailExtent = Mathf.Max(extents.y, groundProbeTailExtentMeters);
+
+        if (groundProbeLocalPoints != null &&
+            Mathf.Approximately(cachedGroundProbeClearance, bottomY) &&
+            Mathf.Approximately(cachedGroundProbeHalfExtents.x, extents.x) &&
+            Mathf.Approximately(cachedGroundProbeHalfExtents.y, extents.y) &&
+            Mathf.Approximately(cachedGroundProbeTailExtent, tailExtent))
+        {
+            return groundProbeLocalPoints;
+        }
+
+        cachedGroundProbeClearance = bottomY;
+        cachedGroundProbeHalfExtents = extents;
+        cachedGroundProbeTailExtent = tailExtent;
+        groundProbeLocalPoints = new[]
+        {
+            new Vector3(0f, bottomY, 0f),
+            new Vector3(-extents.x, bottomY, 0f),
+            new Vector3(extents.x, bottomY, 0f),
+            new Vector3(0f, bottomY, -extents.y),
+            new Vector3(0f, bottomY, tailExtent),
+            new Vector3(-extents.x, bottomY, -extents.y),
+            new Vector3(extents.x, bottomY, -extents.y),
+            new Vector3(-extents.x, bottomY, tailExtent),
+            new Vector3(extents.x, bottomY, tailExtent)
+        };
+
+        return groundProbeLocalPoints;
+    }
+
+    private static Vector3 ClampPositionAboveGround(
+        Vector3 desiredPosition,
+        bool preventGroundClipping,
+        int groundCollisionMask,
+        float groundRaycastStartHeight,
+        float groundRaycastDistance,
+        float groundClearanceMeters,
+        Transform ignoredRoot)
+    {
+        return ClampPositionAboveGround(
+            desiredPosition,
+            preventGroundClipping,
+            groundCollisionMask,
+            groundRaycastStartHeight,
+            groundRaycastDistance,
+            groundClearanceMeters,
+            Quaternion.identity,
+            ignoredRoot,
+            null);
+    }
+
+    private static Vector3 ClampPositionAboveGround(
+        Vector3 desiredPosition,
+        bool preventGroundClipping,
+        int groundCollisionMask,
+        float groundRaycastStartHeight,
+        float groundRaycastDistance,
+        float groundClearanceMeters,
+        Quaternion desiredRotation,
+        Transform ignoredRoot,
+        Vector3[] localGroundProbePoints)
+    {
+        if (!preventGroundClipping)
+            return desiredPosition;
+
+        if (groundRaycastStartHeight <= 0f || groundRaycastDistance <= 0f)
+            return desiredPosition;
+
+        float clampedRootY = desiredPosition.y;
+        if (TryFindHighestGroundY(
+            desiredPosition,
+            groundCollisionMask,
+            groundRaycastStartHeight,
+            groundRaycastDistance,
+            ignoredRoot,
+            out float rootGroundY))
+        {
+            clampedRootY = Mathf.Max(
+                clampedRootY,
+                rootGroundY + Mathf.Max(0f, groundClearanceMeters));
+        }
+
+        const float defaultSurfaceMarginMeters = 0.05f;
+        if (localGroundProbePoints != null)
+        {
+            for (int index = 0; index < localGroundProbePoints.Length; index++)
+            {
+                Vector3 rotatedLocalProbe = desiredRotation * localGroundProbePoints[index];
+                Vector3 probeWorldPosition = desiredPosition + rotatedLocalProbe;
+                if (!TryFindHighestGroundY(
+                    probeWorldPosition,
+                    groundCollisionMask,
+                    groundRaycastStartHeight,
+                    groundRaycastDistance,
+                    ignoredRoot,
+                    out float probeGroundY))
+                {
+                    continue;
+                }
+
+                float minimumProbeY = probeGroundY + defaultSurfaceMarginMeters;
+                float requiredRootY = desiredPosition.y +
+                    (minimumProbeY - probeWorldPosition.y);
+                clampedRootY = Mathf.Max(clampedRootY, requiredRootY);
+            }
+        }
+
+        if (desiredPosition.y >= clampedRootY)
+            return desiredPosition;
+
+        desiredPosition.y = clampedRootY;
+        return desiredPosition;
+    }
+
+    private static bool TryFindHighestGroundY(
+        Vector3 probeWorldPosition,
+        int groundCollisionMask,
+        float groundRaycastStartHeight,
+        float groundRaycastDistance,
+        Transform ignoredRoot,
+        out float highestGroundY)
+    {
+        Vector3 rayOrigin = probeWorldPosition + Vector3.up * groundRaycastStartHeight;
+        int hitCount = Physics.RaycastNonAlloc(
+            rayOrigin,
+            Vector3.down,
+            GroundRaycastHits,
+            groundRaycastDistance,
+            groundCollisionMask,
+            QueryTriggerInteraction.Ignore);
+
+        highestGroundY = float.NegativeInfinity;
+        if (hitCount <= 0)
+            return false;
+
+        for (int i = 0; i < hitCount; i++)
+        {
+            Collider collider = GroundRaycastHits[i].collider;
+            if (collider == null)
+                continue;
+
+            if (ignoredRoot != null && collider.transform.IsChildOf(ignoredRoot))
+                continue;
+
+            if (GroundRaycastHits[i].point.y > highestGroundY)
+                highestGroundY = GroundRaycastHits[i].point.y;
+        }
+
+        return !float.IsNegativeInfinity(highestGroundY);
     }
 
     // ====================== TCP 控制发送 ======================

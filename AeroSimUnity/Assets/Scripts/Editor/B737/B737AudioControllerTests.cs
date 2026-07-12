@@ -18,7 +18,6 @@ public class B737AudioControllerTests
         "Right Engine Loop",
         "Right Engine Starter",
         "Gear",
-        "Flaps",
         "Runway Roll",
         "Touchdown",
         "Stall",
@@ -31,12 +30,8 @@ public class B737AudioControllerTests
         "Audio/B737/Engine/engine_loop",
         "Audio/B737/Engine/starter",
         "Audio/B737/Systems/gear",
-        "Audio/B737/Systems/flap",
         "Audio/B737/Ground/runway_roll",
-        "Audio/B737/Ground/touchdown_1",
-        "Audio/B737/Ground/touchdown_2",
-        "Audio/B737/Ground/touchdown_3",
-        "Audio/B737/Ground/touchdown_4",
+        "Audio/B737/Ground/touchdown_normal",
         "Audio/B737/Alerts/stall",
         "Audio/B737/Alerts/overspeed",
         "Audio/B737/Callouts/1000",
@@ -107,7 +102,6 @@ public class B737AudioControllerTests
             "Audio/B737/Engine/engine_loop",
             "Audio/B737/Ground/runway_roll",
             "Audio/B737/Systems/gear",
-            "Audio/B737/Systems/flap",
             "Audio/B737/Alerts/overspeed"
         };
 
@@ -133,7 +127,6 @@ public class B737AudioControllerTests
             "ClearOfflineEngineOverride",
             "PreviewEngineStart",
             "PreviewGear",
-            "PreviewFlaps",
             "PreviewRunwayRoll",
             "PreviewTouchdown",
             "PreviewStall",
@@ -156,7 +149,7 @@ public class B737AudioControllerTests
     }
 
     [Test]
-    public void InitializeCreatesExactlyElevenStableSourcesAndIsIdempotent()
+    public void InitializeCreatesStableSourcesAndIsIdempotent()
     {
         Component controller = CreateController();
 
@@ -174,11 +167,19 @@ public class B737AudioControllerTests
         {
             "Left Engine Loop",
             "Right Engine Loop",
-            "Gear",
-            "Flaps",
             "Runway Roll",
             "Stall",
             "Overspeed"
+        };
+        HashSet<string> spatial = new HashSet<string>
+        {
+            "Left Engine Loop",
+            "Left Engine Starter",
+            "Right Engine Loop",
+            "Right Engine Starter",
+            "Gear",
+            "Runway Roll",
+            "Touchdown"
         };
 
         for (int index = 0; index < SourceNames.Length; index++)
@@ -188,7 +189,7 @@ public class B737AudioControllerTests
             Assert.That(source.loop, Is.EqualTo(looping.Contains(SourceNames[index])), SourceNames[index]);
             Assert.That(
                 source.spatialBlend,
-                Is.EqualTo(index < 8 ? 1f : 0f).Within(0.0001f),
+                Is.EqualTo(spatial.Contains(SourceNames[index]) ? 1f : 0f).Within(0.0001f),
                 SourceNames[index]);
             Assert.That(source.dopplerLevel, Is.Zero.Within(0.0001f), SourceNames[index]);
             Assert.That(source.clip, Is.Not.Null, SourceNames[index]);
@@ -290,7 +291,6 @@ public class B737AudioControllerTests
         Invoke(controller, "PreviewEngineStart", 0);
         Invoke(controller, "PreviewEngineStart", 1);
         Invoke(controller, "PreviewGear", true);
-        Invoke(controller, "PreviewFlaps", true);
         Invoke(controller, "PreviewRunwayRoll", 0.75f);
         Invoke(controller, "PreviewTouchdown", 4);
         Invoke(controller, "PreviewStall", true);
@@ -310,8 +310,6 @@ public class B737AudioControllerTests
         {
             InvokePrivate(controller, "UpdateOfflineAudio", 0.02f);
             Assert.That(FindSource(controller.gameObject, "Left Engine Loop").volume, Is.GreaterThan(0f));
-            Assert.That(FindSource(controller.gameObject, "Gear").volume, Is.GreaterThan(0f));
-            Assert.That(FindSource(controller.gameObject, "Flaps").volume, Is.GreaterThan(0f));
             Assert.That(FindSource(controller.gameObject, "Runway Roll").volume, Is.GreaterThan(0f));
             Assert.That(FindSource(controller.gameObject, "Stall").volume, Is.GreaterThan(0f));
             Assert.That(FindSource(controller.gameObject, "Overspeed").volume, Is.GreaterThan(0f));
@@ -434,7 +432,6 @@ public class B737AudioControllerTests
         AudioSource rightStarter = FindSource(controller.gameObject, "Right Engine Starter");
         AudioSource touchdown = FindSource(controller.gameObject, "Touchdown");
         AudioSource gear = FindSource(controller.gameObject, "Gear");
-        AudioSource flaps = FindSource(controller.gameObject, "Flaps");
         AudioSource radio = FindSource(controller.gameObject, "Radio Altitude");
         Queue<int> pendingCallouts = (Queue<int>)GetPrivateField(
             controller,
@@ -443,7 +440,6 @@ public class B737AudioControllerTests
         rightStarter.volume = 0f;
         touchdown.volume = 0f;
         gear.volume = 0f;
-        flaps.volume = 0f;
         radio.volume = 0f;
         pendingCallouts.Clear();
 
@@ -454,7 +450,6 @@ public class B737AudioControllerTests
         Assert.That(rightStarter.volume, Is.Zero.Within(0.0001f));
         Assert.That(touchdown.volume, Is.Zero.Within(0.0001f));
         Assert.That(gear.volume, Is.Zero.Within(0.0001f));
-        Assert.That(flaps.volume, Is.Zero.Within(0.0001f));
         Assert.That(radio.volume, Is.Zero.Within(0.0001f));
         Assert.That(pendingCallouts, Is.Empty);
 
@@ -570,7 +565,7 @@ public class B737AudioControllerTests
     }
 
     [Test]
-    public void PartialIndividualWowStillUsesAggregateTouchdownEdge()
+    public void PartialIndividualWowStillUsesAggregateTouchdownEdgeWithoutExplosionClip()
     {
         Component bridge;
         Component controller = CreateControllerWithDependency("JsbsimBridge", out bridge);
@@ -589,7 +584,78 @@ public class B737AudioControllerTests
         Assert.That(touchdown.volume, Is.GreaterThan(0f));
         Assert.That(
             touchdown.clip,
-            Is.SameAs(Resources.Load<AudioClip>("Audio/B737/Ground/touchdown_4")));
+            Is.SameAs(Resources.Load<AudioClip>("Audio/B737/Ground/touchdown_normal")));
+    }
+
+    [Test]
+    public void NormalTouchdownUsesDedicatedContactClip()
+    {
+        Component bridge;
+        Component controller = CreateControllerWithDependency("JsbsimBridge", out bridge);
+        Dictionary<string, float> latest = GetBridgeLatest(bridge);
+        latest.Clear();
+        latest["gear_unit_wow"] = 0f;
+        latest["gear_wow"] = 0f;
+        latest["gear_unit_1_compression_velocity_fps"] = 1f;
+        InvokePrivate(controller, "UpdateConnectedGroundSounds", 0.02f);
+
+        AudioSource touchdown = FindSource(controller.gameObject, "Touchdown");
+        touchdown.volume = 0f;
+        latest["gear_wow"] = 1f;
+        InvokePrivate(controller, "UpdateConnectedGroundSounds", 0.02f);
+
+        Assert.That(touchdown.volume, Is.GreaterThan(0f));
+        Assert.That(
+            touchdown.clip,
+            Is.SameAs(Resources.Load<AudioClip>("Audio/B737/Ground/touchdown_normal")));
+    }
+
+    [Test]
+    public void FourFeetPerSecondTouchdownStillUsesDedicatedContactClip()
+    {
+        Component bridge;
+        Component controller = CreateControllerWithDependency("JsbsimBridge", out bridge);
+        Dictionary<string, float> latest = GetBridgeLatest(bridge);
+        latest.Clear();
+        latest["gear_unit_wow"] = 0f;
+        latest["gear_wow"] = 0f;
+        latest["gear_unit_1_compression_velocity_fps"] = 4f;
+        InvokePrivate(controller, "UpdateConnectedGroundSounds", 0.02f);
+
+        AudioSource touchdown = FindSource(controller.gameObject, "Touchdown");
+        touchdown.volume = 0f;
+        latest["gear_wow"] = 1f;
+        InvokePrivate(controller, "UpdateConnectedGroundSounds", 0.02f);
+
+        Assert.That(touchdown.volume, Is.GreaterThan(0f));
+        Assert.That(
+            touchdown.clip,
+            Is.SameAs(Resources.Load<AudioClip>("Audio/B737/Ground/touchdown_normal")));
+    }
+
+    [Test]
+    public void ShallowHighSpeedTouchdownStillUsesDedicatedContactClip()
+    {
+        Component bridge;
+        Component controller = CreateControllerWithDependency("JsbsimBridge", out bridge);
+        Dictionary<string, float> latest = GetBridgeLatest(bridge);
+        latest.Clear();
+        latest["gear_unit_wow"] = 0f;
+        latest["gear_wow"] = 0f;
+        latest["gear_unit_wheel_speed_fps"] = 230f;
+        latest["gear_unit_1_compression_velocity_fps"] = 5f;
+        SetPrivateField(bridge, "<VerticalSpeedFps>k__BackingField", -2f);
+        InvokePrivate(controller, "UpdateConnectedGroundSounds", 0.02f);
+
+        AudioSource touchdown = FindSource(controller.gameObject, "Touchdown");
+        touchdown.volume = 0f;
+        latest["gear_wow"] = 1f;
+        InvokePrivate(controller, "UpdateConnectedGroundSounds", 0.02f);
+
+        Assert.That(touchdown.volume, Is.GreaterThan(0f));
+        Assert.That(
+            touchdown.clip,
+            Is.SameAs(Resources.Load<AudioClip>("Audio/B737/Ground/touchdown_normal")));
     }
 
     [Test]
@@ -664,17 +730,19 @@ public class B737AudioControllerTests
     }
 
     [Test]
-    public void PreviewTouchdownSelectsEachOfTheFourBoomClips()
+    public void PreviewTouchdownAlwaysSelectsNormalContactClip()
     {
         Component controller = CreateController();
         AudioSource source = FindSource(controller.gameObject, "Touchdown");
 
-        for (int severity = 1; severity <= 4; severity++)
+        AudioClip normalClip = Resources.Load<AudioClip>("Audio/B737/Ground/touchdown_normal");
+
+        for (int severity = 1; severity <= 5; severity++)
         {
             Invoke(controller, "PreviewTouchdown", severity);
             Assert.That(
                 source.clip,
-                Is.SameAs(Resources.Load<AudioClip>("Audio/B737/Ground/touchdown_" + severity)));
+                Is.SameAs(normalClip));
         }
     }
 
@@ -696,7 +764,6 @@ public class B737AudioControllerTests
     {
         Component controller = CreateController();
         AssertPreviewToggle(controller, "PreviewGear", "Gear");
-        AssertPreviewToggle(controller, "PreviewFlaps", "Flaps");
         AssertPreviewToggle(controller, "PreviewStall", "Stall");
         AssertPreviewToggle(controller, "PreviewOverspeed", "Overspeed");
 
@@ -719,11 +786,11 @@ public class B737AudioControllerTests
         Assert.DoesNotThrow(() => Invoke(controller, "PreviewTouchdown", int.MinValue));
         Assert.That(
             FindSource(controller.gameObject, "Touchdown").clip,
-            Is.SameAs(Resources.Load<AudioClip>("Audio/B737/Ground/touchdown_1")));
+            Is.SameAs(Resources.Load<AudioClip>("Audio/B737/Ground/touchdown_normal")));
         Assert.DoesNotThrow(() => Invoke(controller, "PreviewTouchdown", int.MaxValue));
         Assert.That(
             FindSource(controller.gameObject, "Touchdown").clip,
-            Is.SameAs(Resources.Load<AudioClip>("Audio/B737/Ground/touchdown_4")));
+            Is.SameAs(Resources.Load<AudioClip>("Audio/B737/Ground/touchdown_normal")));
         Assert.DoesNotThrow(() => Invoke(controller, "PreviewRunwayRoll", float.NaN));
         Assert.DoesNotThrow(() => Invoke(controller, "PreviewRunwayRoll", float.PositiveInfinity));
         Assert.DoesNotThrow(() => Invoke(controller, "PreviewCallout", -1));
