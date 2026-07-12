@@ -79,7 +79,7 @@ public class JsbsimBridge : MonoBehaviour
     [SerializeField] private bool useCesiumGeoreference = true;
     [SerializeField] private double cesiumOriginShiftDistance = 250.0;
     [SerializeField] private bool anchorStaticCesiumChildren = true;
-    [SerializeField] private bool preserveStaticCesiumChildRotation = true;
+    [SerializeField] private bool preserveStaticCesiumChildRotation = false;
 
     [Header("浮动原点(消除渲染抖动)")]
     [Tooltip("开启后,由 FloatingOriginManager 在飞机远离原点时触发三维原点平移。\n" +
@@ -165,6 +165,10 @@ public class JsbsimBridge : MonoBehaviour
     private bool originSet;
     private double originLatRad;
     private double originLonRad;
+    private bool displacementOriginSet;
+    private float originNorthFt;
+    private float originEastFt;
+    private float originUpFt;
     private float originAltM;          // 首帧海拔(米),用于让高度相对于场景位置
     private const double EarthRadiusM = 6378137.0; // WGS84 赤道半径
 
@@ -609,7 +613,8 @@ public class JsbsimBridge : MonoBehaviour
                 currentCesiumRotation = Quaternion.Slerp(currentCesiumRotation, targetCesiumRotation, t);
             }
 
-            currentCesiumEcefPosition = ClampCesiumEcefPositionAboveGround(currentCesiumEcefPosition);
+            // JSBSim owns ground contact in Cesium mode. Unity ground probes operate in the
+            // shifted render frame and can mistake mismatched scenery colliders for the runway.
             ApplyCesiumPose(currentCesiumEcefPosition, currentCesiumRotation);
             firstPose = false;
         }
@@ -741,8 +746,8 @@ public class JsbsimBridge : MonoBehaviour
             Transform child = cesiumGeoreference.transform.GetChild(i);
             if (child == null || child == aircraft) continue;
             if (child.GetComponent<Cesium3DTileset>() != null) continue;
-            if (child.GetComponent<CesiumGlobeAnchor>() != null) continue;
 
+            Vector3 originalPosition = child.localPosition;
             Quaternion originalRotation = child.localRotation;
             Vector3 originalScale = child.localScale;
             CesiumGlobeAnchor anchor = child.GetComponent<CesiumGlobeAnchor>();
@@ -751,9 +756,12 @@ public class JsbsimBridge : MonoBehaviour
 
             anchor.detectTransformChanges = false;
             anchor.adjustOrientationForGlobeWhenMoving = false;
-            anchor.Sync();
+            // AddComponent may immediately align the Transform to the ellipsoid.
+            // Make the authored pose authoritative before caching its ECEF matrix.
+            child.localPosition = originalPosition;
             child.localRotation = originalRotation;
             child.localScale = originalScale;
+            anchor.Sync();
 
             staticCesiumChildren.Add(new StaticCesiumChild
             {
@@ -869,9 +877,17 @@ public class JsbsimBridge : MonoBehaviour
             s.TryGetValue("position_from_start_neu_e_ft", out eastFt) &&
             s.TryGetValue("position_from_start_neu_u_ft", out upFt))
         {
-            north = northFt * feetToMeters;
-            east = eastFt * feetToMeters;
-            verticalOffsetM = upFt * feetToMeters;
+            if (!displacementOriginSet)
+            {
+                originNorthFt = northFt;
+                originEastFt = eastFt;
+                originUpFt = upFt;
+                displacementOriginSet = true;
+            }
+
+            north = (northFt - originNorthFt) * feetToMeters;
+            east = (eastFt - originEastFt) * feetToMeters;
+            verticalOffsetM = (upFt - originUpFt) * feetToMeters;
         }
 
         // Unity: X=East, Y=Up, Z=North (标准约定)
@@ -889,16 +905,18 @@ public class JsbsimBridge : MonoBehaviour
             verticalOffsetM,
             altitudeOffset);
         Vector3 visualTargetPos = unshiftedTargetPos + accumulatedOriginShift;
-        targetPos = ClampPositionAboveGround(
-            visualTargetPos,
-            preventGroundClipping,
-            groundCollisionMask,
-            groundRaycastStartHeight,
-            groundRaycastDistance,
-            groundClearanceMeters,
-            targetRot,
-            aircraft,
-            GetGroundProbeLocalPoints());
+        targetPos = usingCesiumCoordinates
+            ? visualTargetPos
+            : ClampPositionAboveGround(
+                visualTargetPos,
+                preventGroundClipping,
+                groundCollisionMask,
+                groundRaycastStartHeight,
+                groundRaycastDistance,
+                groundClearanceMeters,
+                targetRot,
+                aircraft,
+                GetGroundProbeLocalPoints());
 
         // ---- 姿态:NED 欧拉角 -> Unity 四元数 ----
         // 位移已翻转(north→-Z, east→-X),等价于把世界坐标系绕 Y 轴镜像 180°,
@@ -914,26 +932,10 @@ public class JsbsimBridge : MonoBehaviour
             float deltaRollDeg = Mathf.DeltaAngle(originRollDeg, RollDeg);
             Quaternion cesiumRotation = sceneStartRot
                                         * Quaternion.Euler(deltaPitchDeg, deltaHeadingDeg, deltaRollDeg);
-            Vector3 cesiumWorldTargetPos = aircraft.parent != null
-                ? aircraft.parent.TransformPoint(unshiftedTargetPos)
-                : unshiftedTargetPos;
-            Vector3 clampedCesiumWorldTargetPos = ClampPositionAboveGround(
-                cesiumWorldTargetPos,
-                preventGroundClipping,
-                groundCollisionMask,
-                groundRaycastStartHeight,
-                groundRaycastDistance,
-                groundClearanceMeters,
-                cesiumRotation,
-                aircraft,
-                GetGroundProbeLocalPoints());
-            Vector3 cesiumLocalTargetPos = aircraft.parent != null
-                ? aircraft.parent.InverseTransformPoint(clampedCesiumWorldTargetPos)
-                : clampedCesiumWorldTargetPos;
             double3 localPosition = new double3(
-                cesiumLocalTargetPos.x,
-                cesiumLocalTargetPos.y,
-                cesiumLocalTargetPos.z);
+                unshiftedTargetPos.x,
+                unshiftedTargetPos.y,
+                unshiftedTargetPos.z);
             double3 ecefPosition = math.mul(
                 cesiumStartLocalToEcef,
                 new double4(localPosition, 1.0)).xyz;

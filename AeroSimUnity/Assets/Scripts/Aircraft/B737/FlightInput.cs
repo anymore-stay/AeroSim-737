@@ -109,6 +109,16 @@ public class FlightInput : MonoBehaviour
     [Tooltip("低于此校准空速时关闭保护，避免影响地面滑行转向。")]
     [SerializeField, Min(0f)] private float sideSlipProtectionMinSpeedKts = 60f;
 
+    [Header("地面前轮转向")]
+    [Tooltip("中文名：启用地面前轮转向。开启后 Q/E 会同时控制 JSBSim 的前轮转向通道。")]
+    [SerializeField] private bool groundSteeringEnabled = true;
+    [Tooltip("中文名：地面转向力度。1 表示使用完整前轮转向范围，减小后滑行转弯会更缓。")]
+    [SerializeField, Range(0f, 1f)] private float groundSteeringAuthority = 1f;
+    [Tooltip("中文名：地面转向最大离地高度。高于该无线电高度后前轮转向自动归零。")]
+    [SerializeField, Min(0f)] private float groundSteeringMaxAglFt = 15f;
+    [Tooltip("中文名：反转 JSBSim 前轮转向。当前 737 场景保持关闭，使 Q 左转、E 右转。")]
+    [SerializeField] private bool invertGroundSteering = false;
+
     [Header("坡度角保护")]
     [Tooltip("限制飞行中的最大坡度角，防止持续按 A/D 导致飞机翻转。")]
     [SerializeField] private bool bankAngleProtection = true;
@@ -368,6 +378,7 @@ public class FlightInput : MonoBehaviour
         bridge.SetProperty("fcs/elevator-cmd-norm", elevatorCommand);
         bridge.SetProperty("fcs/aileron-cmd-norm", aileronCommand);
         bridge.SetProperty("fcs/rudder-cmd-norm", rudderCommand);
+        bridge.SetProperty("fcs/steer-cmd-norm", CalculateGroundSteeringCommand());
         bridge.SetProperty("fcs/throttle-cmd-norm[0]", throttle);
         bridge.SetProperty("fcs/throttle-cmd-norm[1]", throttle);
         bridge.SetProperty("fcs/flap-cmd-norm", Flaps);
@@ -377,6 +388,21 @@ public class FlightInput : MonoBehaviour
         float b = brakes ? 1f : 0f;
         bridge.SetProperty("fcs/left-brake-cmd-norm", b);
         bridge.SetProperty("fcs/right-brake-cmd-norm", b);
+    }
+
+    private float CalculateGroundSteeringCommand()
+    {
+        if (!groundSteeringEnabled || bridge == null || !bridge.HasState ||
+            bridge.AglFt > groundSteeringMaxAglFt)
+        {
+            return 0f;
+        }
+
+        float steeringInput = maxTurnRudderInput > 0.001f
+            ? rudder / maxTurnRudderInput
+            : rudder;
+        float steeringCommand = Mathf.Clamp(steeringInput * groundSteeringAuthority, -1f, 1f);
+        return invertGroundSteering ? -steeringCommand : steeringCommand;
     }
 
     private float CalculatePitchAssist()

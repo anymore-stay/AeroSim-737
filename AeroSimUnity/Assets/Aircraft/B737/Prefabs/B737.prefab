@@ -68616,7 +68616,7 @@ MonoBehaviour:
   useCesiumGeoreference: 1
   cesiumOriginShiftDistance: 250
   anchorStaticCesiumChildren: 1
-  preserveStaticCesiumChildRotation: 1
+  preserveStaticCesiumChildRotation: 0
   useFloatingOrigin: 1
   floatingOriginObjects:
   - {fileID: 0}
@@ -68665,6 +68665,10 @@ MonoBehaviour:
   pitchHoldGain: 0.03
   turnPitchCompensation: 0.012
   maxPitchAssist: 0.45
+  groundSteeringEnabled: 1
+  groundSteeringAuthority: 1
+  groundSteeringMaxAglFt: 15
+  invertGroundSteering: 0
   sendRate: 50
 --- !u!114 &8219233128410032355
 MonoBehaviour:
