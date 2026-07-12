@@ -164,6 +164,30 @@ public class JsbsimBridgeGroundClippingTests
     }
 
     [Test]
+    public void RearwardRotationPivotRaisesAircraftDuringPositivePitch()
+    {
+        Type bridgeType = Type.GetType("JsbsimBridge, Assembly-CSharp");
+        Assert.That(bridgeType, Is.Not.Null);
+        MethodInfo method = bridgeType.GetMethod(
+            "CalculateRotationPivotCompensation",
+            BindingFlags.NonPublic | BindingFlags.Static);
+        Assert.That(method, Is.Not.Null);
+
+        var compensation = (Vector3)method.Invoke(
+            null,
+            new object[]
+            {
+                Quaternion.identity,
+                Quaternion.Euler(15f, 0f, 0f),
+                new Vector3(0f, 0f, 3f)
+            });
+
+        Assert.That(compensation.x, Is.EqualTo(0f).Within(0.001f));
+        Assert.That(compensation.y, Is.EqualTo(0.776f).Within(0.001f));
+        Assert.That(compensation.z, Is.EqualTo(0.102f).Within(0.001f));
+    }
+
+    [Test]
     public void ApplyStateUsesCurrentPoseWhenClampingGroundProbes()
     {
         CreateGroundWithTopAtZero();

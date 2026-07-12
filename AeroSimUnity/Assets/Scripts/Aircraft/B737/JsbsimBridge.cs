@@ -55,6 +55,9 @@ public class JsbsimBridge : MonoBehaviour
     [Tooltip("绕 Y 轴的额外偏航修正(度),用于对齐模型几何朝向与飞行方向。\n本项目 737 模型机头朝 -Z(机尾朝 +Z),与 JSBSim 航向约定差 180°,故默认 180。")]
     [SerializeField] private float modelYawOffsetDeg = 180f;
 
+    [Tooltip("Local offset of the JSBSim attitude pivot in meters. The B737 tail points along +Z; a positive Z offset reduces tail ground clipping during rotation.")]
+    [SerializeField] private Vector3 rotationPivotOffsetLocal = new Vector3(0f, 0f, 18f);
+
     [Header("平滑")]
     [Tooltip("位置/姿态插值速度。0 表示直接硬切(最跟手),越大越平滑但有延迟。建议 10~20。")]
     [SerializeField] private float smoothing = 15f;
@@ -175,6 +178,7 @@ public class JsbsimBridge : MonoBehaviour
     // ---- 场景起飞位置:飞机在编辑器中摆的位置,JSBSim 经纬度原点映射到这里 ----
     private Vector3 sceneStartPos;
     private Quaternion sceneStartRot = Quaternion.identity;
+    private Quaternion initialTargetRot = Quaternion.identity;
 
     // 目标位姿(线程收到后,主线程插值逼近)
     private Vector3 targetPos;
@@ -849,6 +853,7 @@ public class JsbsimBridge : MonoBehaviour
         RollDeg = phi * Mathf.Rad2Deg;
         PitchDeg = theta * Mathf.Rad2Deg;
         HeadingDeg = psi * Mathf.Rad2Deg;
+        targetRot = Quaternion.Euler(PitchDeg, HeadingDeg, RollDeg);
 
         // ---- 位置:经纬度 -> 局部平面(米)----
         double latRad = latDeg * Math.PI / 180.0;
@@ -860,6 +865,7 @@ public class JsbsimBridge : MonoBehaviour
             originHeadingDeg = HeadingDeg;
             originPitchDeg = PitchDeg;
             originRollDeg = RollDeg;
+            initialTargetRot = targetRot;
             cesiumHorizontalAlignmentDeg = CalculateCesiumHorizontalAlignment();
             originAltM = AltitudeFt * feetToMeters; // 首帧海拔作为地面基准
             originSet = true;
@@ -898,13 +904,16 @@ public class JsbsimBridge : MonoBehaviour
         if (usingCesiumCoordinates)
             horizontalOffset = Quaternion.Euler(0f, cesiumHorizontalAlignmentDeg, 0f) * horizontalOffset;
 
-        targetRot = Quaternion.Euler(PitchDeg, HeadingDeg, RollDeg);
         Vector3 unshiftedTargetPos = CalculateTargetPosition(
             sceneStartPos,
             horizontalOffset,
             verticalOffsetM,
             altitudeOffset);
-        Vector3 visualTargetPos = unshiftedTargetPos + accumulatedOriginShift;
+        Vector3 pivotCompensation = CalculateRotationPivotCompensation(
+            initialTargetRot,
+            targetRot,
+            rotationPivotOffsetLocal);
+        Vector3 visualTargetPos = unshiftedTargetPos + pivotCompensation + accumulatedOriginShift;
         targetPos = usingCesiumCoordinates
             ? visualTargetPos
             : ClampPositionAboveGround(
@@ -932,10 +941,15 @@ public class JsbsimBridge : MonoBehaviour
             float deltaRollDeg = Mathf.DeltaAngle(originRollDeg, RollDeg);
             Quaternion cesiumRotation = sceneStartRot
                                         * Quaternion.Euler(deltaPitchDeg, deltaHeadingDeg, deltaRollDeg);
+            Vector3 cesiumPivotCompensation = CalculateRotationPivotCompensation(
+                sceneStartRot,
+                cesiumRotation,
+                rotationPivotOffsetLocal);
+            Vector3 pivotAdjustedLocalPosition = unshiftedTargetPos + cesiumPivotCompensation;
             double3 localPosition = new double3(
-                unshiftedTargetPos.x,
-                unshiftedTargetPos.y,
-                unshiftedTargetPos.z);
+                pivotAdjustedLocalPosition.x,
+                pivotAdjustedLocalPosition.y,
+                pivotAdjustedLocalPosition.z);
             double3 ecefPosition = math.mul(
                 cesiumStartLocalToEcef,
                 new double4(localPosition, 1.0)).xyz;
@@ -962,6 +976,14 @@ public class JsbsimBridge : MonoBehaviour
         return sceneStartPosition
                + horizontalOffset
                + new Vector3(0f, verticalOffsetM + altitudeOffsetM, 0f);
+    }
+
+    private static Vector3 CalculateRotationPivotCompensation(
+        Quaternion referenceRotation,
+        Quaternion currentRotation,
+        Vector3 pivotOffsetLocal)
+    {
+        return referenceRotation * pivotOffsetLocal - currentRotation * pivotOffsetLocal;
     }
 
     private Vector3[] GetGroundProbeLocalPoints()

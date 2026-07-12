@@ -26,7 +26,7 @@ public class FlightInput : MonoBehaviour
     [SerializeField] private bool enableEscapePause = true;
 
     [Header("舵面灵敏度(每秒变化量)")]
-    [SerializeField] private float elevatorRate = 0.5f;
+    [SerializeField] private float elevatorRate = 0.8f;
     [SerializeField] private float aileronRate = 1.0f;
     [SerializeField] private float rudderRate = 0.8f;
     [Tooltip("松开按键后舵面回中速度。")]
@@ -410,11 +410,13 @@ public class FlightInput : MonoBehaviour
         if (!pitchHoldAssist || bridge == null || !bridge.HasState)
             return 0f;
 
+        // 玩家拉杆或推杆时必须拥有完整俯仰权限，辅助仅在松杆后接管姿态保持。
+        if (Mathf.Abs(elevator) > 0.01f)
+            return 0f;
+
         float targetPitchDeg = pitchHoldDeg;
         float lowAltitudeAssistLimit = 0f;
-        bool hasPitchInput = Mathf.Abs(elevator) > 0.01f;
         if (lowAltitudePitchAssist &&
-            !hasPitchInput &&
             bridge.SpeedKts >= lowAltitudeAssistMinSpeedKts &&
             bridge.AglFt >= lowAltitudeAssistMinimumAglFt &&
             bridge.AglFt < lowAltitudeAssistCeilingAglFt)

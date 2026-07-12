@@ -68612,6 +68612,7 @@ MonoBehaviour:
   feetToMeters: 0.3048
   altitudeOffset: -3
   modelYawOffsetDeg: 180
+  rotationPivotOffsetLocal: {x: 0, y: 0, z: 18}
   smoothing: 15
   useCesiumGeoreference: 1
   cesiumOriginShiftDistance: 250
@@ -68637,7 +68638,7 @@ MonoBehaviour:
   flapController: {fileID: 0}
   mechanicalController: {fileID: 0}
   enableEscapePause: 1
-  elevatorRate: 0.5
+  elevatorRate: 0.8
   aileronRate: 1
   rudderRate: 0.8
   centerRate: 0.75
