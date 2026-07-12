@@ -1,6 +1,9 @@
 using System.Globalization;
 using UnityEngine;
 using UnityEngine.UI;
+#if UNITY_EDITOR
+using UnityEditor;
+#endif
 
 [ExecuteAlways]
 [RequireComponent(typeof(RectTransform))]
@@ -236,14 +239,7 @@ public class B737FmsDisplay : MonoBehaviour
             Transform oldRoot = transform.Find(GeneratedRootName);
             if (oldRoot != null)
             {
-                if (Application.isPlaying)
-                {
-                    Destroy(oldRoot.gameObject);
-                }
-                else
-                {
-                    DestroyImmediate(oldRoot.gameObject);
-                }
+                DestroyObject(oldRoot.gameObject);
             }
 
             GameObject generatedRoot = new GameObject(GeneratedRootName, typeof(RectTransform));
@@ -274,6 +270,37 @@ public class B737FmsDisplay : MonoBehaviour
         {
             isRebuilding = false;
         }
+    }
+
+    private static void DestroyObject(Object target)
+    {
+        if (target == null)
+        {
+            return;
+        }
+
+        if (Application.isPlaying)
+        {
+            Destroy(target);
+            return;
+        }
+
+#if UNITY_EDITOR
+        if (target is GameObject gameObject)
+        {
+            gameObject.name += "_PendingDestroy";
+        }
+
+        EditorApplication.delayCall += () =>
+        {
+            if (target != null)
+            {
+                DestroyImmediate(target);
+            }
+        };
+#else
+        DestroyImmediate(target);
+#endif
     }
 
     private void AttachBridge()

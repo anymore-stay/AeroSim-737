@@ -68151,6 +68151,8 @@ GameObject:
   - component: {fileID: 4725208600538106599}
   - component: {fileID: 4326620856204064838}
   - component: {fileID: 9187182646747135954}
+  - component: {fileID: 313737240712000101}
+  - component: {fileID: 313737240712000102}
   m_Layer: 0
   m_Name: B737
   m_TagString: Untagged
@@ -68986,6 +68988,75 @@ MonoBehaviour:
   minimumRecenteringDistanceMeters: 10
   logStateChanges: 0
   transformJumpRecenteringDistanceMeters: 300
+--- !u!114 &313737240712000101
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5773677376619802584}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b8e3d6f8f4434cc0ac6fc6de3c673701, type: 3}
+  m_Name: ""
+  m_EditorClassIdentifier: ""
+  lightsOn: 1
+  enableKeyboardControl: 1
+  toggleKey: 110
+  leftRedPoint: {fileID: 0}
+  rightGreenPoint: {fileID: 0}
+  tailWhitePoint: {fileID: 0}
+  leftRedDefaultLocalPosition: {x: -8.2, y: 0.05, z: -1.2}
+  rightGreenDefaultLocalPosition: {x: 8.2, y: 0.05, z: -1.2}
+  tailWhiteDefaultLocalPosition: {x: 0, y: 1.05, z: 20.8}
+  leftRedColor: {r: 1, g: 0.05, b: 0.025, a: 1}
+  rightGreenColor: {r: 0.02, g: 0.95, b: 0.18, a: 1}
+  tailWhiteColor: {r: 1, g: 0.96, b: 0.9, a: 1}
+  pointIntensity: 0.28
+  pointRange: 3.2
+  lensScale: 0.06
+  glowScale: 0.24
+  glowAlpha: 0.16
+  emissionIntensity: 5.5
+--- !u!114 &313737240712000102
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5773677376619802584}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: cd4fb154f9624f59a4222a75cb592a10, type: 3}
+  m_Name: ""
+  m_EditorClassIdentifier: ""
+  bridge: {fileID: 5768411947729856939}
+  autoFindBridge: 1
+  mode: 1
+  enableKeyboardControl: 1
+  cycleModeKey: 107
+  leftWingStrobePoint: {fileID: 0}
+  rightWingStrobePoint: {fileID: 0}
+  tailStrobePoint: {fileID: 0}
+  leftWingDefaultLocalPosition: {x: -8.25, y: 0.08, z: -1.3}
+  rightWingDefaultLocalPosition: {x: 8.25, y: 0.08, z: -1.3}
+  tailDefaultLocalPosition: {x: 0, y: 1.05, z: 20.9}
+  forceWhenMovingOrAirborne: 1
+  previewArmedWithoutJsbsim: 1
+  armedModeConstantOn: 1
+  forceAboveAglFt: 10
+  forceAboveSpeedKts: 5
+  landingHoldSeconds: 12
+  pulseSeconds: 0.05
+  gapSeconds: 0.05
+  restSeconds: 1
+  strobeColor: {r: 1, g: 1, b: 1, a: 1}
+  peakIntensity: 220
+  range: 42
+  lensScale: 0.08
+  flashGlowScale: 0.85
+  flashGlowAlpha: 0.75
+  emissionIntensity: 18
 --- !u!114 &9187182646747135954
 MonoBehaviour:
   m_ObjectHideFlags: 0
