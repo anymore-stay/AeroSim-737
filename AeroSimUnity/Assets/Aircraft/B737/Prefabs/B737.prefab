@@ -21766,7 +21766,7 @@ GameObject:
   - component: {fileID: 8884930322662335683}
   m_Layer: 0
   m_Name: ThirdPersonCamera
-  m_TagString: Untagged
+  m_TagString: MainCamera
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
@@ -49061,7 +49061,7 @@ Camera:
     width: 1
     height: 1
   near clip plane: 0.01
-  far clip plane: 1000
+  far clip plane: 100000
   field of view: 60
   orthographic: 0
   orthographic size: 5
@@ -68153,7 +68153,7 @@ GameObject:
   - component: {fileID: 9187182646747135954}
   m_Layer: 0
   m_Name: B737
-  m_TagString: Untagged
+  m_TagString: Player
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
@@ -68610,7 +68610,7 @@ MonoBehaviour:
   controlTcpPort: 5502
   aircraft: {fileID: 8610188127108794172}
   feetToMeters: 0.3048
-  altitudeOffset: -3
+  altitudeOffset: -1.7
   modelYawOffsetDeg: 180
   smoothing: 15
   useCesiumGeoreference: 1
@@ -68662,7 +68662,7 @@ MonoBehaviour:
   maxLevelingAileron: 0.28
   pitchHoldAssist: 1
   pitchHoldDeg: 0
-  pitchHoldGain: 0.03
+  pitchHoldGain: 0.06
   turnPitchCompensation: 0.012
   maxPitchAssist: 0.45
   sendRate: 50
@@ -68680,10 +68680,11 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   bridge: {fileID: 0}
   input: {fileID: 0}
-  fontSize: 12
+  fontSize: 18
   color: {r: 1, g: 1, b: 1, a: 1}
   toggleKey: 9
   visibleOnStart: 1
+  refreshInterval: 0.1
 --- !u!114 &2327114715132849011
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -88892,7 +88893,7 @@ MonoBehaviour:
   maxX: 1.4
   minY: -0.35
   maxY: 0.45
-  minZ: -12
+  minZ: -2
   maxZ: 24
   orbitTarget: {fileID: 0}
   orbitTargetOffset: {x: 0, y: 0, z: 0}
@@ -103875,6 +103876,7 @@ MonoBehaviour:
   bridge: {fileID: 0}
   displayController: {fileID: 0}
   magneticVariationDeg: 0
+  displayRefreshInterval: 0.033333335
 --- !u!1001 &2892383716138023722
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -105570,6 +105572,7 @@ MonoBehaviour:
   verticalSpeedController: {fileID: 0}
   staleWarningSeconds: 1
   logStaleWarning: 1
+  displayRefreshInterval: 0.033333335
 --- !u!4 &5629095732520397681 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 7367149108257902683, guid: 559e21e3ec94e314c96d643c9b82a018,
@@ -107277,6 +107280,7 @@ MonoBehaviour:
   verticalSpeedController: {fileID: 0}
   staleWarningSeconds: 1
   logStaleWarning: 1
+  displayRefreshInterval: 0.033333335
 --- !u!1001 &6658138434621045650
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -107375,7 +107379,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 19897242, guid: 4f672daf6d5264e5c9c59059b417bd89, type: 3}
       propertyPath: InitialModule.maxNumParticles
-      value: 1200
+      value: 1800
       objectReference: {fileID: 0}
     - target: {fileID: 19897242, guid: 4f672daf6d5264e5c9c59059b417bd89, type: 3}
       propertyPath: InitialModule.startSize.scalar
@@ -107428,6 +107432,14 @@ PrefabInstance:
     - target: {fileID: 19897242, guid: 4f672daf6d5264e5c9c59059b417bd89, type: 3}
       propertyPath: InitialModule.startColor.minMaxState
       value: 2
+      objectReference: {fileID: 0}
+    - target: {fileID: 19897242, guid: 4f672daf6d5264e5c9c59059b417bd89, type: 3}
+      propertyPath: InitialModule.startSizeY.minMaxState
+      value: 3
+      objectReference: {fileID: 0}
+    - target: {fileID: 19897242, guid: 4f672daf6d5264e5c9c59059b417bd89, type: 3}
+      propertyPath: InitialModule.startSizeZ.minMaxState
+      value: 3
       objectReference: {fileID: 0}
     - target: {fileID: 19897242, guid: 4f672daf6d5264e5c9c59059b417bd89, type: 3}
       propertyPath: InitialModule.startLifetime.minScalar
@@ -107484,6 +107496,14 @@ PrefabInstance:
     - target: {fileID: 19897242, guid: 4f672daf6d5264e5c9c59059b417bd89, type: 3}
       propertyPath: ColorModule.gradient.maxGradient.key2.r
       value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 19897242, guid: 4f672daf6d5264e5c9c59059b417bd89, type: 3}
+      propertyPath: InitialModule.startRotationX.minMaxState
+      value: 3
+      objectReference: {fileID: 0}
+    - target: {fileID: 19897242, guid: 4f672daf6d5264e5c9c59059b417bd89, type: 3}
+      propertyPath: InitialModule.startRotationY.minMaxState
+      value: 3
       objectReference: {fileID: 0}
     - target: {fileID: 19897242, guid: 4f672daf6d5264e5c9c59059b417bd89, type: 3}
       propertyPath: SizeModule.curve.maxCurve.m_Curve.Array.size
@@ -107708,7 +107728,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 19897242, guid: 4f672daf6d5264e5c9c59059b417bd89, type: 3}
       propertyPath: InitialModule.maxNumParticles
-      value: 1200
+      value: 1800
       objectReference: {fileID: 0}
     - target: {fileID: 19897242, guid: 4f672daf6d5264e5c9c59059b417bd89, type: 3}
       propertyPath: InitialModule.startSize.scalar
@@ -107761,6 +107781,14 @@ PrefabInstance:
     - target: {fileID: 19897242, guid: 4f672daf6d5264e5c9c59059b417bd89, type: 3}
       propertyPath: InitialModule.startColor.minMaxState
       value: 2
+      objectReference: {fileID: 0}
+    - target: {fileID: 19897242, guid: 4f672daf6d5264e5c9c59059b417bd89, type: 3}
+      propertyPath: InitialModule.startSizeY.minMaxState
+      value: 3
+      objectReference: {fileID: 0}
+    - target: {fileID: 19897242, guid: 4f672daf6d5264e5c9c59059b417bd89, type: 3}
+      propertyPath: InitialModule.startSizeZ.minMaxState
+      value: 3
       objectReference: {fileID: 0}
     - target: {fileID: 19897242, guid: 4f672daf6d5264e5c9c59059b417bd89, type: 3}
       propertyPath: InitialModule.startLifetime.minScalar
@@ -107817,6 +107845,14 @@ PrefabInstance:
     - target: {fileID: 19897242, guid: 4f672daf6d5264e5c9c59059b417bd89, type: 3}
       propertyPath: ColorModule.gradient.maxGradient.key2.r
       value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 19897242, guid: 4f672daf6d5264e5c9c59059b417bd89, type: 3}
+      propertyPath: InitialModule.startRotationX.minMaxState
+      value: 3
+      objectReference: {fileID: 0}
+    - target: {fileID: 19897242, guid: 4f672daf6d5264e5c9c59059b417bd89, type: 3}
+      propertyPath: InitialModule.startRotationY.minMaxState
+      value: 3
       objectReference: {fileID: 0}
     - target: {fileID: 19897242, guid: 4f672daf6d5264e5c9c59059b417bd89, type: 3}
       propertyPath: SizeModule.curve.maxCurve.m_Curve.Array.size

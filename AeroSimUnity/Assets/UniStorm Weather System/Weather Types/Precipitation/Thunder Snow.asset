@@ -57,6 +57,7 @@ MonoBehaviour:
     atime6: 0
     atime7: 0
     m_Mode: 0
+    m_ColorSpace: -1
     m_NumColorKeys: 8
     m_NumAlphaKeys: 2
   WindSpeedLevel: 0.85
@@ -64,7 +65,7 @@ MonoBehaviour:
   WindIntensity: 1
   WeatherEffect: {fileID: 198957874608633202, guid: dbee897552d49b2419fbe8ea3ada9baa,
     type: 3}
-  ParticleEffectAmount: 1000
+  ParticleEffectAmount: 3000
   ParticleEffectVector: {x: 0, y: 6, z: 20}
   AdditionalWeatherEffect: {fileID: 198814685187613174, guid: 872b852f5cbd3d54dbfd29aec77b4965,
     type: 3}
@@ -110,6 +111,7 @@ MonoBehaviour:
     atime6: 0
     atime7: 0
     m_Mode: 0
+    m_ColorSpace: -1
     m_NumColorKeys: 8
     m_NumAlphaKeys: 2
   UseLightning: 0

@@ -42,13 +42,13 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   m_Active: 1
   settings:
-    isEnabled: 0
+    isEnabled: 1
     renderPassEvent: 500
-    resolution: 1
+    resolution: 2
     screenBlendMode: 0
     celestialName: UniStorm Sun
     radialBlurIterations: 2
-    sunColor: {r: 0.43051076, g: 0.2265402, b: 0.11699359, a: 1}
+    sunColor: {r: 0.4528302, g: 0.43659666, b: 0.41224635, a: 1}
     sunThreshold: {r: 0.5568628, g: 0.5372549, b: 0.48235294, a: 1}
     sunShaftBlurRadius: 3
     sunShaftIntensity: 1
@@ -112,18 +112,18 @@ MonoBehaviour:
     heightFog: 0
     height: 1
     heightDensity: 2
-    startDistance: 0
-    SunColor: {r: 0, g: 0, b: 0, a: 1}
+    startDistance: 15000
+    SunColor: {r: 0.6603774, g: 0.63595825, b: 0.6011926, a: 1}
     MoonColor: {r: 0.33023313, g: 0.36793935, b: 0.38679242, a: 1}
     TopColor: {r: 0, g: 0, b: 0, a: 0}
-    BottomColor: {r: 0.08706565, g: 0.13197207, b: 0.16122551, a: 1}
-    BlendHeight: 0
+    BottomColor: {r: 0.44588825, g: 0.49321982, b: 0.5660378, a: 1}
+    BlendHeight: 0.014999998
     FogGradientHeight: 0.5
-    SunIntensity: 0.039391663
-    MoonIntensity: 0.02520277
+    SunIntensity: 0.06174622
+    MoonIntensity: -0.009495788
     SunFalloffIntensity: 9.4
-    SunControl: -0.01898291
-    MoonControl: 0.788651
+    SunControl: 1.0006503
+    MoonControl: 0
 --- !u!114 &11400000
 MonoBehaviour:
   m_ObjectHideFlags: 0
