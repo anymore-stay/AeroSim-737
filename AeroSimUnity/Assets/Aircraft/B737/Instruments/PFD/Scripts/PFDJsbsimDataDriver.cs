@@ -21,11 +21,14 @@ public class PFDJsbsimDataDriver : MonoBehaviour
     [Header("断流诊断")]
     [SerializeField, Min(0.1f)] private float staleWarningSeconds = 1f;
     [SerializeField] private bool logStaleWarning = true;
+    [SerializeField, Min(0.01f)] private float displayRefreshInterval = 1f / 30f;
 
     private JsbsimBridge subscribedBridge;
     private float lastStateUpdateTime;
     private bool hasReceivedState;
     private bool staleWarningLogged;
+    private bool stateUpdatePending;
+    private float nextDisplayRefreshTime;
 
     private void Awake()
     {
@@ -46,6 +49,15 @@ public class PFDJsbsimDataDriver : MonoBehaviour
         if (subscribedBridge == null)
         {
             TryBindBridge();
+        }
+
+        if (stateUpdatePending
+            && subscribedBridge != null
+            && Time.unscaledTime >= nextDisplayRefreshTime)
+        {
+            stateUpdatePending = false;
+            nextDisplayRefreshTime = Time.unscaledTime + displayRefreshInterval;
+            ApplyBridgeState(subscribedBridge);
         }
 
         if (logStaleWarning
@@ -92,10 +104,10 @@ public class PFDJsbsimDataDriver : MonoBehaviour
 
     private void HandleStateUpdated()
     {
-        if (subscribedBridge != null)
-        {
-            ApplyBridgeState(subscribedBridge);
-        }
+        stateUpdatePending = true;
+        hasReceivedState = true;
+        staleWarningLogged = false;
+        lastStateUpdateTime = Time.unscaledTime;
     }
 
     private void ApplyBridgeState(JsbsimBridge state)

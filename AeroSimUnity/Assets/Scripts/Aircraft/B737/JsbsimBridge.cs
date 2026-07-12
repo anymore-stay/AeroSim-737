@@ -124,6 +124,7 @@ public class JsbsimBridge : MonoBehaviour
     private string[] labels;
     private readonly object stateLock = new object();
     private Dictionary<string, float> latest = new Dictionary<string, float>();
+    private readonly Dictionary<string, float> mainThreadSnapshot = new Dictionary<string, float>();
     private bool newStateAvailable;
 
     // ---- TCP 控制相关 ----
@@ -372,13 +373,16 @@ public class JsbsimBridge : MonoBehaviour
 
         if (hasNewState)
         {
-            Dictionary<string, float> snap;
             lock (stateLock)
             {
-                snap = new Dictionary<string, float>(latest);
+                mainThreadSnapshot.Clear();
+                foreach (KeyValuePair<string, float> pair in latest)
+                {
+                    mainThreadSnapshot[pair.Key] = pair.Value;
+                }
                 newStateAvailable = false;
             }
-            ApplyState(snap);
+            ApplyState(mainThreadSnapshot);
             HasState = true;
             OnStateUpdated?.Invoke();
         }

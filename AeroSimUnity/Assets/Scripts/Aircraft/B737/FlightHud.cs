@@ -20,12 +20,14 @@ public class FlightHud : MonoBehaviour
     [SerializeField] private KeyCode toggleKey = KeyCode.Tab;
     [Tooltip("启动时是否显示 HUD。")]
     [SerializeField] private bool visibleOnStart = true;
+    [SerializeField, Min(0.05f)] private float refreshInterval = 0.1f;
 
     private Text label;
     private RectTransform panelRt;
     private GameObject panelGo;
     private Canvas canvas;
     private bool hudVisible;
+    private float nextRefreshTime;
     private readonly System.Text.StringBuilder sb = new System.Text.StringBuilder();
 
     private void Awake()
@@ -108,6 +110,12 @@ public class FlightHud : MonoBehaviour
 
         string status = bridge != null && bridge.HasState ? "已连接" : "等待 JSBSim 数据...";
         string ctrl = bridge != null && bridge.ControlConnected ? "控制: 已连接" : "控制: 未连接";
+
+        if (Time.unscaledTime < nextRefreshTime)
+        {
+            return;
+        }
+        nextRefreshTime = Time.unscaledTime + refreshInterval;
 
         sb.Length = 0;
         sb.AppendLine("JSBSim 飞行仿真  [" + status + "]");

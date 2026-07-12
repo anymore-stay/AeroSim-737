@@ -15,6 +15,7 @@ public class EICAS1_Script : MonoBehaviour
     [Tooltip("主动轮询刷新间隔，单位秒。0.05 表示约 20Hz。")]
     [SerializeField, Min(0.01f)] private float pollInterval = 0.05f;
     private float nextPollTime;
+    private bool refreshPending;
 
     [Header("Gauges")]
     [Tooltip("左发 N1 仪表。")]
@@ -117,7 +118,7 @@ public class EICAS1_Script : MonoBehaviour
     {
         if (subscribedBridge != null)
         {
-            subscribedBridge.OnStateUpdated -= Refresh;
+            subscribedBridge.OnStateUpdated -= RequestRefresh;
             subscribedBridge = null;
         }
     }
@@ -129,9 +130,12 @@ public class EICAS1_Script : MonoBehaviour
             AttachBridge();
         }
 
-        if (pollBridgeInUpdate && bridge != null && Time.unscaledTime >= nextPollTime)
+        if (bridge != null
+            && Time.unscaledTime >= nextPollTime
+            && (pollBridgeInUpdate || refreshPending))
         {
             nextPollTime = Time.unscaledTime + pollInterval;
+            refreshPending = false;
             Refresh();
         }
     }
@@ -151,12 +155,18 @@ public class EICAS1_Script : MonoBehaviour
 
         if (subscribedBridge != null)
         {
-            subscribedBridge.OnStateUpdated -= Refresh;
+            subscribedBridge.OnStateUpdated -= RequestRefresh;
         }
 
         bridge = nextBridge;
         subscribedBridge = nextBridge;
-        subscribedBridge.OnStateUpdated += Refresh;
+        subscribedBridge.OnStateUpdated += RequestRefresh;
+        refreshPending = true;
+    }
+
+    private void RequestRefresh()
+    {
+        refreshPending = true;
     }
 
     private void Refresh()
@@ -275,7 +285,7 @@ public class EICAS1_Script : MonoBehaviour
 
     private static void SetText(Text text, string value)
     {
-        if (text != null)
+        if (text != null && text.text != value)
         {
             text.text = value;
         }

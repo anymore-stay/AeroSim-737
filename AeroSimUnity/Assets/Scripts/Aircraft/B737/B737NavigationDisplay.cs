@@ -81,15 +81,20 @@ public class B737NavigationDisplay : MonoBehaviour
 
     [Header("Animation")]
     [SerializeField, Min(0f)] private float animationResponse = 12f;
+    [SerializeField, Min(0.01f)] private float displayRefreshInterval = 1f / 30f;
 
     private const float FeetPerSecondToKnots = 0.5924838f;
     private const double EarthRadiusNm = 3440.065;
 
     private readonly List<B737NavigationDisplaySymbolSnapshot> symbolBuffer = new List<B737NavigationDisplaySymbolSnapshot>(16);
+    private B737NavigationDisplaySymbolSnapshot[] symbolSnapshot = Array.Empty<B737NavigationDisplaySymbolSnapshot>();
     private RuntimeData targetData;
     private RuntimeData displayData;
     private bool dataInitialized;
     private float nextPollTime;
+    private float nextDisplayRefreshTime;
+    private float lastDisplayRefreshTime;
+    private bool stateRefreshPending;
     private JsbsimBridge subscribedBridge;
 
     private RectTransform generatedRoot;
@@ -133,6 +138,8 @@ public class B737NavigationDisplay : MonoBehaviour
     {
         AttachBridge();
         RefreshFromBridge();
+        nextDisplayRefreshTime = 0f;
+        lastDisplayRefreshTime = 0f;
         RenderDisplay();
     }
 
@@ -140,7 +147,7 @@ public class B737NavigationDisplay : MonoBehaviour
     {
         if (subscribedBridge != null)
         {
-            subscribedBridge.OnStateUpdated -= RefreshFromBridge;
+            subscribedBridge.OnStateUpdated -= RequestStateRefresh;
             subscribedBridge = null;
         }
     }
@@ -152,13 +159,30 @@ public class B737NavigationDisplay : MonoBehaviour
             AttachBridge();
         }
 
-        if (pollBridgeInUpdate && Time.unscaledTime >= nextPollTime)
+        bool pollDue = pollBridgeInUpdate && Time.unscaledTime >= nextPollTime;
+        if (pollDue)
         {
             nextPollTime = Time.unscaledTime + pollInterval;
+        }
+
+        if (Time.unscaledTime < nextDisplayRefreshTime)
+        {
+            return;
+        }
+
+        float displayDeltaTime = lastDisplayRefreshTime > 0f
+            ? Time.unscaledTime - lastDisplayRefreshTime
+            : Time.unscaledDeltaTime;
+        lastDisplayRefreshTime = Time.unscaledTime;
+        nextDisplayRefreshTime = Time.unscaledTime + displayRefreshInterval;
+
+        if (pollDue || stateRefreshPending)
+        {
+            stateRefreshPending = false;
             RefreshFromBridge();
         }
 
-        AnimateData();
+        AnimateData(displayDeltaTime);
         RenderDisplay();
     }
 
@@ -197,12 +221,18 @@ public class B737NavigationDisplay : MonoBehaviour
 
         if (subscribedBridge != null)
         {
-            subscribedBridge.OnStateUpdated -= RefreshFromBridge;
+            subscribedBridge.OnStateUpdated -= RequestStateRefresh;
         }
 
         bridge = nextBridge;
         subscribedBridge = nextBridge;
-        subscribedBridge.OnStateUpdated += RefreshFromBridge;
+        subscribedBridge.OnStateUpdated += RequestStateRefresh;
+        stateRefreshPending = true;
+    }
+
+    private void RequestStateRefresh()
+    {
+        stateRefreshPending = true;
     }
 
     private void RefreshFromBridge()
@@ -254,7 +284,7 @@ public class B737NavigationDisplay : MonoBehaviour
         targetData.windSpeedKts = 31f;
     }
 
-    private void AnimateData()
+    private void AnimateData(float deltaTime)
     {
         if (!dataInitialized)
         {
@@ -263,7 +293,7 @@ public class B737NavigationDisplay : MonoBehaviour
             return;
         }
 
-        float t = animationResponse <= 0f ? 1f : 1f - Mathf.Exp(-animationResponse * Time.unscaledDeltaTime);
+        float t = animationResponse <= 0f ? 1f : 1f - Mathf.Exp(-animationResponse * deltaTime);
         displayData.hasBridgeData = targetData.hasBridgeData;
         displayData.hasLatLon = targetData.hasLatLon;
         displayData.latDeg = targetData.latDeg;
@@ -287,6 +317,7 @@ public class B737NavigationDisplay : MonoBehaviour
 
         if (graphic != null)
         {
+            CopySymbolSnapshot();
             graphic.ConfigureGeometry(canvasSize, aircraftApex, arcRadius, visibleArcDeg);
             graphic.SetState(new B737NavigationDisplayState
             {
@@ -297,9 +328,19 @@ public class B737NavigationDisplay : MonoBehaviour
                 WindFromMagDeg = displayData.windFromMagDeg,
                 WindSpeedKts = displayData.windSpeedKts,
                 DisplayRangeNm = displayRangeNm,
-                Symbols = symbolBuffer.ToArray()
+                Symbols = symbolSnapshot
             });
         }
+    }
+
+    private void CopySymbolSnapshot()
+    {
+        if (symbolSnapshot.Length != symbolBuffer.Count)
+        {
+            symbolSnapshot = new B737NavigationDisplaySymbolSnapshot[symbolBuffer.Count];
+        }
+
+        symbolBuffer.CopyTo(symbolSnapshot);
     }
 
     private void UpdateTexts()
@@ -824,7 +865,7 @@ public class B737NavigationDisplay : MonoBehaviour
 
     private static void SetText(Text text, string value)
     {
-        if (text != null)
+        if (text != null && text.text != value)
         {
             text.text = value;
         }
