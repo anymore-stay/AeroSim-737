@@ -34,6 +34,12 @@ public class FlightMapOverlay : MonoBehaviour
         }
     }
 
+    private enum TileCoordinateSystem
+    {
+        Wgs84,
+        Gcj02
+    }
+
     [Header("Input")]
     [SerializeField] private KeyCode toggleKey = KeyCode.M;
     [SerializeField] private bool visibleOnStart;
@@ -42,17 +48,23 @@ public class FlightMapOverlay : MonoBehaviour
     [Header("Data")]
     [SerializeField] private JsbsimBridge bridge;
     [SerializeField] private Waypoint[] route;
-    [SerializeField, Min(0.5f)] private float minimumRangeNm = 1.5f;
-    [SerializeField, Min(10f)] private float defaultRangeNm = 40f;
-    [SerializeField, Min(20f)] private float maximumRangeNm = 240f;
-    [SerializeField] private bool autoFitRoute = true;
+    [SerializeField, Min(0.1f)] private float minimumRangeNm = 0.5f;
+    [SerializeField, Min(0.2f)] private float defaultRangeNm = 3.2f;
+    [SerializeField, Min(2f)] private float maximumRangeNm = 80f;
+    [SerializeField] private bool autoFitRoute;
     [SerializeField, Range(0.5f, 0.95f)] private float routeFitFill = 0.72f;
     [SerializeField] private bool keepAircraftCentered;
 
     [Header("Track")]
     [SerializeField] private bool recordTrack = true;
     [SerializeField, Min(2)] private int maxTrackPoints = 900;
-    [SerializeField, Min(0.01f)] private float trackMinDistanceNm = 0.05f;
+    [SerializeField, Min(0.001f)] private float trackMinDistanceNm = 0.01f;
+    [SerializeField, Min(0.000001f)] private float trackDisplayAppendMinDistanceNm = 0.00001f;
+
+    [Header("Aircraft Symbol")]
+    [SerializeField] private Vector3 aircraftNoseLocalAxis = new Vector3(0f, 0f, -1f);
+    [SerializeField, Range(0f, 1f)] private float headingSmoothing = 0.18f;
+    [SerializeField, Min(1f)] private float motionHeadingMinPixels = 8f;
 
     [Header("Window")]
     [SerializeField, Min(260f)] private float mapSize = 520f;
@@ -65,11 +77,11 @@ public class FlightMapOverlay : MonoBehaviour
 
     [Header("Fallback Texture")]
     [SerializeField] private Texture2D mapBackgroundTexture;
-    [SerializeField, Min(0.1f)] private float backgroundTextureRangeNm = 180f;
-    [SerializeField] private bool generateFallbackMapTexture = true;
+    [SerializeField, Min(0.1f)] private float backgroundTextureRangeNm = 6.4f;
+    [SerializeField] private bool generateFallbackMapTexture;
 
     [Header("Cesium Scene Basemap")]
-    [SerializeField] private bool useCesiumSceneBasemap = true;
+    [SerializeField] private bool useCesiumSceneBasemap;
     [SerializeField, Range(256, 2048)] private int cesiumMapTextureSize = 1024;
     [SerializeField, Min(300f)] private float cesiumMinimumCameraHeightMeters = 1200f;
     [SerializeField, Min(1000f)] private float cesiumFarPaddingMeters = 12000f;
@@ -81,18 +93,22 @@ public class FlightMapOverlay : MonoBehaviour
 
     [Header("Online Tile Basemap")]
     [SerializeField] private bool useOnlineTileBasemap;
-    [SerializeField] private string tileUrlTemplate = "https://tile.openstreetmap.org/{z}/{x}/{y}.png";
-    [SerializeField] private string tileUserAgent = "AeroSim-737-Unity/0.1 (https://github.com/anymore-stay/AeroSim-737)";
-    [SerializeField] private string tileAttribution = "Map data (c) OpenStreetMap contributors";
-    [SerializeField, Range(1, 19)] private int minTileZoom = 3;
-    [SerializeField, Range(1, 19)] private int maxTileZoom = 15;
+    [SerializeField] private string tileUrlTemplate = "https://webrd01.is.autonavi.com/appmaptile?lang=zh_cn&size=1&scale=1&style=8&x={x}&y={y}&z={z}";
+    [SerializeField] private string tileUserAgent = "AeroSim-737-Unity/0.1";
+    [SerializeField] private string tileAttribution = "Gaode Maps";
+    [SerializeField] private TileCoordinateSystem tileCoordinateSystem = TileCoordinateSystem.Gcj02;
+    [SerializeField] private string tileCacheNamespace = "gaode_road_gcj02";
+    [SerializeField, Range(1, 19)] private int minTileZoom = 10;
+    [SerializeField, Range(1, 19)] private int maxTileZoom = 18;
     [SerializeField, Min(128)] private int tileSizePx = 256;
-    [SerializeField, Min(4)] private int maxVisibleTiles = 64;
+    [SerializeField, Min(4)] private int maxVisibleTiles = 96;
     [SerializeField] private bool cacheTilesOnDisk = true;
     [SerializeField, Min(1)] private int tileCacheDays = 14;
 
     private const double EarthRadiusNm = 3440.065;
     private const double EarthRadiusMeters = 6378137.0;
+    private const double DaxingLatitudeDeg = 39.509167;
+    private const double DaxingLongitudeDeg = 116.410556;
     private const float FeetPerSecondToKnots = 0.5924838f;
     private const float HeaderHeight = 38f;
     private const float FooterHeight = 82f;
@@ -136,6 +152,7 @@ public class FlightMapOverlay : MonoBehaviour
     private RenderTexture cesiumMapTexture;
     private Camera cesiumMapCamera;
     private CesiumGeoreference cesiumGeoreference;
+    private CesiumGlobeAnchor aircraftGlobeAnchor;
     private CesiumCameraManager cesiumCameraManager;
     private bool mapVisible;
     private bool cesiumSceneBasemapAvailable;
@@ -149,6 +166,11 @@ public class FlightMapOverlay : MonoBehaviour
     private bool manualCenterOverride;
     private double manualCenterLatDeg;
     private double manualCenterLonDeg;
+    private bool departurePointInitialized;
+    private GeoPoint departurePoint = new GeoPoint(DaxingLatitudeDeg, DaxingLongitudeDeg);
+    private GeoPoint staticMapCenter = new GeoPoint(DaxingLatitudeDeg, DaxingLongitudeDeg);
+    private bool headingInitialized;
+    private float lastResolvedHeadingDeg;
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
     private static void CreateRuntimeOverlay()
@@ -178,6 +200,7 @@ public class FlightMapOverlay : MonoBehaviour
         activeInstance = this;
         DontDestroyOnLoad(gameObject);
         EnsureDefaultRoute();
+        ConfigureStaticMapBackground();
         BuildUi();
         mapVisible = visibleOnStart;
         canvas.gameObject.SetActive(mapVisible);
@@ -283,8 +306,11 @@ public class FlightMapOverlay : MonoBehaviour
         viewportGo.AddComponent<RectMask2D>();
 
         mapBackgroundImage = CreateMapBackground(mapViewportRt);
-        cesiumMapImage = CreateCesiumSceneBackground(mapViewportRt);
-        cesiumColorWashImage = CreateCesiumColorWash(mapViewportRt);
+        if (useCesiumSceneBasemap)
+        {
+            cesiumMapImage = CreateCesiumSceneBackground(mapViewportRt);
+            cesiumColorWashImage = CreateCesiumColorWash(mapViewportRt);
+        }
 
         GameObject tileRootGo = new GameObject("TileBasemap", typeof(RectTransform));
         tileRootGo.transform.SetParent(mapViewportRt, false);
@@ -323,6 +349,20 @@ public class FlightMapOverlay : MonoBehaviour
         resizeBottomRt = CreateHandle("ResizeBorderBottom", panelRt, FlightMapWindowHandle.Mode.ResizeBottom).rectTransform;
 
         ApplyWindowLayout();
+    }
+
+    private void ConfigureStaticMapBackground()
+    {
+        useCesiumSceneBasemap = false;
+        useOnlineTileBasemap = false;
+        autoFitRoute = false;
+        allowMouseWheelRange = true;
+        minimumRangeNm = Mathf.Clamp(minimumRangeNm, 0.2f, 2f);
+        defaultRangeNm = Mathf.Clamp(defaultRangeNm, minimumRangeNm, maximumRangeNm);
+        backgroundTextureRangeNm = Mathf.Max(defaultRangeNm * 2f, backgroundTextureRangeNm);
+        maximumRangeNm = Mathf.Min(maximumRangeNm, backgroundTextureRangeNm * 0.5f);
+        defaultRangeNm = Mathf.Clamp(defaultRangeNm, minimumRangeNm, maximumRangeNm);
+        ReleaseCesiumSceneBasemap();
     }
 
     private Image CreateHandle(string name, RectTransform parent, FlightMapWindowHandle.Mode mode)
@@ -452,6 +492,7 @@ public class FlightMapOverlay : MonoBehaviour
     private void RenderMap()
     {
         bool hasAircraft = TryReadAircraft(out double aircraftLat, out double aircraftLon, out float headingDeg);
+        UpdateDeparturePoint(hasAircraft, aircraftLat, aircraftLon);
         double centerLat = manualCenterOverride ? manualCenterLatDeg : GetDisplayCenterLat(hasAircraft, aircraftLat);
         double centerLon = manualCenterOverride ? manualCenterLonDeg : GetDisplayCenterLon(hasAircraft, aircraftLon);
         currentCenterLatDeg = centerLat;
@@ -459,7 +500,15 @@ public class FlightMapOverlay : MonoBehaviour
 
         float rangeNm = CalculateRangeNm(hasAircraft, aircraftLat, aircraftLon, centerLat, centerLon);
         currentRangeNm = rangeNm;
-        PrepareMercatorProjection(centerLat, rangeNm);
+        if (ShouldUseOnlineTileBasemap())
+        {
+            PrepareMercatorProjection(centerLat, rangeNm);
+        }
+        else
+        {
+            currentTileZoom = -1;
+            currentTileDisplayScale = 1f;
+        }
 
         if (hasAircraft)
         {
@@ -468,14 +517,32 @@ public class FlightMapOverlay : MonoBehaviour
 
         int activeLeg = FindActiveLeg(hasAircraft, aircraftLat, aircraftLon);
         Vector2[] routePoints = BuildRoutePoints(centerLat, centerLon, rangeNm);
-        Vector2[] projectedTrack = BuildTrackPoints(centerLat, centerLon, rangeNm);
         Vector2 aircraftPoint = hasAircraft
             ? Project(aircraftLat, aircraftLon, centerLat, centerLon, rangeNm)
             : new Vector2(mapSize * 0.5f, mapSize * 0.5f);
+        Vector2[] projectedTrack = BuildTrackPoints(centerLat, centerLon, rangeNm, hasAircraft, aircraftLat, aircraftLon, aircraftPoint);
+        if (hasAircraft)
+        {
+            headingDeg = ResolveAircraftHeadingFromMap(projectedTrack, aircraftPoint, headingDeg);
+        }
 
         UpdateFallbackBackground(centerLat, centerLon, rangeNm);
-        UpdateCesiumSceneBasemap(centerLat, centerLon, rangeNm);
-        UpdateTileBasemap(centerLat, centerLon, rangeNm);
+        if (useCesiumSceneBasemap)
+        {
+            UpdateCesiumSceneBasemap(centerLat, centerLon, rangeNm);
+        }
+        else
+        {
+            cesiumSceneBasemapAvailable = false;
+        }
+        if (ShouldUseOnlineTileBasemap())
+        {
+            UpdateTileBasemap(centerLat, centerLon, rangeNm);
+        }
+        else if (tileRootRt != null)
+        {
+            tileRootRt.gameObject.SetActive(false);
+        }
 
         mapGraphic.SetState(new FlightMapRenderState
         {
@@ -516,32 +583,51 @@ public class FlightMapOverlay : MonoBehaviour
 
     private Vector2[] BuildRoutePoints(double centerLat, double centerLon, float rangeNm)
     {
-        if (route == null || route.Length == 0)
+        return new[]
         {
-            return emptyRoutePoints;
-        }
-
-        Vector2[] points = new Vector2[route.Length];
-        for (int i = 0; i < route.Length; i++)
-        {
-            points[i] = Project(route[i].latitudeDeg, route[i].longitudeDeg, centerLat, centerLon, rangeNm);
-        }
-
-        return points;
+            Project(departurePoint.LatitudeDeg, departurePoint.LongitudeDeg, centerLat, centerLon, rangeNm)
+        };
     }
 
-    private Vector2[] BuildTrackPoints(double centerLat, double centerLon, float rangeNm)
+    private Vector2[] BuildTrackPoints(
+        double centerLat,
+        double centerLon,
+        float rangeNm,
+        bool hasAircraft,
+        double aircraftLat,
+        double aircraftLon,
+        Vector2 aircraftPoint)
     {
-        if (!recordTrack || trackPoints.Count < 2)
+        if (!recordTrack || trackPoints.Count == 0)
         {
             return emptyRoutePoints;
         }
 
-        Vector2[] points = new Vector2[trackPoints.Count];
+        bool appendAircraftPoint = false;
+        if (hasAircraft)
+        {
+            GeoPoint last = trackPoints[trackPoints.Count - 1];
+            CalculateBearingDistance(last.LatitudeDeg, last.LongitudeDeg, aircraftLat, aircraftLon, out _, out double distanceNm);
+            double displayThresholdNm = Math.Min(Math.Max(trackDisplayAppendMinDistanceNm, 0.000001f), 0.00001f);
+            appendAircraftPoint = distanceNm >= displayThresholdNm;
+        }
+
+        int pointCount = trackPoints.Count + (appendAircraftPoint ? 1 : 0);
+        if (pointCount < 2)
+        {
+            return emptyRoutePoints;
+        }
+
+        Vector2[] points = new Vector2[pointCount];
         for (int i = 0; i < trackPoints.Count; i++)
         {
             GeoPoint point = trackPoints[i];
             points[i] = Project(point.LatitudeDeg, point.LongitudeDeg, centerLat, centerLon, rangeNm);
+        }
+
+        if (appendAircraftPoint)
+        {
+            points[points.Length - 1] = aircraftPoint;
         }
 
         return points;
@@ -551,8 +637,8 @@ public class FlightMapOverlay : MonoBehaviour
     {
         if (ShouldUseOnlineTileBasemap() && currentTileZoom >= 0)
         {
-            LatLonToWorldPixel(centerLat, centerLon, currentTileZoom, out double centerX, out double centerY);
-            LatLonToWorldPixel(latitudeDeg, longitudeDeg, currentTileZoom, out double pointX, out double pointY);
+            LatLonToTileWorldPixel(centerLat, centerLon, currentTileZoom, out double centerX, out double centerY);
+            LatLonToTileWorldPixel(latitudeDeg, longitudeDeg, currentTileZoom, out double pointX, out double pointY);
             return new Vector2(
                 mapSize * 0.5f + (float)((pointX - centerX) * currentTileDisplayScale),
                 mapSize * 0.5f + (float)((pointY - centerY) * currentTileDisplayScale));
@@ -580,14 +666,8 @@ public class FlightMapOverlay : MonoBehaviour
 
         double maxDistance = 0.0;
 
-        if (route != null)
-        {
-            for (int i = 0; i < route.Length; i++)
-            {
-                CalculateBearingDistance(centerLat, centerLon, route[i].latitudeDeg, route[i].longitudeDeg, out _, out double distanceNm);
-                maxDistance = Math.Max(maxDistance, distanceNm);
-            }
-        }
+        CalculateBearingDistance(centerLat, centerLon, departurePoint.LatitudeDeg, departurePoint.LongitudeDeg, out _, out double departureDistanceNm);
+        maxDistance = Math.Max(maxDistance, departureDistanceNm);
 
         if (hasAircraft)
         {
@@ -665,6 +745,86 @@ public class FlightMapOverlay : MonoBehaviour
         }
     }
 
+    private float ResolveAircraftHeadingFromMap(Vector2[] projectedTrack, Vector2 aircraftPoint, float fallbackHeadingDeg)
+    {
+        float targetHeadingDeg = Normalize360(fallbackHeadingDeg);
+        if (TryResolveProjectedTrackHeading(projectedTrack, aircraftPoint, out float trackHeadingDeg))
+        {
+            targetHeadingDeg = trackHeadingDeg;
+            lastResolvedHeadingDeg = targetHeadingDeg;
+            headingInitialized = true;
+            return lastResolvedHeadingDeg;
+        }
+        else if (TryReadAircraftTransformHeading(out float transformHeadingDeg))
+        {
+            targetHeadingDeg = transformHeadingDeg;
+        }
+
+        if (!headingInitialized)
+        {
+            lastResolvedHeadingDeg = targetHeadingDeg;
+            headingInitialized = true;
+            return lastResolvedHeadingDeg;
+        }
+
+        lastResolvedHeadingDeg = Normalize360(Mathf.LerpAngle(
+            lastResolvedHeadingDeg,
+            targetHeadingDeg,
+            Mathf.Clamp01(headingSmoothing)));
+        return lastResolvedHeadingDeg;
+    }
+
+    private bool TryResolveProjectedTrackHeading(Vector2[] projectedTrack, Vector2 aircraftPoint, out float headingDeg)
+    {
+        headingDeg = 0f;
+        if (projectedTrack == null || projectedTrack.Length < 2)
+        {
+            return false;
+        }
+
+        float minHeadingDistanceSqr = motionHeadingMinPixels * motionHeadingMinPixels;
+        for (int i = projectedTrack.Length - 1; i >= 0; i--)
+        {
+            Vector2 previous = projectedTrack[i];
+            Vector2 screenDelta = aircraftPoint - previous;
+            if (screenDelta.sqrMagnitude < minHeadingDistanceSqr)
+            {
+                continue;
+            }
+
+            headingDeg = Normalize360(Mathf.Atan2(screenDelta.x, -screenDelta.y) * Mathf.Rad2Deg);
+            return true;
+        }
+
+        return false;
+    }
+
+    private bool TryReadAircraftTransformHeading(out float headingDeg)
+    {
+        headingDeg = 0f;
+        Transform aircraftTransform = bridge != null ? bridge.Aircraft : null;
+        if (aircraftTransform == null)
+        {
+            return false;
+        }
+
+        Vector3 localNose = aircraftNoseLocalAxis.sqrMagnitude > 0.0001f
+            ? aircraftNoseLocalAxis.normalized
+            : Vector3.forward;
+        Vector3 worldNose = aircraftTransform.TransformDirection(localNose);
+        Vector3 referenceNose = aircraftTransform.parent != null
+            ? aircraftTransform.parent.InverseTransformDirection(worldNose)
+            : worldNose;
+        referenceNose.y = 0f;
+        if (referenceNose.sqrMagnitude < 0.0001f)
+        {
+            return false;
+        }
+
+        headingDeg = Normalize360(Mathf.Atan2(-referenceNose.x, -referenceNose.z) * Mathf.Rad2Deg);
+        return true;
+    }
+
     private void UpdateFallbackBackground(double centerLat, double centerLon, float rangeNm)
     {
         if (mapBackgroundImage == null)
@@ -672,9 +832,7 @@ public class FlightMapOverlay : MonoBehaviour
             return;
         }
 
-        double routeCenterLat = GetRouteCenterLat();
-        double routeCenterLon = GetRouteCenterLon();
-        LatLonToOffsetNm(routeCenterLat, routeCenterLon, centerLat, centerLon, out double northNm, out double eastNm);
+        LatLonToOffsetNm(staticMapCenter.LatitudeDeg, staticMapCenter.LongitudeDeg, centerLat, centerLon, out double northNm, out double eastNm);
 
         float visibleSize = Mathf.Clamp(rangeNm * 2f / backgroundTextureRangeNm, 0.08f, 1.6f);
         float u = 0.5f + (float)(eastNm / backgroundTextureRangeNm) - visibleSize * 0.5f;
@@ -797,9 +955,19 @@ public class FlightMapOverlay : MonoBehaviour
 
     private bool TryReadAircraft(out double latDeg, out double lonDeg, out float headingDeg)
     {
-        latDeg = 0.0;
-        lonDeg = 0.0;
+        latDeg = DaxingLatitudeDeg;
+        lonDeg = DaxingLongitudeDeg;
         headingDeg = 0f;
+
+        if (TryReadAircraftFromCesiumAnchor(out latDeg, out lonDeg, out headingDeg))
+        {
+            return true;
+        }
+
+        if (TryReadCesiumOrigin(out _, out _))
+        {
+            return false;
+        }
 
         if (bridge == null || !bridge.HasState)
         {
@@ -811,23 +979,123 @@ public class FlightMapOverlay : MonoBehaviour
         latDeg = lat;
         lonDeg = lon;
         headingDeg = Normalize360(bridge.HeadingDeg);
-        return hasLat && hasLon;
+        return hasLat && hasLon && IsValidCoordinate(latDeg, lonDeg);
+    }
+
+    private bool TryReadAircraftFromCesiumAnchor(out double latDeg, out double lonDeg, out float headingDeg)
+    {
+        latDeg = DaxingLatitudeDeg;
+        lonDeg = DaxingLongitudeDeg;
+        headingDeg = bridge != null ? Normalize360(bridge.HeadingDeg) : 0f;
+
+        CesiumGlobeAnchor anchor = ResolveAircraftGlobeAnchor();
+        if (anchor == null)
+        {
+            return false;
+        }
+
+        if (bridge != null)
+        {
+            headingDeg = Normalize360(bridge.HeadingDeg);
+        }
+
+        double3 longitudeLatitudeHeight = anchor.longitudeLatitudeHeight;
+        lonDeg = longitudeLatitudeHeight.x;
+        latDeg = longitudeLatitudeHeight.y;
+        return IsValidCoordinate(latDeg, lonDeg);
+    }
+
+    private CesiumGlobeAnchor ResolveAircraftGlobeAnchor()
+    {
+        if (aircraftGlobeAnchor != null)
+        {
+            return aircraftGlobeAnchor;
+        }
+
+        if (bridge == null)
+        {
+            bridge = JsbsimBridge.Instance != null ? JsbsimBridge.Instance : FindObjectOfType<JsbsimBridge>();
+        }
+
+        if (bridge != null && bridge.Aircraft != null)
+        {
+            aircraftGlobeAnchor = bridge.Aircraft.GetComponent<CesiumGlobeAnchor>();
+            if (aircraftGlobeAnchor != null)
+            {
+                return aircraftGlobeAnchor;
+            }
+        }
+
+        return null;
+    }
+
+    private void UpdateDeparturePoint(bool hasAircraft, double aircraftLat, double aircraftLon)
+    {
+        if (departurePointInitialized)
+        {
+            return;
+        }
+
+        if (hasAircraft && IsValidCoordinate(aircraftLat, aircraftLon))
+        {
+            departurePoint = new GeoPoint(aircraftLat, aircraftLon);
+            departurePointInitialized = true;
+            return;
+        }
+
+        if (TryReadCesiumOrigin(out double originLat, out double originLon))
+        {
+            departurePoint = new GeoPoint(originLat, originLon);
+        }
+        else
+        {
+            departurePoint = new GeoPoint(DaxingLatitudeDeg, DaxingLongitudeDeg);
+        }
+    }
+
+    private bool TryReadCesiumOrigin(out double latDeg, out double lonDeg)
+    {
+        latDeg = DaxingLatitudeDeg;
+        lonDeg = DaxingLongitudeDeg;
+
+        if (cesiumGeoreference == null)
+        {
+            cesiumGeoreference = FindObjectOfType<CesiumGeoreference>();
+        }
+
+        if (cesiumGeoreference == null)
+        {
+            return false;
+        }
+
+        latDeg = cesiumGeoreference.latitude;
+        lonDeg = cesiumGeoreference.longitude;
+        return IsValidCoordinate(latDeg, lonDeg);
     }
 
     private void EnsureDefaultRoute()
     {
-        if (route != null && route.Length > 0)
+        if (HasDaxingRoute(route))
         {
             return;
         }
 
         route = new[]
         {
-            new Waypoint { ident = "DEP", latitudeDeg = 33.5200, longitudeDeg = 120.3000 },
-            new Waypoint { ident = "WPT1", latitudeDeg = 33.5550, longitudeDeg = 120.4300 },
-            new Waypoint { ident = "WPT2", latitudeDeg = 33.6400, longitudeDeg = 120.6100 },
-            new Waypoint { ident = "ARR", latitudeDeg = 33.7200, longitudeDeg = 120.8200 }
+            new Waypoint { ident = "DEP", latitudeDeg = DaxingLatitudeDeg, longitudeDeg = DaxingLongitudeDeg }
         };
+    }
+
+    private static bool HasDaxingRoute(Waypoint[] candidateRoute)
+    {
+        if (candidateRoute == null || candidateRoute.Length == 0 || candidateRoute[0] == null)
+        {
+            return false;
+        }
+
+        Waypoint first = candidateRoute[0];
+        return Math.Abs(first.latitudeDeg - DaxingLatitudeDeg) < 0.01 &&
+               Math.Abs(first.longitudeDeg - DaxingLongitudeDeg) < 0.01;
     }
 
     private void PrepareMercatorProjection(double centerLat, float rangeNm)
@@ -1061,7 +1329,7 @@ public class FlightMapOverlay : MonoBehaviour
         int zoom = currentTileZoom;
         double centerX;
         double centerY;
-        LatLonToWorldPixel(centerLat, centerLon, zoom, out centerX, out centerY);
+        LatLonToTileWorldPixel(centerLat, centerLon, zoom, out centerX, out centerY);
         float scale = currentTileDisplayScale;
         double halfWorldPixels = (mapSize * 0.5) / Math.Max(0.001, scale);
         int minX = Mathf.FloorToInt((float)((centerX - halfWorldPixels) / tileSizePx));
@@ -1074,7 +1342,7 @@ public class FlightMapOverlay : MonoBehaviour
             zoom--;
             currentTileZoom = zoom;
             currentTileDisplayScale = CalculateTileDisplayScale(zoom, centerLat, rangeNm);
-            LatLonToWorldPixel(centerLat, centerLon, zoom, out centerX, out centerY);
+            LatLonToTileWorldPixel(centerLat, centerLon, zoom, out centerX, out centerY);
             scale = currentTileDisplayScale;
             halfWorldPixels = (mapSize * 0.5) / Math.Max(0.001, scale);
             minX = Mathf.FloorToInt((float)((centerX - halfWorldPixels) / tileSizePx));
@@ -1250,7 +1518,7 @@ public class FlightMapOverlay : MonoBehaviour
 
     private string GetTileCachePath(string key)
     {
-        return Path.Combine(Application.persistentDataPath, "FlightMapTiles", key + ".png");
+        return Path.Combine(Application.persistentDataPath, "FlightMapTiles", BuildTileCacheKey(key) + ".png");
     }
 
     private Texture2D GetTilePlaceholderTexture()
@@ -1389,7 +1657,7 @@ public class FlightMapOverlay : MonoBehaviour
     internal void PanMapFromDragDelta(double startCenterLat, double startCenterLon, Vector2 delta)
     {
         float range = Mathf.Max(minimumRangeNm, currentRangeNm > 0f ? currentRangeNm : defaultRangeNm);
-        double eastNm = -delta.x * range * 2.0 / Math.Max(1.0, mapSize);
+        double eastNm = delta.x * range * 2.0 / Math.Max(1.0, mapSize);
         double northNm = delta.y * range * 2.0 / Math.Max(1.0, mapSize);
         OffsetLatLon(startCenterLat, startCenterLon, northNm, eastNm, out manualCenterLatDeg, out manualCenterLonDeg);
         manualCenterOverride = true;
@@ -1448,92 +1716,82 @@ public class FlightMapOverlay : MonoBehaviour
 
     private double GetRouteCenterLat()
     {
-        if (route == null || route.Length == 0)
-        {
-            return currentCenterLatDeg;
-        }
-
-        double total = 0.0;
-        for (int i = 0; i < route.Length; i++)
-        {
-            total += route[i].latitudeDeg;
-        }
-
-        return total / route.Length;
+        return departurePoint.LatitudeDeg;
     }
 
     private double GetDisplayCenterLat(bool hasAircraft, double aircraftLat)
     {
+        if (!ShouldUseOnlineTileBasemap() && !useCesiumSceneBasemap)
+        {
+            return manualCenterOverride ? manualCenterLatDeg : staticMapCenter.LatitudeDeg;
+        }
+
         if (keepAircraftCentered && hasAircraft)
         {
             return aircraftLat;
         }
 
-        if (route != null && route.Length > 0)
+        double minLat = departurePoint.LatitudeDeg;
+        double maxLat = departurePoint.LatitudeDeg;
+
+        if (hasAircraft)
         {
-            double minLat = route[0].latitudeDeg;
-            double maxLat = route[0].latitudeDeg;
-            for (int i = 1; i < route.Length; i++)
-            {
-                minLat = Math.Min(minLat, route[i].latitudeDeg);
-                maxLat = Math.Max(maxLat, route[i].latitudeDeg);
-            }
-
-            if (hasAircraft)
-            {
-                minLat = Math.Min(minLat, aircraftLat);
-                maxLat = Math.Max(maxLat, aircraftLat);
-            }
-
-            return (minLat + maxLat) * 0.5;
+            minLat = Math.Min(minLat, aircraftLat);
+            maxLat = Math.Max(maxLat, aircraftLat);
         }
 
-        return hasAircraft ? aircraftLat : currentCenterLatDeg;
+        if (recordTrack && trackPoints.Count > 0)
+        {
+            int step = Mathf.Max(1, trackPoints.Count / 80);
+            for (int i = 0; i < trackPoints.Count; i += step)
+            {
+                GeoPoint point = trackPoints[i];
+                minLat = Math.Min(minLat, point.LatitudeDeg);
+                maxLat = Math.Max(maxLat, point.LatitudeDeg);
+            }
+        }
+
+        return (minLat + maxLat) * 0.5;
     }
 
     private double GetDisplayCenterLon(bool hasAircraft, double aircraftLon)
     {
+        if (!ShouldUseOnlineTileBasemap() && !useCesiumSceneBasemap)
+        {
+            return manualCenterOverride ? manualCenterLonDeg : staticMapCenter.LongitudeDeg;
+        }
+
         if (keepAircraftCentered && hasAircraft)
         {
             return aircraftLon;
         }
 
-        if (route != null && route.Length > 0)
+        double minLon = departurePoint.LongitudeDeg;
+        double maxLon = departurePoint.LongitudeDeg;
+
+        if (hasAircraft)
         {
-            double minLon = route[0].longitudeDeg;
-            double maxLon = route[0].longitudeDeg;
-            for (int i = 1; i < route.Length; i++)
-            {
-                minLon = Math.Min(minLon, route[i].longitudeDeg);
-                maxLon = Math.Max(maxLon, route[i].longitudeDeg);
-            }
-
-            if (hasAircraft)
-            {
-                minLon = Math.Min(minLon, aircraftLon);
-                maxLon = Math.Max(maxLon, aircraftLon);
-            }
-
-            return (minLon + maxLon) * 0.5;
+            minLon = Math.Min(minLon, aircraftLon);
+            maxLon = Math.Max(maxLon, aircraftLon);
         }
 
-        return hasAircraft ? aircraftLon : currentCenterLonDeg;
+        if (recordTrack && trackPoints.Count > 0)
+        {
+            int step = Mathf.Max(1, trackPoints.Count / 80);
+            for (int i = 0; i < trackPoints.Count; i += step)
+            {
+                GeoPoint point = trackPoints[i];
+                minLon = Math.Min(minLon, point.LongitudeDeg);
+                maxLon = Math.Max(maxLon, point.LongitudeDeg);
+            }
+        }
+
+        return (minLon + maxLon) * 0.5;
     }
 
     private double GetRouteCenterLon()
     {
-        if (route == null || route.Length == 0)
-        {
-            return currentCenterLonDeg;
-        }
-
-        double total = 0.0;
-        for (int i = 0; i < route.Length; i++)
-        {
-            total += route[i].longitudeDeg;
-        }
-
-        return total / route.Length;
+        return departurePoint.LongitudeDeg;
     }
 
     private static void EnsureEventSystem()
@@ -1588,6 +1846,65 @@ public class FlightMapOverlay : MonoBehaviour
         y = (0.5 - Math.Log((1.0 + sinLat) / (1.0 - sinLat)) / (4.0 * Math.PI)) * worldSize;
     }
 
+    private void LatLonToTileWorldPixel(double latDeg, double lonDeg, int zoom, out double x, out double y)
+    {
+        if (tileCoordinateSystem == TileCoordinateSystem.Gcj02)
+        {
+            Wgs84ToGcj02(latDeg, lonDeg, out latDeg, out lonDeg);
+        }
+
+        LatLonToWorldPixel(latDeg, lonDeg, zoom, out x, out y);
+    }
+
+    private static void Wgs84ToGcj02(double latDeg, double lonDeg, out double gcjLatDeg, out double gcjLonDeg)
+    {
+        if (!IsInChina(latDeg, lonDeg))
+        {
+            gcjLatDeg = latDeg;
+            gcjLonDeg = lonDeg;
+            return;
+        }
+
+        const double a = 6378245.0;
+        const double ee = 0.00669342162296594323;
+        double dLat = TransformLat(lonDeg - 105.0, latDeg - 35.0);
+        double dLon = TransformLon(lonDeg - 105.0, latDeg - 35.0);
+        double radLat = latDeg / 180.0 * Math.PI;
+        double magic = Math.Sin(radLat);
+        magic = 1.0 - ee * magic * magic;
+        double sqrtMagic = Math.Sqrt(magic);
+        dLat = (dLat * 180.0) / ((a * (1.0 - ee)) / (magic * sqrtMagic) * Math.PI);
+        dLon = (dLon * 180.0) / (a / sqrtMagic * Math.Cos(radLat) * Math.PI);
+        gcjLatDeg = latDeg + dLat;
+        gcjLonDeg = lonDeg + dLon;
+    }
+
+    private static bool IsInChina(double latDeg, double lonDeg)
+    {
+        return lonDeg >= 72.004 &&
+               lonDeg <= 137.8347 &&
+               latDeg >= 0.8293 &&
+               latDeg <= 55.8271;
+    }
+
+    private static double TransformLat(double x, double y)
+    {
+        double ret = -100.0 + 2.0 * x + 3.0 * y + 0.2 * y * y + 0.1 * x * y + 0.2 * Math.Sqrt(Math.Abs(x));
+        ret += (20.0 * Math.Sin(6.0 * x * Math.PI) + 20.0 * Math.Sin(2.0 * x * Math.PI)) * 2.0 / 3.0;
+        ret += (20.0 * Math.Sin(y * Math.PI) + 40.0 * Math.Sin(y / 3.0 * Math.PI)) * 2.0 / 3.0;
+        ret += (160.0 * Math.Sin(y / 12.0 * Math.PI) + 320.0 * Math.Sin(y * Math.PI / 30.0)) * 2.0 / 3.0;
+        return ret;
+    }
+
+    private static double TransformLon(double x, double y)
+    {
+        double ret = 300.0 + x + 2.0 * y + 0.1 * x * x + 0.1 * x * y + 0.1 * Math.Sqrt(Math.Abs(x));
+        ret += (20.0 * Math.Sin(6.0 * x * Math.PI) + 20.0 * Math.Sin(2.0 * x * Math.PI)) * 2.0 / 3.0;
+        ret += (20.0 * Math.Sin(x * Math.PI) + 40.0 * Math.Sin(x / 3.0 * Math.PI)) * 2.0 / 3.0;
+        ret += (150.0 * Math.Sin(x / 12.0 * Math.PI) + 300.0 * Math.Sin(x / 30.0 * Math.PI)) * 2.0 / 3.0;
+        return ret;
+    }
+
     private static double GetWorldSizePixels(int zoom)
     {
         return 256.0 * (1 << zoom);
@@ -1606,11 +1923,32 @@ public class FlightMapOverlay : MonoBehaviour
                y.ToString(CultureInfo.InvariantCulture);
     }
 
+    private string BuildTileCacheKey(string key)
+    {
+        string prefix = string.IsNullOrWhiteSpace(tileCacheNamespace)
+            ? "default"
+            : tileCacheNamespace.Trim();
+        return prefix + "_" + key;
+    }
+
     private static string SafeIdent(Waypoint waypoint, int index)
     {
         return waypoint != null && !string.IsNullOrWhiteSpace(waypoint.ident)
             ? waypoint.ident
             : "WPT" + (index + 1).ToString(CultureInfo.InvariantCulture);
+    }
+
+    private static bool IsValidCoordinate(double latDeg, double lonDeg)
+    {
+        return !double.IsNaN(latDeg) &&
+               !double.IsNaN(lonDeg) &&
+               !double.IsInfinity(latDeg) &&
+               !double.IsInfinity(lonDeg) &&
+               latDeg >= -90.0 &&
+               latDeg <= 90.0 &&
+               lonDeg >= -180.0 &&
+               lonDeg <= 180.0 &&
+               (Math.Abs(latDeg) > 0.000001 || Math.Abs(lonDeg) > 0.000001);
     }
 
     private static void SetTopLeft(RectTransform rt, float x, float y, float w, float h)
