@@ -8,7 +8,7 @@ using UnityEngine;
 ///   A / D        : 副翼(滚转)。A 左滚,D 右滚。
 ///   Q / E        : 方向舵(偏航)。
 ///   Shift / Ctrl : 油门加 / 收至怠速。
-///   Shift + Ctrl : 接地后增加反推。
+///   Shift + Ctrl : 在任何状态下增加反推。
 ///   F            : 襟翼切换(0 / 0.5 / 1)。
 ///   方向键不再控制飞机:上下左右留给相机视角移动。
 ///
@@ -37,8 +37,6 @@ public class FlightInput : MonoBehaviour
 
     [Header("油门")]
     [SerializeField] private float throttleRate = 0.5f;
-    [Tooltip("允许使用反推的最大离地高度。接地信号存在时优先使用接地信号。")]
-    [SerializeField, Min(0f)] private float reverseThrustMaxAglFt = 10f;
     [Tooltip("JSBSim 反推角度。2 rad 约产生正常推力 42% 的反向分量。")]
     [SerializeField, Range(1.571f, 3.142f)] private float reverseThrustAngleRad = 2f;
 
@@ -123,6 +121,9 @@ public class FlightInput : MonoBehaviour
     private float elevator;
     private float aileron;
     private float rudder;
+    private float keyboardElevator;
+    private float keyboardAileron;
+    private float keyboardRudder;
     private float turnInput;
     private float smoothedTurnBankTargetDeg;
     private float throttle = 0f;   // 地面起飞:初始油门怠速 0,推 Shift 才加速
@@ -131,6 +132,8 @@ public class FlightInput : MonoBehaviour
     private bool gearDown = true;
     private bool brakes = true;    // 地面起飞:初始刹车锁定,飞机停得住;松刹车(B)再滑跑
     private bool directJoystickControlActive;
+    private bool keyboardThrottleOverride;
+    private float joystickThrottleAtKeyboardTakeover;
 
     private float sendTimer;
     private bool escapePaused;
@@ -157,77 +160,83 @@ public class FlightInput : MonoBehaviour
         float dt = Time.deltaTime;
         directJoystickControlActive = sidestickInput != null && sidestickInput.ControlActive;
 
-        // ---- 升降舵:S 拉杆抬头, W 推杆低头 ----
-        if (directJoystickControlActive)
-        {
-            elevator = sidestickInput.Pitch;
-        }
-        else
-        {
-            float pitchInput = 0f;
-            if (Input.GetKey(KeyCode.W)) pitchInput += 1f;
-            if (Input.GetKey(KeyCode.S)) pitchInput -= 1f;
-            elevator = StepHeldAxis(elevator, pitchInput, elevatorRate, dt);
-        }
+        // ---- 升降舵:S 拉杆抬头, W 推杆低头；接入侧杆后作为保持型修正量叠加 ----
+        float pitchInput = 0f;
+        if (Input.GetKey(KeyCode.W)) pitchInput += 1f;
+        if (Input.GetKey(KeyCode.S)) pitchInput -= 1f;
+        keyboardElevator = StepHeldAxis(keyboardElevator, pitchInput, elevatorRate, dt);
+        float joystickElevator = directJoystickControlActive ? sidestickInput.Pitch : 0f;
+        elevator = Mathf.Clamp(joystickElevator + keyboardElevator, -1f, 1f);
 
-        // ---- 副翼:A 左滚, D 右滚 ----
-        if (directJoystickControlActive)
-        {
-            aileron = sidestickInput.Roll;
-        }
-        else
-        {
-            float rollInput = 0f;
-            if (Input.GetKey(KeyCode.D)) rollInput += 1f;
-            if (Input.GetKey(KeyCode.A)) rollInput -= 1f;
-            aileron = StepAxis(aileron, rollInput, aileronRate, dt);
-        }
+        // ---- 副翼:A 左滚, D 右滚；键盘修正量与侧杆横滚叠加 ----
+        float rollInput = 0f;
+        if (Input.GetKey(KeyCode.D)) rollInput += 1f;
+        if (Input.GetKey(KeyCode.A)) rollInput -= 1f;
+        keyboardAileron = StepAxis(keyboardAileron, rollInput, aileronRate, dt);
+        float joystickAileron = directJoystickControlActive ? sidestickInput.Roll : 0f;
+        aileron = Mathf.Clamp(joystickAileron + keyboardAileron, -1f, 1f);
 
-        // ---- 方向舵:Q 左偏航, E 右偏航 ----
+        // ---- 方向舵:Q 左偏航, E 右偏航；键盘修正量与侧杆扭转叠加 ----
         float yawInput = 0f;
         turnInput = 0f;
-        if (directJoystickControlActive)
+        if (Input.GetKey(KeyCode.E))
         {
-            rudder = sidestickInput.Yaw;
+            yawInput += 1f;
+            turnInput += 1f;
+        }
+        if (Input.GetKey(KeyCode.Q))
+        {
+            yawInput -= 1f;
+            turnInput -= 1f;
+        }
+        if (coordinatedTurnAssist)
+        {
+            float rudderTarget = yawInput * maxTurnRudderInput;
+            keyboardRudder = Mathf.MoveTowards(keyboardRudder, rudderTarget, rudderRate * dt);
         }
         else
         {
-            if (Input.GetKey(KeyCode.E))
-            {
-                yawInput += 1f;
-                turnInput += 1f;
-            }
-            if (Input.GetKey(KeyCode.Q))
-            {
-                yawInput -= 1f;
-                turnInput -= 1f;
-            }
-            if (coordinatedTurnAssist)
-            {
-                float rudderTarget = yawInput * maxTurnRudderInput;
-                rudder = Mathf.MoveTowards(rudder, rudderTarget, rudderRate * dt);
-            }
-            else
-            {
-                rudder = StepAxis(rudder, yawInput, rudderRate, dt);
-            }
+            keyboardRudder = StepAxis(keyboardRudder, yawInput, rudderRate, dt);
         }
+        float joystickRudder = directJoystickControlActive ? sidestickInput.Yaw : 0f;
+        rudder = Mathf.Clamp(joystickRudder + keyboardRudder, -1f, 1f);
 
-        // ---- 油门:Shift 加，Ctrl 收至怠速，同时按下在地面增加反推 ----
+        // ---- 油门:Shift 加，Ctrl 收至怠速，同时按下可在任何状态增加反推 ----
         bool increaseThrottle = Input.GetKey(KeyCode.LeftShift);
         bool decreaseThrottle = Input.GetKey(KeyCode.LeftControl);
-        bool reverseShortcutPressed = increaseThrottle && decreaseThrottle;
-        if (sidestickInput != null && sidestickInput.ThrottleControlEnabled && !reverseShortcutPressed)
+        bool hasKeyboardThrottleInput = increaseThrottle || decreaseThrottle;
+        bool hasJoystickThrottle = sidestickInput != null && sidestickInput.ThrottleControlEnabled;
+        if (hasJoystickThrottle)
         {
-            throttle = sidestickInput.Throttle;
+            float joystickThrottle = sidestickInput.Throttle;
+            if (hasKeyboardThrottleInput)
+            {
+                if (!keyboardThrottleOverride)
+                    joystickThrottleAtKeyboardTakeover = joystickThrottle;
+                keyboardThrottleOverride = true;
+                throttle = ReverseThrustMath.UpdateSignedThrottle(
+                    throttle,
+                    increaseThrottle,
+                    decreaseThrottle,
+                    true,
+                    throttleRate,
+                    dt);
+            }
+            else if (!keyboardThrottleOverride ||
+                     Mathf.Abs(joystickThrottle - joystickThrottleAtKeyboardTakeover) >= 0.02f)
+            {
+                keyboardThrottleOverride = false;
+                throttle = joystickThrottle;
+            }
         }
         else
         {
+            keyboardThrottleOverride = false;
             throttle = ReverseThrustMath.UpdateSignedThrottle(
                 throttle,
                 increaseThrottle,
                 decreaseThrottle,
-                IsReverseThrustAllowed(),
+                true,
                 throttleRate,
                 dt);
         }
@@ -346,7 +355,8 @@ public class FlightInput : MonoBehaviour
     {
         if (bridge == null || !bridge.ControlConnected) return;
         float coordinatedAileron = aileron;
-        bool useTurnAssist = coordinatedTurnAssist && !directJoystickControlActive;
+        bool useTurnAssist = coordinatedTurnAssist &&
+                             (!directJoystickControlActive || Mathf.Abs(turnInput) > coordinatedTurnDeadzone);
         bool hasTurnInput = useTurnAssist && Mathf.Abs(turnInput) > coordinatedTurnDeadzone;
         float desiredBankDeg = useTurnAssist && hasTurnInput
             ? turnInput * coordinatedTurnBankDeg
@@ -406,10 +416,9 @@ public class FlightInput : MonoBehaviour
         bridge.SetProperty("fcs/aileron-cmd-norm", aileronCommand);
         bridge.SetProperty("fcs/rudder-cmd-norm", rudderCommand);
         bridge.SetProperty("fcs/steer-cmd-norm", CalculateGroundSteeringCommand());
-        bool reverseThrustAllowed = IsReverseThrustAllowed();
         ReverseThrustMath.CalculateEngineCommands(
             throttle,
-            reverseThrustAllowed,
+            true,
             reverseThrustAngleRad,
             out float engineThrottle,
             out float reverserAngleRad);
@@ -442,23 +451,12 @@ public class FlightInput : MonoBehaviour
         return invertGroundSteering ? -steeringCommand : steeringCommand;
     }
 
-    private bool IsReverseThrustAllowed()
-    {
-        if (!gearDown || bridge == null || !bridge.HasState)
-            return false;
-
-        bool weightOnWheels = bridge.GetValue("gear_wow", 0f) > 0.5f ||
-                              bridge.GetValue("gear_unit_1_wow", 0f) > 0.5f ||
-                              bridge.GetValue("gear_unit_2_wow", 0f) > 0.5f;
-        return weightOnWheels || bridge.AglFt <= reverseThrustMaxAglFt;
-    }
-
     // 给 HUD 读取
     public float Elevator => elevator;
     public float Aileron => aileron;
     public float Rudder => rudder;
     public float Throttle => throttle;
-    public bool ReverseThrustActive => throttle < 0f && IsReverseThrustAllowed();
+    public bool ReverseThrustActive => throttle < 0f;
     public float Flaps => flapStepCount > 0 ? (float)flapStep / flapStepCount : 0f;
     public int FlapStep => flapStep;
     public int FlapStepCount => flapStepCount;
