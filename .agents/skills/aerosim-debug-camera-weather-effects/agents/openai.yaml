@@ -1,0 +1,5 @@
+interface:
+  display_name: "AeroSim 多视角天气诊断"
+  short_description: "排查 AeroSim-737 多相机天气特效的跟随、覆盖与密度问题"
+  default_prompt: "使用 $aerosim-debug-camera-weather-effects 排查并修复本项目不同相机视角下天气特效显示不一致的问题。"
+

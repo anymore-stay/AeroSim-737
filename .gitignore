@@ -31,7 +31,16 @@
 .vs/
 .vscode/
 .idea/
-.agents/
+
+# Agent 本地输出，仅提交项目级 Skills
+.agents/*
+!.agents/skills/
+!.agents/skills/**
+
+# Claude 本地配置，仅提交项目级 Skills
+.claude/*
+!.claude/skills/
+!.claude/skills/**
 
 # OS / editor noise
 Thumbs.db

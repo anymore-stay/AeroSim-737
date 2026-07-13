@@ -97,6 +97,10 @@ AeroSim-737/
 ## 天气系统约定
 
 - 当前主天气系统为 `UniStorm URP System`。
+- 处理驾驶舱、客舱、第三人称之间的天气密度、覆盖、偏移、跟随、雾或声音不一致问题时，必须先读取当前 Agent 对应的项目 Skill：
+  - Codex：`.agents/skills/aerosim-debug-camera-weather-effects/SKILL.md`
+  - Claude Code：`.claude/skills/aerosim-debug-camera-weather-effects/SKILL.md`
+- 两个 Skill 入口必须保持一致，并继续完整读取 `Docs/UniStorm-Camera-Weather-Effects-Guide.md`。详细指南是该类问题的唯一事实源。
 - 天气菜单使用 UniStorm 自带菜单，项目脚本 `B737UniStormWeatherMenuController` 负责右上角布局和中文显示。
 - 按键 `2` 打开天气和时间选择。
 - 修改天气 UI 时优先改 `AeroSimUnity/Assets/Scripts/Aircraft/B737/B737UniStormWeatherMenuController.cs`，不要直接硬改运行时生成的 UI 对象。
