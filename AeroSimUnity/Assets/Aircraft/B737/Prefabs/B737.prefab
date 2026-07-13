@@ -21929,7 +21929,7 @@ MonoBehaviour:
   thirdPersonMaxDistance: 95
   thirdPersonZoomSpeed: 10
   thirdPersonOrbitSensitivity: 3
-  thirdPersonMinPitch: -15
+  thirdPersonMinPitch: -89.5
   thirdPersonMaxPitch: 70
   thirdPersonKeepoutPadding: 1.5
   preventThirdPersonInsideAircraft: 1
@@ -68153,6 +68153,7 @@ GameObject:
   - component: {fileID: 9187182646747135954}
   - component: {fileID: 313737240712000101}
   - component: {fileID: 313737240712000102}
+  - component: {fileID: 313737240712000103}
   m_Layer: 0
   m_Name: B737
   m_TagString: Player
@@ -68639,6 +68640,7 @@ MonoBehaviour:
   bridge: {fileID: 0}
   flapController: {fileID: 0}
   mechanicalController: {fileID: 0}
+  sidestickInput: {fileID: 313737240712000103}
   enableEscapePause: 1
   elevatorRate: 0.8
   aileronRate: 1
@@ -68667,6 +68669,52 @@ MonoBehaviour:
   groundSteeringMaxAglFt: 15
   invertGroundSteering: 0
   sendRate: 50
+--- !u!114 &313737240712000103
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5773677376619802584}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 71010e6579e340648f2b2f8a55edb625, type: 3}
+  m_Name:
+  m_EditorClassIdentifier:
+  inputEnabled: 1
+  preferredDeviceKeywords: TCA|A320|Thrustmaster|图马思特
+  preferredHardwareIds: 044F:0406
+  useOnlyConnectedDeviceAsFallback: 1
+  reconnectInterval: 1
+  roll:
+    axis: 0
+    invert: 0
+    deadzone: 0.03
+    centerOffset: 0.03
+    responseExponent: 1
+    sensitivity: 1
+  pitch:
+    axis: 1
+    invert: 1
+    deadzone: 0.03
+    centerOffset: 0
+    responseExponent: 1
+    sensitivity: 1
+  yaw:
+    axis: 3
+    invert: 0
+    deadzone: 0.03
+    centerOffset: 0
+    responseExponent: 1
+    sensitivity: 1
+  throttleEnabled: 1
+  throttle:
+    axis: 2
+    invert: 1
+    deadzone: 0.01
+    centerOffset: 0
+    responseExponent: 1
+    sensitivity: 1
 --- !u!114 &8219233128410032355
 MonoBehaviour:
   m_ObjectHideFlags: 0
