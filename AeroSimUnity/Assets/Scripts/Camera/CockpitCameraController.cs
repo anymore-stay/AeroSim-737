@@ -50,6 +50,19 @@ public class CockpitCameraController : MonoBehaviour
     [Tooltip("Cockpit/Cabin 模式下允许向上看的最大角度。")]
     public float maxPitch = 80f;
 
+    [Header("POV 帽视角控制")]
+    [Tooltip("为空时自动从飞机根节点查找图马思特侧杆输入组件。")]
+    [InspectorName("侧杆输入组件")]
+    public ThrustmasterA320SidestickInput sidestickInput;
+
+    [InspectorName("启用 POV 帽控制视角")]
+    public bool enablePovLook = true;
+
+    [Tooltip("按住 POV 帽时每秒旋转的角度。")]
+    [InspectorName("POV 视角旋转速度")]
+    [Min(0f)]
+    public float povLookSpeed = 90f;
+
     [Header("驾驶舱/客舱活动范围（相对初始位置，本地坐标）")]
     [Tooltip("相对初始位置，本地 X 负方向最远距离。")]
     public float minX = -1f;
@@ -107,8 +120,8 @@ public class CockpitCameraController : MonoBehaviour
     [Tooltip("按住右键拖动时，第三人称水平/俯仰旋转灵敏度。")]
     public float thirdPersonOrbitSensitivity = 3f;
 
-    [Tooltip("第三人称最低俯仰角。")]
-    public float thirdPersonMinPitch = -15f;
+    [Tooltip("第三人称最低俯仰角。-89.5 可让相机到飞机正上方并向下观察。")]
+    public float thirdPersonMinPitch = -89.5f;
 
     [Tooltip("第三人称最高俯仰角。")]
     public float thirdPersonMaxPitch = 70f;
@@ -163,6 +176,7 @@ public class CockpitCameraController : MonoBehaviour
     {
         EnsurePhysicsComponents();
         EnsureCameraSettings();
+        ResolveSidestickInput();
 
         startLocalPos = transform.localPosition;
         // 用本地欧拉角初始化(相机是飞机子物体,视角在机体坐标系内表示)
@@ -246,16 +260,24 @@ public class CockpitCameraController : MonoBehaviour
             EndMouseControl();
         }
 
-        if (!isLooking)
+        Vector2 povLook = ReadPovLookDirection();
+        bool hasPovLook = povLook.sqrMagnitude > 0.0001f;
+
+        if (isLooking)
         {
-            hasLookInput = false;
-            return;
+            yaw += Input.GetAxis("Mouse X") * lookSensitivity;
+            pitch -= Input.GetAxis("Mouse Y") * lookSensitivity;
         }
 
-        yaw += Input.GetAxis("Mouse X") * lookSensitivity;
-        pitch -= Input.GetAxis("Mouse Y") * lookSensitivity;
+        if (hasPovLook)
+        {
+            float povDelta = povLookSpeed * Time.unscaledDeltaTime;
+            yaw += povLook.x * povDelta;
+            pitch -= povLook.y * povDelta;
+        }
+
         pitch = Mathf.Clamp(pitch, minPitch, maxPitch);
-        hasLookInput = true;
+        hasLookInput = isLooking || hasPovLook;
     }
 
     private void ApplyLook()
@@ -336,6 +358,16 @@ public class CockpitCameraController : MonoBehaviour
         {
             orbitYaw += Input.GetAxis("Mouse X") * thirdPersonOrbitSensitivity;
             orbitPitch -= Input.GetAxis("Mouse Y") * thirdPersonOrbitSensitivity;
+            orbitPitch = Mathf.Clamp(orbitPitch, thirdPersonMinPitch, thirdPersonMaxPitch);
+            orbitDirty = true;
+        }
+
+        Vector2 povLook = ReadPovLookDirection();
+        if (povLook.sqrMagnitude > 0.0001f)
+        {
+            float povDelta = povLookSpeed * Time.unscaledDeltaTime;
+            orbitYaw += povLook.x * povDelta;
+            orbitPitch -= povLook.y * povDelta;
             orbitPitch = Mathf.Clamp(orbitPitch, thirdPersonMinPitch, thirdPersonMaxPitch);
             orbitDirty = true;
         }
@@ -662,6 +694,29 @@ public class CockpitCameraController : MonoBehaviour
         isLooking = true;
         Cursor.lockState = CursorLockMode.Locked;
         Cursor.visible = false;
+    }
+
+    private Vector2 ReadPovLookDirection()
+    {
+        if (!enablePovLook)
+            return Vector2.zero;
+
+        if (sidestickInput == null)
+            ResolveSidestickInput();
+
+        return sidestickInput != null && sidestickInput.ControlActive
+            ? sidestickInput.PovLookDirection
+            : Vector2.zero;
+    }
+
+    private void ResolveSidestickInput()
+    {
+        if (sidestickInput != null)
+            return;
+
+        Transform root = aircraftRoot != null ? aircraftRoot : transform.root;
+        if (root != null)
+            sidestickInput = root.GetComponentInChildren<ThrustmasterA320SidestickInput>(true);
     }
 
     private void EndMouseControl()

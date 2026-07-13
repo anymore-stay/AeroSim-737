@@ -22,6 +22,8 @@ public class FlightInput : MonoBehaviour
     [SerializeField] private JsbsimBridge bridge;
     [SerializeField] private B737FlapController flapController;
     [SerializeField] private B737MechanicalController mechanicalController;
+    [Tooltip("检测到图马思特侧杆后优先使用侧杆；设备断开时自动恢复键盘控制。")]
+    [SerializeField] private ThrustmasterA320SidestickInput sidestickInput;
 
     [Header("Pause")]
     [SerializeField] private bool enableEscapePause = true;
@@ -128,6 +130,7 @@ public class FlightInput : MonoBehaviour
     private int spoilerStep;
     private bool gearDown = true;
     private bool brakes = true;    // 地面起飞:初始刹车锁定,飞机停得住;松刹车(B)再滑跑
+    private bool directJoystickControlActive;
 
     private float sendTimer;
     private bool escapePaused;
@@ -138,6 +141,7 @@ public class FlightInput : MonoBehaviour
         if (bridge == null) bridge = GetComponent<JsbsimBridge>();
         if (flapController == null) flapController = GetComponent<B737FlapController>();
         if (mechanicalController == null) mechanicalController = GetComponent<B737MechanicalController>();
+        if (sidestickInput == null) sidestickInput = GetComponent<ThrustmasterA320SidestickInput>();
     }
 
     private void Update()
@@ -151,52 +155,82 @@ public class FlightInput : MonoBehaviour
         if (escapePaused) return;
 
         float dt = Time.deltaTime;
+        directJoystickControlActive = sidestickInput != null && sidestickInput.ControlActive;
 
         // ---- 升降舵:S 拉杆抬头, W 推杆低头 ----
-        float pitchInput = 0f;
-        if (Input.GetKey(KeyCode.W)) pitchInput += 1f;
-        if (Input.GetKey(KeyCode.S)) pitchInput -= 1f;
-        elevator = StepHeldAxis(elevator, pitchInput, elevatorRate, dt);
+        if (directJoystickControlActive)
+        {
+            elevator = sidestickInput.Pitch;
+        }
+        else
+        {
+            float pitchInput = 0f;
+            if (Input.GetKey(KeyCode.W)) pitchInput += 1f;
+            if (Input.GetKey(KeyCode.S)) pitchInput -= 1f;
+            elevator = StepHeldAxis(elevator, pitchInput, elevatorRate, dt);
+        }
 
         // ---- 副翼:A 左滚, D 右滚 ----
-        float rollInput = 0f;
-        if (Input.GetKey(KeyCode.D)) rollInput += 1f;
-        if (Input.GetKey(KeyCode.A)) rollInput -= 1f;
-        aileron = StepAxis(aileron, rollInput, aileronRate, dt);
+        if (directJoystickControlActive)
+        {
+            aileron = sidestickInput.Roll;
+        }
+        else
+        {
+            float rollInput = 0f;
+            if (Input.GetKey(KeyCode.D)) rollInput += 1f;
+            if (Input.GetKey(KeyCode.A)) rollInput -= 1f;
+            aileron = StepAxis(aileron, rollInput, aileronRate, dt);
+        }
 
         // ---- 方向舵:Q 左偏航, E 右偏航 ----
         float yawInput = 0f;
         turnInput = 0f;
-        if (Input.GetKey(KeyCode.E))
+        if (directJoystickControlActive)
         {
-            yawInput += 1f;
-            turnInput += 1f;
-        }
-        if (Input.GetKey(KeyCode.Q))
-        {
-            yawInput -= 1f;
-            turnInput -= 1f;
-        }
-        if (coordinatedTurnAssist)
-        {
-            float rudderTarget = yawInput * maxTurnRudderInput;
-            rudder = Mathf.MoveTowards(rudder, rudderTarget, rudderRate * dt);
+            rudder = sidestickInput.Yaw;
         }
         else
         {
-            rudder = StepAxis(rudder, yawInput, rudderRate, dt);
+            if (Input.GetKey(KeyCode.E))
+            {
+                yawInput += 1f;
+                turnInput += 1f;
+            }
+            if (Input.GetKey(KeyCode.Q))
+            {
+                yawInput -= 1f;
+                turnInput -= 1f;
+            }
+            if (coordinatedTurnAssist)
+            {
+                float rudderTarget = yawInput * maxTurnRudderInput;
+                rudder = Mathf.MoveTowards(rudder, rudderTarget, rudderRate * dt);
+            }
+            else
+            {
+                rudder = StepAxis(rudder, yawInput, rudderRate, dt);
+            }
         }
 
         // ---- 油门:Shift 加，Ctrl 收至怠速，同时按下在地面增加反推 ----
         bool increaseThrottle = Input.GetKey(KeyCode.LeftShift);
         bool decreaseThrottle = Input.GetKey(KeyCode.LeftControl);
-        throttle = ReverseThrustMath.UpdateSignedThrottle(
-            throttle,
-            increaseThrottle,
-            decreaseThrottle,
-            IsReverseThrustAllowed(),
-            throttleRate,
-            dt);
+        bool reverseShortcutPressed = increaseThrottle && decreaseThrottle;
+        if (sidestickInput != null && sidestickInput.ThrottleControlEnabled && !reverseShortcutPressed)
+        {
+            throttle = sidestickInput.Throttle;
+        }
+        else
+        {
+            throttle = ReverseThrustMath.UpdateSignedThrottle(
+                throttle,
+                increaseThrottle,
+                decreaseThrottle,
+                IsReverseThrustAllowed(),
+                throttleRate,
+                dt);
+        }
 
         // ---- 襟翼:F 增加一级,V 减少一级 ----
         if (Input.GetKeyDown(KeyCode.F))
@@ -312,8 +346,9 @@ public class FlightInput : MonoBehaviour
     {
         if (bridge == null || !bridge.ControlConnected) return;
         float coordinatedAileron = aileron;
-        bool hasTurnInput = Mathf.Abs(turnInput) > coordinatedTurnDeadzone;
-        float desiredBankDeg = coordinatedTurnAssist && hasTurnInput
+        bool useTurnAssist = coordinatedTurnAssist && !directJoystickControlActive;
+        bool hasTurnInput = useTurnAssist && Mathf.Abs(turnInput) > coordinatedTurnDeadzone;
+        float desiredBankDeg = useTurnAssist && hasTurnInput
             ? turnInput * coordinatedTurnBankDeg
             : 0f;
 
@@ -322,7 +357,7 @@ public class FlightInput : MonoBehaviour
             desiredBankDeg,
             bankTargetSlewRate * Time.deltaTime);
 
-        if (coordinatedTurnAssist && bridge.HasState &&
+        if (useTurnAssist && bridge.HasState &&
             (hasTurnInput ||
              Mathf.Abs(bridge.RollDeg) > levelBankDeadzoneDeg ||
              Mathf.Abs(smoothedTurnBankTargetDeg) > levelBankDeadzoneDeg))
@@ -336,7 +371,7 @@ public class FlightInput : MonoBehaviour
                 aileronLimit);
             coordinatedAileron += bankCommand;
         }
-        else if (coordinatedTurnAssist && hasTurnInput)
+        else if (useTurnAssist && hasTurnInput)
         {
             coordinatedAileron += turnInput * yawToAileron;
         }
