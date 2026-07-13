@@ -191,7 +191,7 @@ AeroSimUnity/
   - `LeftControl + LeftShift` 在接地后增加反推
   - `F` 循环切换襟翼档位
   - `B` 切换刹车
-- 让舵面输入在松手后自动回中
+- 升降舵在 `W/S` 松开后保持当前舵位，副翼和方向舵在松手后自动回中
 - 控制量按固定发送频率发给 `JsbsimBridge`
 - 对外暴露 `Elevator`、`Aileron`、`Rudder`、`Throttle`、`Flaps`、`Brakes` 属性供 HUD 读取
 

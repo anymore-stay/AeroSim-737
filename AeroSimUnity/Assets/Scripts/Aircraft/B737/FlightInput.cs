@@ -12,8 +12,8 @@ using UnityEngine;
 ///   F            : 襟翼切换(0 / 0.5 / 1)。
 ///   方向键不再控制飞机:上下左右留给相机视角移动。
 ///
-/// 控制量采用"自动回中"逻辑:松开按键后舵面平滑回到中立位,更接近真实手感。
-/// 油门是保持型(不会自动回中)。
+/// 升降舵和油门采用保持型逻辑，松开按键后保持当前状态。
+/// 副翼和方向舵松开按键后平滑回到中立位。
 /// </summary>
 [RequireComponent(typeof(JsbsimBridge))]
 public class FlightInput : MonoBehaviour
@@ -30,7 +30,7 @@ public class FlightInput : MonoBehaviour
     [SerializeField] private float elevatorRate = 0.8f;
     [SerializeField] private float aileronRate = 1.0f;
     [SerializeField] private float rudderRate = 0.8f;
-    [Tooltip("松开按键后舵面回中速度。")]
+    [Tooltip("松开按键后副翼和方向舵的回中速度。升降舵不会自动回中。")]
     [SerializeField] private float centerRate = 0.75f;
 
     [Header("油门")]
@@ -45,8 +45,6 @@ public class FlightInput : MonoBehaviour
     [SerializeField, Min(1)] private int spoilerStepCount = 4;
     [SerializeField, Min(0f)] private float minimumGearRetractionAglFt = 10f;
     [Header("Control Tuning")]
-    [Tooltip("中文名：升降舵中立偏置。负值会给飞机一点抬头趋势，正值会给一点低头趋势。")]
-    [SerializeField, Range(-1f, 1f)] private float elevatorNeutralBias = 0f;
     [Tooltip("中文名：升降舵权限。数值越大，W/S 对俯仰控制越强。")]
     [SerializeField, Range(0f, 1f)] private float elevatorAuthority = 0.75f;
     [Tooltip("中文名：副翼权限。数值越大，滚转和转弯建立越快，但太大会不好控制。")]
@@ -75,31 +73,6 @@ public class FlightInput : MonoBehaviour
     [SerializeField] private float levelBankDeadzoneDeg = 1.5f;
     [Tooltip("中文名：自动回正副翼上限。松开 Q/E 后用于把飞机扶平的副翼最大补偿。")]
     [SerializeField, Range(0f, 1f)] private float maxLevelingAileron = 0.28f;
-    [Tooltip("中文名：启用俯仰保持辅助。开启后转弯时会自动给一点抬头补偿，减少掉高度。")]
-    [SerializeField] private bool pitchHoldAssist = true;
-    [Tooltip("中文名：目标俯仰角。俯仰保持辅助希望维持的机头角度。")]
-    [SerializeField] private float pitchHoldDeg = 0f;
-    [Tooltip("中文名：俯仰保持增益。数值越大越积极拉回目标俯仰角，太大容易上下晃。")]
-    [SerializeField] private float pitchHoldGain = 0.03f;
-    [Tooltip("中文名：转弯抬头补偿。坡度越大时给越多抬头，减少大转弯掉高度。")]
-    [SerializeField] private float turnPitchCompensation = 0.012f;
-    [Tooltip("中文名：最大俯仰辅助。限制自动抬头补偿的最大强度，避免机头拉得过猛。")]
-    [SerializeField, Range(0f, 1f)] private float maxPitchAssist = 0.45f;
-
-    [Header("低空俯仰保持")]
-    [Tooltip("低空飞行且没有 W/S 输入时，自动保持很小的抬头姿态。")]
-    [SerializeField] private bool lowAltitudePitchAssist = true;
-    [Tooltip("低于此无线电高度时逐渐加入轻微抬头辅助。")]
-    [SerializeField, Min(1f)] private float lowAltitudeAssistCeilingAglFt = 1500f;
-    [Tooltip("低于此无线电高度时不启用，避免地面滑跑时自动抬轮。")]
-    [SerializeField, Min(0f)] private float lowAltitudeAssistMinimumAglFt = 20f;
-    [Tooltip("低空时在原目标俯仰上增加的最大抬头角，建议保持较小。")]
-    [SerializeField, Range(0f, 5f)] private float lowAltitudePitchUpDeg = 2f;
-    [Tooltip("低于此空速时不启用低空抬头辅助。")]
-    [SerializeField, Min(0f)] private float lowAltitudeAssistMinSpeedKts = 80f;
-    [Tooltip("低空抬头辅助允许增加的最大升降舵修正量。")]
-    [SerializeField, Range(0f, 0.3f)] private float maxLowAltitudePitchAssist = 0.12f;
-
     [Header("侧滑保护")]
     [Tooltip("限制飞行中的侧滑，防止持续偏航发展成旋转。")]
     [SerializeField] private bool sideSlipProtection = true;
@@ -183,7 +156,7 @@ public class FlightInput : MonoBehaviour
         float pitchInput = 0f;
         if (Input.GetKey(KeyCode.W)) pitchInput += 1f;
         if (Input.GetKey(KeyCode.S)) pitchInput -= 1f;
-        elevator = StepAxis(elevator, pitchInput, elevatorRate, dt);
+        elevator = StepHeldAxis(elevator, pitchInput, elevatorRate, dt);
 
         // ---- 副翼:A 左滚, D 右滚 ----
         float rollInput = 0f;
@@ -326,10 +299,18 @@ public class FlightInput : MonoBehaviour
         return Mathf.Clamp(current, -1f, 1f);
     }
 
+    /// <summary>有输入时改变舵位，无输入时保持当前舵位。</summary>
+    private static float StepHeldAxis(float current, float input, float rate, float dt)
+    {
+        if (Mathf.Abs(input) > 0.01f)
+            current += input * Mathf.Max(0f, rate) * Mathf.Max(0f, dt);
+
+        return Mathf.Clamp(current, -1f, 1f);
+    }
+
     private void SendControls()
     {
         if (bridge == null || !bridge.ControlConnected) return;
-        float pitchAssist = CalculatePitchAssist();
         float coordinatedAileron = aileron;
         bool hasTurnInput = Mathf.Abs(turnInput) > coordinatedTurnDeadzone;
         float desiredBankDeg = coordinatedTurnAssist && hasTurnInput
@@ -360,7 +341,7 @@ public class FlightInput : MonoBehaviour
             coordinatedAileron += turnInput * yawToAileron;
         }
 
-        float elevatorCommand = Mathf.Clamp(elevator * elevatorAuthority + elevatorNeutralBias + pitchAssist, -1f, 1f);
+        float elevatorCommand = Mathf.Clamp(elevator * elevatorAuthority, -1f, 1f);
         float aileronCommand = Mathf.Clamp(coordinatedAileron * aileronAuthority, -1f, 1f);
         if (bankAngleProtection && bridge.HasState && bridge.SpeedKts >= bankProtectionMinSpeedKts)
         {
@@ -435,45 +416,6 @@ public class FlightInput : MonoBehaviour
                               bridge.GetValue("gear_unit_1_wow", 0f) > 0.5f ||
                               bridge.GetValue("gear_unit_2_wow", 0f) > 0.5f;
         return weightOnWheels || bridge.AglFt <= reverseThrustMaxAglFt;
-    }
-
-    private float CalculatePitchAssist()
-    {
-        if (!pitchHoldAssist || bridge == null || !bridge.HasState)
-            return 0f;
-
-        // 玩家拉杆或推杆时必须拥有完整俯仰权限，辅助仅在松杆后接管姿态保持。
-        if (Mathf.Abs(elevator) > 0.01f)
-            return 0f;
-
-        float targetPitchDeg = pitchHoldDeg;
-        float lowAltitudeAssistLimit = 0f;
-        if (lowAltitudePitchAssist &&
-            bridge.SpeedKts >= lowAltitudeAssistMinSpeedKts &&
-            bridge.AglFt >= lowAltitudeAssistMinimumAglFt &&
-            bridge.AglFt < lowAltitudeAssistCeilingAglFt)
-        {
-            float altitudeBlend = LowAltitudePitchAssistMath.CalculateBlend(
-                bridge.AglFt,
-                lowAltitudeAssistMinimumAglFt,
-                lowAltitudeAssistCeilingAglFt);
-            targetPitchDeg += lowAltitudePitchUpDeg * altitudeBlend;
-            lowAltitudeAssistLimit = maxLowAltitudePitchAssist * altitudeBlend;
-        }
-
-        float pitchError = targetPitchDeg - bridge.PitchDeg;
-        float pitchHold = -pitchError * pitchHoldGain;
-        if (lowAltitudeAssistLimit > 0f)
-        {
-            float basePitchError = pitchHoldDeg - bridge.PitchDeg;
-            float basePitchHold = -basePitchError * pitchHoldGain;
-            pitchHold = basePitchHold + Mathf.Clamp(
-                pitchHold - basePitchHold,
-                -lowAltitudeAssistLimit,
-                lowAltitudeAssistLimit);
-        }
-        float turnHold = -Mathf.Abs(bridge.RollDeg) * turnPitchCompensation;
-        return Mathf.Clamp(pitchHold + turnHold, -maxPitchAssist, maxPitchAssist);
     }
 
     // 给 HUD 读取

@@ -69,6 +69,8 @@ public class B737MechanicalController : MonoBehaviour
     }
 
     [Header("Input")]
+    [Tooltip("存在时，机身升降舵直接读取该组件保持的 Elevator 状态。")]
+    [SerializeField] private FlightInput flightInput;
     [SerializeField] private bool useKeyboardInput = true;
     [SerializeField] private KeyAxis pitchKeys = new KeyAxis { negativeKey = KeyCode.W, positiveKey = KeyCode.S };
     [SerializeField] private KeyAxis rollKeys = new KeyAxis { negativeKey = KeyCode.A, positiveKey = KeyCode.D };
@@ -114,11 +116,29 @@ public class B737MechanicalController : MonoBehaviour
 
     private void Awake()
     {
+        if (flightInput == null)
+        {
+            flightInput = GetComponent<FlightInput>();
+        }
+
         SyncTargetBindings();
         CaptureNeutralPose();
         gearExtended = startWithGearExtended;
         gearBlend = gearExtended ? 0f : 1f;
         ApplyAll();
+    }
+
+    private void LateUpdate()
+    {
+        if (flightInput == null)
+        {
+            return;
+        }
+
+        // FlightInput 中 W 为正、S 为负；机械模型原有约定与其相反。
+        pitchInput = Mathf.Clamp(-flightInput.Elevator, -1f, 1f);
+        ApplyControlSurfaceGroup(elevators, pitchInput);
+        ApplyCockpitYokes();
     }
 
     private void Update()

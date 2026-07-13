@@ -68648,7 +68648,6 @@ MonoBehaviour:
   flapStepCount: 4
   spoilerStepCount: 4
   minimumGearRetractionAglFt: 10
-  elevatorNeutralBias: 0
   elevatorAuthority: 0.75
   aileronAuthority: 1
   rudderAuthority: 0.3
@@ -68663,11 +68662,6 @@ MonoBehaviour:
   maxCoordinatedAileron: 0.75
   levelBankDeadzoneDeg: 1.5
   maxLevelingAileron: 0.28
-  pitchHoldAssist: 1
-  pitchHoldDeg: 0
-  pitchHoldGain: 0.06
-  turnPitchCompensation: 0.012
-  maxPitchAssist: 0.45
   groundSteeringEnabled: 1
   groundSteeringAuthority: 1
   groundSteeringMaxAglFt: 15
