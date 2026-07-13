@@ -187,8 +187,9 @@ JSBSIM_DIR=<包含 JSBSim.exe 的目录>
 | `D` | 右滚 |
 | `Q` | 左偏航 |
 | `E` | 右偏航 |
-| `LeftShift` | 增加油门 |
-| `LeftControl` | 减少油门 |
+| `LeftShift` | 增加正推油门 |
+| `LeftControl` | 将油门收向怠速 |
+| `LeftControl + LeftShift` | 接地后增加反推，HUD 油门显示为负数 |
 | `B` | 切换刹车 |
 | `G` | 起落架收放 |
 | `F` | 放下襟翼 |
