@@ -21181,6 +21181,7 @@ GameObject:
   - component: {fileID: 1589623297}
   - component: {fileID: 1589623298}
   - component: {fileID: 1589623299}
+  - component: {fileID: 1589623300}
   m_Layer: 0
   m_Name: UniStorm URP System
   m_TagString: Untagged
@@ -24073,6 +24074,24 @@ MonoBehaviour:
   timeSliderSize: {x: 200, y: 15}
   timeLabelSize: {x: 200, y: 15}
   timeLabelFontSize: 14
+--- !u!114 &1589623300
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1589623294}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a741f2698f8e4fc4b8c2fd5fb8e30fb7, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  uniStormSystem: {fileID: 1589623295}
+  cameraManager: {fileID: 0}
+  sunDisc: {fileID: 0}
+  referenceDistance: 2000
+  farClipUsage: 0.9
+  preserveAngularSize: 1
 --- !u!128 &1591313071
 Font:
   m_ObjectHideFlags: 0
