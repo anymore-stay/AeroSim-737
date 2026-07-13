@@ -1,5 +1,6 @@
 using CesiumForUnity;
 using System.Collections.Generic;
+using UniStorm;
 using UnityEngine;
 
 /// <summary>
@@ -45,6 +46,28 @@ public class B737ContrailController : MonoBehaviour
     [Tooltip("航迹云透明粒子的渲染排序。保持比发动机热浪高，让烟雾后渲染，减少被热浪盖住的问题。")]
     [SerializeField] private int smokeSortingOrder = 20;
 
+    [Header("夜间显示")]
+    [Tooltip("用于读取当前时间的 UniStorm 系统。为空时会自动查找。")]
+    [SerializeField] private UniStormSystem uniStormSystem;
+
+    [Tooltip("夜晚开始小时，和夜间视觉控制器保持一致。")]
+    [SerializeField, Range(0f, 24f)] private float nightStartHour = 19f;
+
+    [Tooltip("夜晚结束小时，和夜间视觉控制器保持一致。")]
+    [SerializeField, Range(0f, 24f)] private float nightEndHour = 5.5f;
+
+    [Tooltip("昼夜切换过渡小时数。")]
+    [SerializeField, Min(0f)] private float nightTransitionHours = 0.75f;
+
+    [Tooltip("满夜时白色航迹云的目标颜色。默认接近黑夜里的微弱冷灰。")]
+    [SerializeField] private Color nightSmokeTint = new Color(0.04f, 0.045f, 0.05f, 1f);
+
+    [Tooltip("满夜时航迹云颜色保留比例。数值越低，白色尾迹越不显眼。")]
+    [SerializeField, Range(0f, 1f)] private float nightSmokeBrightness = 0.08f;
+
+    [Tooltip("满夜时航迹云透明度保留比例。数值越低，尾迹越淡。")]
+    [SerializeField, Range(0f, 1f)] private float nightSmokeAlphaMultiplier = 0.18f;
+
     [Header("Cesium 回拉补偿")]
     [Tooltip("Cesium 原点变化时，飞机位移至少达到多少米才平移已有烟雾。用于忽略很小的坐标变化。")]
     [Min(0f)]
@@ -65,9 +88,14 @@ public class B737ContrailController : MonoBehaviour
     private ParticleSystem.Particle[] particleBuffer;
     private Vector3[] lastRealisticSmokePositions;
     private bool realisticSmokePositionsInitialized;
+    private MaterialPropertyBlock smokePropertyBlock;
+
+    private static readonly int ColorId = Shader.PropertyToID("_Color");
+    private static readonly int TintColorId = Shader.PropertyToID("_TintColor");
 
     private void Awake()
     {
+        EnsureSmokePropertyBlock();
         ResolveReferences();
         SetEmission(false);
     }
@@ -86,11 +114,13 @@ public class B737ContrailController : MonoBehaviour
 
     private void LateUpdate()
     {
+        EnsureSmokePropertyBlock();
         ResolveReferences();
         SubscribeToGeoreference();
         DetectTransformRecentering();
         UpdateEmissionState();
         EmitRealisticSmokeByDistance();
+        ApplyNightSmokeToExistingParticles();
         CaptureAircraftPosition();
     }
 
@@ -98,6 +128,7 @@ public class B737ContrailController : MonoBehaviour
     {
         if (bridge == null) bridge = JsbsimBridge.Instance;
         if (aircraft == null && bridge != null) aircraft = bridge.Aircraft;
+        if (uniStormSystem == null) uniStormSystem = FindFirstObjectByType<UniStormSystem>();
 
         if (!realisticSmokeTrailsResolved || realisticSmokeTrails == null || realisticSmokeTrails.Length == 0)
         {
@@ -106,6 +137,14 @@ public class B737ContrailController : MonoBehaviour
         }
 
         ConfigureRealisticSmokeRenderers();
+    }
+
+    private void EnsureSmokePropertyBlock()
+    {
+        if (smokePropertyBlock == null)
+        {
+            smokePropertyBlock = new MaterialPropertyBlock();
+        }
     }
 
     private void SubscribeToGeoreference()
@@ -293,6 +332,52 @@ public class B737ContrailController : MonoBehaviour
 
         renderer.sortingOrder = smokeSortingOrder;
         renderer.sortingFudge = 4f;
+        ApplyNightSmokeTint(renderer);
+    }
+
+    private void ApplyNightSmokeTint(ParticleSystemRenderer renderer)
+    {
+        EnsureSmokePropertyBlock();
+
+        float nightBlend = GetNightBlend();
+        Material[] materials = renderer.sharedMaterials;
+        for (int materialIndex = 0; materialIndex < materials.Length; materialIndex++)
+        {
+            Material material = materials[materialIndex];
+            if (material == null) continue;
+
+            smokePropertyBlock.Clear();
+            renderer.GetPropertyBlock(smokePropertyBlock, materialIndex);
+
+            if (material.HasProperty(ColorId))
+            {
+                Color source = material.GetColor(ColorId);
+                smokePropertyBlock.SetColor(
+                    ColorId,
+                    CalculateNightSmokeColor(source, nightSmokeTint, nightSmokeBrightness, nightSmokeAlphaMultiplier, nightBlend));
+            }
+
+            if (material.HasProperty(TintColorId))
+            {
+                Color source = material.GetColor(TintColorId);
+                smokePropertyBlock.SetColor(
+                    TintColorId,
+                    CalculateNightSmokeColor(source, nightSmokeTint, nightSmokeBrightness, nightSmokeAlphaMultiplier, nightBlend));
+            }
+
+            renderer.SetPropertyBlock(smokePropertyBlock, materialIndex);
+        }
+    }
+
+    private float GetNightBlend()
+    {
+        float hour = 12f;
+        if (uniStormSystem != null)
+        {
+            hour = Mathf.Repeat(uniStormSystem.Hour + uniStormSystem.Minute / 60f, 24f);
+        }
+
+        return B737NightVisualController.CalculateNightBlend(hour, nightStartHour, nightEndHour, nightTransitionHours);
     }
 
     private void ShiftRealisticSmokeParticles(Vector3 offset)
@@ -366,6 +451,11 @@ public class B737ContrailController : MonoBehaviour
             Vector3 direction = segment / distance;
             int emitCount = Mathf.Min(Mathf.FloorToInt(distance / spacing), maxParticlesPerFrame);
             ParticleSystem.EmitParams emitParams = new ParticleSystem.EmitParams();
+            float nightBlend = GetNightBlend();
+            if (nightBlend > 0f)
+            {
+                emitParams.startColor = CalculateCurrentNightSmokeColor(nightBlend);
+            }
 
             for (int particleIndex = 1; particleIndex <= emitCount; particleIndex++)
             {
@@ -377,5 +467,56 @@ public class B737ContrailController : MonoBehaviour
 
             lastRealisticSmokePositions[smokeIndex] += direction * spacing * emitCount;
         }
+    }
+
+    private void ApplyNightSmokeToExistingParticles()
+    {
+        if (realisticSmokeTrails == null) return;
+
+        float nightBlend = GetNightBlend();
+        if (nightBlend <= 0f) return;
+
+        Color smokeColor = CalculateCurrentNightSmokeColor(nightBlend);
+        for (int smokeIndex = 0; smokeIndex < realisticSmokeTrails.Length; smokeIndex++)
+        {
+            ParticleSystem particleSystem = realisticSmokeTrails[smokeIndex];
+            if (particleSystem == null) continue;
+
+            int maxParticles = particleSystem.main.maxParticles;
+            if (particleBuffer == null || particleBuffer.Length < maxParticles)
+                particleBuffer = new ParticleSystem.Particle[maxParticles];
+
+            int particleCount = particleSystem.GetParticles(particleBuffer);
+            for (int particleIndex = 0; particleIndex < particleCount; particleIndex++)
+                particleBuffer[particleIndex].startColor = smokeColor;
+
+            if (particleCount > 0)
+                particleSystem.SetParticles(particleBuffer, particleCount);
+        }
+    }
+
+    private Color CalculateCurrentNightSmokeColor(float nightBlend)
+    {
+        return CalculateNightSmokeColor(Color.white, nightSmokeTint, nightSmokeBrightness, nightSmokeAlphaMultiplier, nightBlend);
+    }
+
+    public static Color CalculateNightSmokeColor(
+        Color sourceColor,
+        Color nightTint,
+        float nightBrightness,
+        float nightAlphaMultiplier,
+        float nightBlend)
+    {
+        float blend = Mathf.Clamp01(nightBlend);
+        float brightness = Mathf.Clamp01(nightBrightness);
+        float alphaMultiplier = Mathf.Clamp01(nightAlphaMultiplier);
+
+        Color target = new Color(
+            sourceColor.r * brightness * Mathf.Clamp01(nightTint.r),
+            sourceColor.g * brightness * Mathf.Clamp01(nightTint.g),
+            sourceColor.b * brightness * Mathf.Clamp01(nightTint.b),
+            sourceColor.a * alphaMultiplier);
+
+        return Color.Lerp(sourceColor, target, blend);
     }
 }

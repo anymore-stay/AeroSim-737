@@ -11,6 +11,8 @@ sources:
   - AeroSimUnity/Assets/UniStorm Weather System/Scripts/System/LightningSystem.cs
   - AeroSimUnity/Assets/Scenes/MainScene.unity
   - AeroSimUnity/Assets/Aircraft/B737/Prefabs/B737.prefab
+  - AeroSimUnity/Assets/Scripts/Aircraft/B737/B737NightVisualController.cs
+  - AeroSimUnity/Assets/Scripts/Aircraft/B737/B737ContrailController.cs
 ---
 
 # AeroSim-737 UniStorm 多视角天气特效排查与修复指南
@@ -652,6 +654,9 @@ Thunder Snow 的基础值为 `3000` 时：
 | Lightning / Thunder | 世界事件 + AudioSource | 生成中心和声音距离基于错误 Player | 明确以飞机还是听者为中心 |
 | Weather Sounds | 相机附近 AudioSource | 多 AudioListener、容器未跟随 | 保证唯一 Listener；跟随活动相机 |
 | Wetness / Snow Shader | 全局 Shader 参数 | 材质不支持、不同相机 Renderer 差异 | 检查材质 Shader，不使用粒子锚点方案 |
+| Night Cesium Tiles | `OnTileGameObjectCreated` + `MaterialPropertyBlock` 渐变压暗 | 新瓦片如果等扫描后再压暗，会先按白天亮度渲染一帧或几帧；全量每帧扫描会明显降帧；切换 `Cesium3DTileset.opaqueMaterial` 或替换瓦片 Renderer 的 `sharedMaterials` 会破坏 Cesium 贴图链路并导致白色地景；统一白色自发光会把草地和影像贴图洗成 `nightSurfaceEmissionColor` 的颜色；热重载后旧的 `_EmissionColor` 覆盖可能残留在 `MaterialPropertyBlock` 中 | 不切换 Cesium 材质；不再给地表写白色 `_EmissionColor`；每次应用亮度时主动把地表 `_EmissionColor` 覆盖清成黑色，清掉旧自发光残留；订阅瓦片创建事件后立即给新 Renderer 写 PropertyBlock；现有瓦片按低频预算补注册；Cesium 只使用 `cesiumSurfaceBrightness` 按 `Lerp(1, cesiumSurfaceBrightness, nightBlend)` 压暗，当前场景值为 `0.08` |
+| Night Airport Scenery | 机场静态 Renderer + `MaterialPropertyBlock` 渐变压暗 | 机场 FBX 不属于 Cesium 瓦片，如果混在普通世界压暗里会比 Cesium 地景更黑；如果 `airportDarkeningRoots` 绑到空对象，机场专用亮度不会覆盖真实跑道；如果环境光每帧基于已压暗的当前值继续插值，会在黄昏过渡中先黑到不可见；机场材质不适合整体自发光，过高 emission 会把跑道和航站楼顶成纯白；如果夜晚视觉混合等到太阳落山后才开始，机场会先随太阳直射光变黑，再在夜晚脚本接管时突然变亮；如果夜间环境底光过低，`airportSurfaceBrightness` 再高也只能改材质本色，跑道仍会因没有光照而不可见 | `airportDarkeningRoots` 必须直接绑定北京大兴机场 Prefab 根节点，当前主场景为 `beijing-daxing-international-airport` 的 stripped Transform；脚本会忽略没有 Renderer 的错误根并按机场关键词兜底发现真实根；环境光和天空盒颜色必须从缓存的白天基准值插值到夜间目标，不能递归使用当前帧值；机场不使用自发光，只保留独立 `airportSurfaceBrightness` 和扫描预算；扫描只负责发现 Renderer，已缓存机场 Renderer 每帧按 `Lerp(1, airportSurfaceBrightness, nightBlend)` 更新；当前场景从 `eveningTransitionStartHour = 17` 开始过渡，到 `nightStartHour = 19` 达到目标亮度；当前机场亮度值为 `0.64`，夜间环境底光为 `ambientIntensity = 0.16`、`ambientSkyColor = 0.045/0.052/0.065` |
+| B737 Contrails | 飞机局部 ParticleSystem | 白色航迹云不受地景压暗影响，夜晚仍按白天亮度显示；只改材质可能被粒子顶点色抵消 | 在 `B737ContrailController` 中按 UniStorm 时间压暗新发粒子和存量粒子颜色 |
 
 ### 当前主场景中尤其需要继续检查的天气
 
