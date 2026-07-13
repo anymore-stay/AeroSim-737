@@ -15,6 +15,18 @@ public class EICAS1_Script : MonoBehaviour
     [Tooltip("主动轮询刷新间隔，单位秒。0.05 表示约 20Hz。")]
     [SerializeField, Min(0.01f)] private float pollInterval = 0.05f;
     private float nextPollTime;
+    private bool refreshPending;
+    private int n1LeftDisplay = int.MinValue;
+    private int n1RightDisplay = int.MinValue;
+    private int egtLeftDisplay = int.MinValue;
+    private int egtRightDisplay = int.MinValue;
+    private int tatDisplay = int.MinValue;
+    private int fuelFlowLeftDisplay = int.MinValue;
+    private int fuelFlowRightDisplay = int.MinValue;
+    private int leftFuelDisplay = int.MinValue;
+    private int centerFuelDisplay = int.MinValue;
+    private int rightFuelDisplay = int.MinValue;
+    private int totalFuelDisplay = int.MinValue;
 
     [Header("Gauges")]
     [Tooltip("左发 N1 仪表。")]
@@ -117,7 +129,7 @@ public class EICAS1_Script : MonoBehaviour
     {
         if (subscribedBridge != null)
         {
-            subscribedBridge.OnStateUpdated -= Refresh;
+            subscribedBridge.OnStateUpdated -= RequestRefresh;
             subscribedBridge = null;
         }
     }
@@ -129,9 +141,12 @@ public class EICAS1_Script : MonoBehaviour
             AttachBridge();
         }
 
-        if (pollBridgeInUpdate && bridge != null && Time.unscaledTime >= nextPollTime)
+        if (bridge != null
+            && Time.unscaledTime >= nextPollTime
+            && (pollBridgeInUpdate || refreshPending))
         {
             nextPollTime = Time.unscaledTime + pollInterval;
+            refreshPending = false;
             Refresh();
         }
     }
@@ -151,12 +166,18 @@ public class EICAS1_Script : MonoBehaviour
 
         if (subscribedBridge != null)
         {
-            subscribedBridge.OnStateUpdated -= Refresh;
+            subscribedBridge.OnStateUpdated -= RequestRefresh;
         }
 
         bridge = nextBridge;
         subscribedBridge = nextBridge;
-        subscribedBridge.OnStateUpdated += Refresh;
+        subscribedBridge.OnStateUpdated += RequestRefresh;
+        refreshPending = true;
+    }
+
+    private void RequestRefresh()
+    {
+        refreshPending = true;
     }
 
     private void Refresh()
@@ -170,28 +191,27 @@ public class EICAS1_Script : MonoBehaviour
         float n1Right = Read(engine2N1Key, 0f);
         SetGauge(n1LeftGauge, n1Left);
         SetGauge(n1RightGauge, n1Right);
-        SetText(n1LeftText, n1Left.ToString("0.0", CultureInfo.InvariantCulture));
-        SetText(n1RightText, n1Right.ToString("0.0", CultureInfo.InvariantCulture));
+        SetNumericText(n1LeftText, n1Left, 1, ref n1LeftDisplay);
+        SetNumericText(n1RightText, n1Right, 1, ref n1RightDisplay);
 
         float egtLeft = ReadEgt(engine1EgtKey, n1Left);
         float egtRight = ReadEgt(engine2EgtKey, n1Right);
         SetGauge(egtLeftGauge, egtLeft);
         SetGauge(egtRightGauge, egtRight);
-        SetText(egtLeftText, egtLeft.ToString("0", CultureInfo.InvariantCulture));
-        SetText(egtRightText, egtRight.ToString("0", CultureInfo.InvariantCulture));
+        SetNumericText(egtLeftText, egtLeft, 0, ref egtLeftDisplay);
+        SetNumericText(egtRightText, egtRight, 0, ref egtRightDisplay);
 
-        SetText(tatText, Mathf.RoundToInt(Read(tatCelsiusKey, 15f)).ToString(CultureInfo.InvariantCulture) + " C");
-        SetText(fuelFlowLeftText, FormatFuelFlow(Read(engine1FuelFlowPpsKey, 0f)));
-        SetText(fuelFlowRightText, FormatFuelFlow(Read(engine2FuelFlowPpsKey, 0f)));
+        SetNumericText(tatText, Read(tatCelsiusKey, 15f), 0, ref tatDisplay, " C");
+        SetNumericText(fuelFlowLeftText, Read(engine1FuelFlowPpsKey, 0f) * 3.6f, 2, ref fuelFlowLeftDisplay);
+        SetNumericText(fuelFlowRightText, Read(engine2FuelFlowPpsKey, 0f) * 3.6f, 2, ref fuelFlowRightDisplay);
 
         float leftFuel = Read(leftTankLbsKey, 0f);
         float centerFuel = Read(centerTankLbsKey, 0f);
         float rightFuel = Read(rightTankLbsKey, 0f);
         float totalFuel = Read(totalFuelLbsKey, leftFuel + centerFuel + rightFuel);
 
-        SetText(fuelQtyText, string.Format(CultureInfo.InvariantCulture, "{0:0.00} {1:0.00} {2:0.00}",
-            leftFuel / 1000f, centerFuel / 1000f, rightFuel / 1000f));
-        SetText(fuelTotalText, string.Format(CultureInfo.InvariantCulture, "{0:0.0}", totalFuel / 1000f));
+        SetFuelQuantityText(leftFuel, centerFuel, rightFuel);
+        SetNumericText(fuelTotalText, totalFuel / 1000f, 1, ref totalFuelDisplay);
 
         UpdateWarnings();
     }
@@ -227,10 +247,28 @@ public class EICAS1_Script : MonoBehaviour
         return deriveEgtFromN1WhenMissing ? egtBaseC + n1 * egtPerN1 : 0f;
     }
 
-    private string FormatFuelFlow(float poundsPerSecond)
+    private void SetFuelQuantityText(float leftFuel, float centerFuel, float rightFuel)
     {
-        float thousandPoundsPerHour = poundsPerSecond * 3.6f;
-        return thousandPoundsPerHour.ToString("0.00", CultureInfo.InvariantCulture);
+        int nextLeft = Mathf.RoundToInt(leftFuel / 10f);
+        int nextCenter = Mathf.RoundToInt(centerFuel / 10f);
+        int nextRight = Mathf.RoundToInt(rightFuel / 10f);
+        if (fuelQtyText == null
+            || (nextLeft == leftFuelDisplay
+                && nextCenter == centerFuelDisplay
+                && nextRight == rightFuelDisplay))
+        {
+            return;
+        }
+
+        leftFuelDisplay = nextLeft;
+        centerFuelDisplay = nextCenter;
+        rightFuelDisplay = nextRight;
+        fuelQtyText.text = string.Format(
+            CultureInfo.InvariantCulture,
+            "{0:0.00} {1:0.00} {2:0.00}",
+            nextLeft * 0.01f,
+            nextCenter * 0.01f,
+            nextRight * 0.01f);
     }
 
     private void HideAllWarnings()
@@ -273,12 +311,24 @@ public class EICAS1_Script : MonoBehaviour
         }
     }
 
-    private static void SetText(Text text, string value)
+    private static void SetNumericText(Text text, float value, int decimals, ref int cachedValue, string suffix = null)
     {
-        if (text != null)
+        if (text == null)
         {
-            text.text = value;
+            return;
         }
+
+        int scale = decimals == 0 ? 1 : decimals == 1 ? 10 : 100;
+        int displayedValue = Mathf.RoundToInt(value * scale);
+        if (displayedValue == cachedValue)
+        {
+            return;
+        }
+
+        cachedValue = displayedValue;
+        string format = decimals == 0 ? "0" : decimals == 1 ? "0.0" : "0.00";
+        string nextText = (displayedValue / (float)scale).ToString(format, CultureInfo.InvariantCulture);
+        text.text = suffix == null ? nextText : nextText + suffix;
     }
 
     private static void SetActive(GameObject target, bool active)

@@ -81,15 +81,20 @@ public class B737NavigationDisplay : MonoBehaviour
 
     [Header("Animation")]
     [SerializeField, Min(0f)] private float animationResponse = 12f;
+    [SerializeField, Min(0.01f)] private float displayRefreshInterval = 1f / 30f;
 
     private const float FeetPerSecondToKnots = 0.5924838f;
     private const double EarthRadiusNm = 3440.065;
 
     private readonly List<B737NavigationDisplaySymbolSnapshot> symbolBuffer = new List<B737NavigationDisplaySymbolSnapshot>(16);
+    private B737NavigationDisplaySymbolSnapshot[] symbolSnapshot = Array.Empty<B737NavigationDisplaySymbolSnapshot>();
     private RuntimeData targetData;
     private RuntimeData displayData;
     private bool dataInitialized;
     private float nextPollTime;
+    private float nextDisplayRefreshTime;
+    private float lastDisplayRefreshTime;
+    private bool stateRefreshPending;
     private JsbsimBridge subscribedBridge;
 
     private RectTransform generatedRoot;
@@ -106,6 +111,18 @@ public class B737NavigationDisplay : MonoBehaviour
     private Text[] compassTexts;
     private Text[] symbolTexts;
     private Font ndFont;
+    private int gsDisplay = int.MinValue;
+    private int tasDisplay = int.MinValue;
+    private int windDirectionDisplay = int.MinValue;
+    private int windSpeedDisplay = int.MinValue;
+    private int trackDisplay = int.MinValue;
+    private string nextIdentDisplay;
+    private int nextEtaMinuteDisplay = int.MinValue;
+    private int nextDistanceDisplay = int.MinValue;
+    private string vorIdentDisplay;
+    private string vorFrequencyDisplay;
+    private int vorDistanceDisplay = int.MinValue;
+    private int[] compassLabelValues;
 
     public float HeadingBugMagDeg
     {
@@ -133,6 +150,8 @@ public class B737NavigationDisplay : MonoBehaviour
     {
         AttachBridge();
         RefreshFromBridge();
+        nextDisplayRefreshTime = 0f;
+        lastDisplayRefreshTime = 0f;
         RenderDisplay();
     }
 
@@ -140,7 +159,7 @@ public class B737NavigationDisplay : MonoBehaviour
     {
         if (subscribedBridge != null)
         {
-            subscribedBridge.OnStateUpdated -= RefreshFromBridge;
+            subscribedBridge.OnStateUpdated -= RequestStateRefresh;
             subscribedBridge = null;
         }
     }
@@ -152,13 +171,30 @@ public class B737NavigationDisplay : MonoBehaviour
             AttachBridge();
         }
 
-        if (pollBridgeInUpdate && Time.unscaledTime >= nextPollTime)
+        bool pollDue = pollBridgeInUpdate && Time.unscaledTime >= nextPollTime;
+        if (pollDue)
         {
             nextPollTime = Time.unscaledTime + pollInterval;
+        }
+
+        if (Time.unscaledTime < nextDisplayRefreshTime)
+        {
+            return;
+        }
+
+        float displayDeltaTime = lastDisplayRefreshTime > 0f
+            ? Time.unscaledTime - lastDisplayRefreshTime
+            : Time.unscaledDeltaTime;
+        lastDisplayRefreshTime = Time.unscaledTime;
+        nextDisplayRefreshTime = Time.unscaledTime + displayRefreshInterval;
+
+        if (pollDue || stateRefreshPending)
+        {
+            stateRefreshPending = false;
             RefreshFromBridge();
         }
 
-        AnimateData();
+        AnimateData(displayDeltaTime);
         RenderDisplay();
     }
 
@@ -197,12 +233,18 @@ public class B737NavigationDisplay : MonoBehaviour
 
         if (subscribedBridge != null)
         {
-            subscribedBridge.OnStateUpdated -= RefreshFromBridge;
+            subscribedBridge.OnStateUpdated -= RequestStateRefresh;
         }
 
         bridge = nextBridge;
         subscribedBridge = nextBridge;
-        subscribedBridge.OnStateUpdated += RefreshFromBridge;
+        subscribedBridge.OnStateUpdated += RequestStateRefresh;
+        stateRefreshPending = true;
+    }
+
+    private void RequestStateRefresh()
+    {
+        stateRefreshPending = true;
     }
 
     private void RefreshFromBridge()
@@ -254,7 +296,7 @@ public class B737NavigationDisplay : MonoBehaviour
         targetData.windSpeedKts = 31f;
     }
 
-    private void AnimateData()
+    private void AnimateData(float deltaTime)
     {
         if (!dataInitialized)
         {
@@ -263,7 +305,7 @@ public class B737NavigationDisplay : MonoBehaviour
             return;
         }
 
-        float t = animationResponse <= 0f ? 1f : 1f - Mathf.Exp(-animationResponse * Time.unscaledDeltaTime);
+        float t = animationResponse <= 0f ? 1f : 1f - Mathf.Exp(-animationResponse * deltaTime);
         displayData.hasBridgeData = targetData.hasBridgeData;
         displayData.hasLatLon = targetData.hasLatLon;
         displayData.latDeg = targetData.latDeg;
@@ -287,6 +329,7 @@ public class B737NavigationDisplay : MonoBehaviour
 
         if (graphic != null)
         {
+            CopySymbolSnapshot();
             graphic.ConfigureGeometry(canvasSize, aircraftApex, arcRadius, visibleArcDeg);
             graphic.SetState(new B737NavigationDisplayState
             {
@@ -297,24 +340,54 @@ public class B737NavigationDisplay : MonoBehaviour
                 WindFromMagDeg = displayData.windFromMagDeg,
                 WindSpeedKts = displayData.windSpeedKts,
                 DisplayRangeNm = displayRangeNm,
-                Symbols = symbolBuffer.ToArray()
+                Symbols = symbolSnapshot
             });
         }
+    }
+
+    private void CopySymbolSnapshot()
+    {
+        if (symbolSnapshot.Length != symbolBuffer.Count)
+        {
+            symbolSnapshot = new B737NavigationDisplaySymbolSnapshot[symbolBuffer.Count];
+        }
+
+        symbolBuffer.CopyTo(symbolSnapshot);
     }
 
     private void UpdateTexts()
     {
         if (gsText != null)
         {
-            gsText.text = string.Format(CultureInfo.InvariantCulture,
-                "<color=#a9b0b7>GS</color>{0:000}  <color=#a9b0b7>TAS</color>{1:000}\n{2:000}\u00b0/{3:00}",
-                Mathf.RoundToInt(displayData.groundSpeedKts),
-                Mathf.RoundToInt(displayData.trueAirSpeedKts),
-                Mathf.RoundToInt(Normalize360(displayData.windFromMagDeg)),
-                Mathf.RoundToInt(displayData.windSpeedKts));
+            int nextGs = Mathf.RoundToInt(displayData.groundSpeedKts);
+            int nextTas = Mathf.RoundToInt(displayData.trueAirSpeedKts);
+            int nextWindDirection = Mathf.RoundToInt(Normalize360(displayData.windFromMagDeg));
+            int nextWindSpeed = Mathf.RoundToInt(displayData.windSpeedKts);
+            if (nextGs != gsDisplay
+                || nextTas != tasDisplay
+                || nextWindDirection != windDirectionDisplay
+                || nextWindSpeed != windSpeedDisplay)
+            {
+                gsDisplay = nextGs;
+                tasDisplay = nextTas;
+                windDirectionDisplay = nextWindDirection;
+                windSpeedDisplay = nextWindSpeed;
+                gsText.text = string.Format(
+                    CultureInfo.InvariantCulture,
+                    "<color=#a9b0b7>GS</color>{0:000}  <color=#a9b0b7>TAS</color>{1:000}\n{2:000}\u00b0/{3:00}",
+                    nextGs,
+                    nextTas,
+                    nextWindDirection,
+                    nextWindSpeed);
+            }
         }
 
-        SetText(trackValueText, Mathf.RoundToInt(Normalize360(displayData.trackMagDeg)).ToString("000", CultureInfo.InvariantCulture));
+        int nextTrack = Mathf.RoundToInt(Normalize360(displayData.trackMagDeg));
+        if (trackValueText != null && nextTrack != trackDisplay)
+        {
+            trackDisplay = nextTrack;
+            trackValueText.text = nextTrack.ToString("000", CultureInfo.InvariantCulture);
+        }
 
         NavigationTarget next = FindNextWaypoint();
         if (nextWaypointText != null)
@@ -322,12 +395,22 @@ public class B737NavigationDisplay : MonoBehaviour
             string ident = next != null ? next.ident : "NO WPT";
             float distance = 0f;
             TryResolveNextWaypoint(displayData, out _, out distance);
-            string eta = next != null ? FormatZuluEta(distance, displayData.groundSpeedKts) : "----.-z";
-            nextWaypointText.text = string.Format(CultureInfo.InvariantCulture,
-                "<color=#e24dba>{0}</color>\n<color=#d8dde0>{1}</color>\n<color=#d8dde0>{2:0.0}NM</color>",
-                ident,
-                eta,
-                distance);
+            int etaMinute = next != null ? CalculateZuluEtaMinute(distance, displayData.groundSpeedKts) : -1;
+            int distanceTenths = Mathf.RoundToInt(distance * 10f);
+            if (ident != nextIdentDisplay
+                || etaMinute != nextEtaMinuteDisplay
+                || distanceTenths != nextDistanceDisplay)
+            {
+                nextIdentDisplay = ident;
+                nextEtaMinuteDisplay = etaMinute;
+                nextDistanceDisplay = distanceTenths;
+                nextWaypointText.text = string.Format(
+                    CultureInfo.InvariantCulture,
+                    "<color=#e24dba>{0}</color>\n<color=#d8dde0>{1}</color>\n<color=#d8dde0>{2:0.0}NM</color>",
+                    ident,
+                    FormatZuluEta(etaMinute),
+                    distanceTenths * 0.1f);
+            }
         }
 
         NavigationTarget vor = FindTunedVor();
@@ -341,11 +424,21 @@ public class B737NavigationDisplay : MonoBehaviour
 
             string ident = vor != null ? vor.ident : "VOR 1";
             string freq = vor != null && !string.IsNullOrWhiteSpace(vor.frequencyText) ? vor.frequencyText : "114.20";
-            vorText.text = string.Format(CultureInfo.InvariantCulture,
-                "<color=#7fd65f>{0}</color>\n<color=#7fd65f>{1}</color>\n<color=#7fd65f>DME {2:0}</color>",
-                ident,
-                freq,
-                distance);
+            int distanceRounded = Mathf.RoundToInt(distance);
+            if (ident != vorIdentDisplay
+                || freq != vorFrequencyDisplay
+                || distanceRounded != vorDistanceDisplay)
+            {
+                vorIdentDisplay = ident;
+                vorFrequencyDisplay = freq;
+                vorDistanceDisplay = distanceRounded;
+                vorText.text = string.Format(
+                    CultureInfo.InvariantCulture,
+                    "<color=#7fd65f>{0}</color>\n<color=#7fd65f>{1}</color>\n<color=#7fd65f>DME {2:0}</color>",
+                    ident,
+                    freq,
+                    distanceRounded);
+            }
         }
 
         SetText(activeFeaturesText, "<color=#4fa8e8>ARPT\nWPT\nSTA\nWXR\n-2A</color>");
@@ -358,6 +451,15 @@ public class B737NavigationDisplay : MonoBehaviour
         if (compassTexts == null)
         {
             return;
+        }
+
+        if (compassLabelValues == null || compassLabelValues.Length != compassTexts.Length)
+        {
+            compassLabelValues = new int[compassTexts.Length];
+            for (int i = 0; i < compassLabelValues.Length; i++)
+            {
+                compassLabelValues[i] = int.MinValue;
+            }
         }
 
         float halfArc = visibleArcDeg * 0.5f;
@@ -374,15 +476,27 @@ public class B737NavigationDisplay : MonoBehaviour
             }
 
             Vector2 p = PointFromBearing(rel, arcRadius - 34f);
-            Text label = compassTexts[index++];
-            label.gameObject.SetActive(true);
-            label.text = FormatCompassLabel(normalizedHeading);
+            int labelIndex = index++;
+            Text label = compassTexts[labelIndex];
+            if (!label.gameObject.activeSelf)
+            {
+                label.gameObject.SetActive(true);
+            }
+            int labelValue = GetCompassLabelValue(normalizedHeading);
+            if (compassLabelValues[labelIndex] != labelValue)
+            {
+                compassLabelValues[labelIndex] = labelValue;
+                label.text = labelValue.ToString(CultureInfo.InvariantCulture);
+            }
             SetTopLeft(label.rectTransform, p.x - 15f, p.y - 10f, 30f, 20f);
         }
 
         for (; index < compassTexts.Length; index++)
         {
-            compassTexts[index].gameObject.SetActive(false);
+            if (compassTexts[index].gameObject.activeSelf)
+            {
+                compassTexts[index].gameObject.SetActive(false);
+            }
         }
     }
 
@@ -403,15 +517,25 @@ public class B737NavigationDisplay : MonoBehaviour
             }
 
             Text label = symbolTexts[index++];
-            label.gameObject.SetActive(true);
-            label.text = symbol.Ident;
-            label.color = ColorForSymbol(symbol.Type);
+            if (!label.gameObject.activeSelf)
+            {
+                label.gameObject.SetActive(true);
+            }
+            SetText(label, symbol.Ident);
+            Color symbolColor = ColorForSymbol(symbol.Type);
+            if (label.color != symbolColor)
+            {
+                label.color = symbolColor;
+            }
             SetTopLeft(label.rectTransform, p.x + 9f, p.y - 7f, 70f, 20f);
         }
 
         for (; index < symbolTexts.Length; index++)
         {
-            symbolTexts[index].gameObject.SetActive(false);
+            if (symbolTexts[index].gameObject.activeSelf)
+            {
+                symbolTexts[index].gameObject.SetActive(false);
+            }
         }
     }
 
@@ -623,9 +747,11 @@ public class B737NavigationDisplay : MonoBehaviour
         magLabelText.text = "MAG";
 
         compassTexts = new Text[8];
+        compassLabelValues = new int[compassTexts.Length];
         for (int i = 0; i < compassTexts.Length; i++)
         {
             compassTexts[i] = CreateText("Compass_Label_" + i, 0f, 0f, 32f, 20f, 18, Color.white, TextAnchor.MiddleCenter);
+            compassLabelValues[i] = int.MinValue;
             compassTexts[i].gameObject.SetActive(false);
         }
 
@@ -815,16 +941,19 @@ public class B737NavigationDisplay : MonoBehaviour
 
     private static void SetTopLeft(RectTransform rt, float x, float y, float w, float h)
     {
-        rt.anchorMin = new Vector2(0f, 1f);
-        rt.anchorMax = new Vector2(0f, 1f);
-        rt.pivot = new Vector2(0f, 1f);
-        rt.anchoredPosition = new Vector2(x, -y);
-        rt.sizeDelta = new Vector2(w, h);
+        Vector2 topLeft = new Vector2(0f, 1f);
+        Vector2 position = new Vector2(x, -y);
+        Vector2 size = new Vector2(w, h);
+        if (rt.anchorMin != topLeft) rt.anchorMin = topLeft;
+        if (rt.anchorMax != topLeft) rt.anchorMax = topLeft;
+        if (rt.pivot != topLeft) rt.pivot = topLeft;
+        if ((rt.anchoredPosition - position).sqrMagnitude > 0.0001f) rt.anchoredPosition = position;
+        if (rt.sizeDelta != size) rt.sizeDelta = size;
     }
 
     private static void SetText(Text text, string value)
     {
-        if (text != null)
+        if (text != null && text.text != value)
         {
             text.text = value;
         }
@@ -844,7 +973,7 @@ public class B737NavigationDisplay : MonoBehaviour
         }
     }
 
-    private static string FormatCompassLabel(float headingMagDeg)
+    private static int GetCompassLabelValue(float headingMagDeg)
     {
         int value = Mathf.RoundToInt(Normalize360(headingMagDeg) / 10f);
         if (value == 0)
@@ -852,18 +981,25 @@ public class B737NavigationDisplay : MonoBehaviour
             value = 36;
         }
 
-        return value.ToString(CultureInfo.InvariantCulture);
+        return value;
     }
 
-    private static string FormatZuluEta(float distanceNm, float groundSpeedKts)
+    private static int CalculateZuluEtaMinute(float distanceNm, float groundSpeedKts)
     {
         if (groundSpeedKts < 1f || distanceNm <= 0f)
         {
-            return "----.-z";
+            return -1;
         }
 
         DateTime eta = DateTime.UtcNow.AddHours(distanceNm / groundSpeedKts);
-        return eta.ToString("HHmm", CultureInfo.InvariantCulture) + ".0z";
+        return eta.Hour * 60 + eta.Minute;
+    }
+
+    private static string FormatZuluEta(int minuteOfDay)
+    {
+        return minuteOfDay < 0
+            ? "----.-z"
+            : string.Format(CultureInfo.InvariantCulture, "{0:00}{1:00}.0z", minuteOfDay / 60, minuteOfDay % 60);
     }
 
     private static void CalculateBearingDistance(double lat1Deg, double lon1Deg, double lat2Deg, double lon2Deg, out float bearingDeg, out float distanceNm)

@@ -6,6 +6,8 @@ using UnityEngine.UI;
 /// </summary>
 public class StandbyDisplayController : MonoBehaviour
 {
+    private const float PositionEpsilon = 0.01f;
+    private const float RotationEpsilon = 0.01f;
     private static readonly float[] AirspeedPlaces = { 100f, 10f, 1f };
     private static readonly float[] AltitudePlaces = { 10000f, 1000f, 100f };
 
@@ -130,15 +132,23 @@ public class StandbyDisplayController : MonoBehaviour
             return;
         }
 
-        displayedSpeedTapeOffset = Mathf.SmoothDamp(
+        float nextOffset = Mathf.SmoothDamp(
             displayedSpeedTapeOffset,
             targetSpeedTapeOffset,
             ref speedTapeVelocity,
             speedTapeSmoothTime,
             Mathf.Infinity,
             deltaTime);
-        speedTapeContent.anchoredPosition = speedTapeBasePosition
-            + Vector2.up * displayedSpeedTapeOffset;
+        if (Mathf.Abs(nextOffset - targetSpeedTapeOffset) <= PositionEpsilon)
+        {
+            nextOffset = targetSpeedTapeOffset;
+            speedTapeVelocity = 0f;
+        }
+
+        displayedSpeedTapeOffset = nextOffset;
+        SetAnchoredPositionIfChanged(
+            speedTapeContent,
+            speedTapeBasePosition + Vector2.up * displayedSpeedTapeOffset);
     }
 
     public void SetAltitudeFeet(float value)
@@ -153,7 +163,9 @@ public class StandbyDisplayController : MonoBehaviour
                 altitudeReferenceFeet,
                 altitudePixelsPerFoot,
                 invertAltitudeTape);
-            altitudeTapeContent.anchoredPosition = altitudeTapeBasePosition + Vector2.up * offset;
+            SetAnchoredPositionIfChanged(
+                altitudeTapeContent,
+                altitudeTapeBasePosition + Vector2.up * offset);
         }
 
         UpdateAltitudeWheels();
@@ -173,28 +185,31 @@ public class StandbyDisplayController : MonoBehaviour
         if (attitudeRollGroup != null)
         {
             float pitchDirection = invertPitch ? -1f : 1f;
-            horizonContent.anchoredPosition = horizonBasePosition
-                + Vector2.down * pitchDegrees * pitchPixelsPerDegree * pitchDirection;
+            SetAnchoredPositionIfChanged(
+                horizonContent,
+                horizonBasePosition + Vector2.down * pitchDegrees * pitchPixelsPerDegree * pitchDirection);
             float rollRotation = StandbyDisplayMath.CalculateHorizonRotation(
                 attitudeRollBaseRotationZ,
                 rollDegrees,
                 invertRoll);
-            attitudeRollGroup.localRotation = Quaternion.Euler(0f, 0f, rollRotation);
+            SetLocalRotationIfChanged(attitudeRollGroup, rollRotation);
         }
         else
         {
-            horizonContent.anchoredPosition = StandbyDisplayMath.CalculateHorizonPosition(
-                horizonBasePosition,
-                pitchDegrees,
-                rollDegrees,
-                pitchPixelsPerDegree,
-                invertPitch,
-                invertRoll);
+            SetAnchoredPositionIfChanged(
+                horizonContent,
+                StandbyDisplayMath.CalculateHorizonPosition(
+                    horizonBasePosition,
+                    pitchDegrees,
+                    rollDegrees,
+                    pitchPixelsPerDegree,
+                    invertPitch,
+                    invertRoll));
             float rotationZ = StandbyDisplayMath.CalculateHorizonRotation(
                 horizonBaseRotationZ,
                 rollDegrees,
                 invertRoll);
-            horizonContent.localRotation = Quaternion.Euler(0f, 0f, rotationZ);
+            SetLocalRotationIfChanged(horizonContent, rotationZ);
         }
 
         if (bankPointerGroup != null)
@@ -203,7 +218,7 @@ public class StandbyDisplayController : MonoBehaviour
                 bankPointerBaseRotationZ,
                 rollDegrees,
                 invertRoll);
-            bankPointerGroup.localRotation = Quaternion.Euler(0f, 0f, pointerRotation);
+            SetLocalRotationIfChanged(bankPointerGroup, pointerRotation);
         }
     }
 
@@ -217,9 +232,8 @@ public class StandbyDisplayController : MonoBehaviour
         }
 
         float direction = invertHeading ? -1f : 1f;
-        headingRose.localRotation = Quaternion.Euler(
-            0f,
-            0f,
+        SetLocalRotationIfChanged(
+            headingRose,
             headingBaseRotationZ + magneticHeadingDegrees * direction);
     }
 
@@ -244,12 +258,14 @@ public class StandbyDisplayController : MonoBehaviour
                 Mathf.Clamp(airspeedKnots, 0f, 999.999f),
                 AirspeedPlaces[i],
                 1f);
-            airspeedDigitWheels[i].uvRect = StandbyDisplayMath.CalculateDigitStripUv(
-                wheelValue,
-                i,
-                3,
-                39f,
-                294f);
+            SetUvRectIfChanged(
+                airspeedDigitWheels[i],
+                StandbyDisplayMath.CalculateDigitStripUv(
+                    wheelValue,
+                    i,
+                    3,
+                    39f,
+                    294f));
         }
     }
 
@@ -282,16 +298,45 @@ public class StandbyDisplayController : MonoBehaviour
                 uvRect.y += altitudeHundredsWheelUvOffsetY;
             }
 
-            altitudeMainDigitWheels[i].uvRect = uvRect;
+            SetUvRectIfChanged(altitudeMainDigitWheels[i], uvRect);
         }
 
         if (altitudePairWheel != null)
         {
             float pairValue = StandbyDisplayMath.CalculateAltitudePairWheelValue(value);
-            altitudePairWheel.uvRect = StandbyDisplayMath.CalculateAltitudePairUv(
-                pairValue,
-                37f,
-                136f);
+            SetUvRectIfChanged(
+                altitudePairWheel,
+                StandbyDisplayMath.CalculateAltitudePairUv(pairValue, 37f, 136f));
+        }
+    }
+
+    private static void SetAnchoredPositionIfChanged(RectTransform target, Vector2 value)
+    {
+        if ((target.anchoredPosition - value).sqrMagnitude > PositionEpsilon * PositionEpsilon)
+        {
+            target.anchoredPosition = value;
+        }
+    }
+
+    private static void SetLocalRotationIfChanged(RectTransform target, float rotationZ)
+    {
+        if (Mathf.Abs(Mathf.DeltaAngle(target.localEulerAngles.z, rotationZ)) > RotationEpsilon)
+        {
+            target.localRotation = Quaternion.Euler(0f, 0f, rotationZ);
+        }
+    }
+
+    private static void SetUvRectIfChanged(RawImage image, Rect value)
+    {
+        Rect current = image.uvRect;
+        float textureHeight = image.texture != null ? image.texture.height : 0f;
+        float yEpsilon = textureHeight > 0f ? 0.5f / textureHeight : 0.0001f;
+        if (Mathf.Abs(current.x - value.x) > 0.0001f
+            || Mathf.Abs(current.y - value.y) > yEpsilon
+            || Mathf.Abs(current.width - value.width) > 0.0001f
+            || Mathf.Abs(current.height - value.height) > yEpsilon)
+        {
+            image.uvRect = value;
         }
     }
 

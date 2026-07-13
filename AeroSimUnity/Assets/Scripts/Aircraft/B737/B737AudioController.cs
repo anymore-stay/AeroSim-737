@@ -80,10 +80,7 @@ public class B737AudioController : MonoBehaviour
     [SerializeField] private AudioClip gearClip;
     [SerializeField] private AudioClip flapClip;
     [SerializeField] private AudioClip runwayRollClip;
-    [SerializeField] private AudioClip touchdown1Clip;
-    [SerializeField] private AudioClip touchdown2Clip;
-    [SerializeField] private AudioClip touchdown3Clip;
-    [SerializeField] private AudioClip touchdown4Clip;
+    [SerializeField] private AudioClip touchdownNormalClip;
     [SerializeField] private AudioClip stallClip;
     [SerializeField] private AudioClip overspeedClip;
 
@@ -172,10 +169,7 @@ public class B737AudioController : MonoBehaviour
         engineStarterClip != null &&
         gearClip != null &&
         runwayRollClip != null &&
-        touchdown1Clip != null &&
-        touchdown2Clip != null &&
-        touchdown3Clip != null &&
-        touchdown4Clip != null &&
+        touchdownNormalClip != null &&
         stallClip != null &&
         overspeedClip != null &&
         callout1000Clip != null &&
@@ -281,7 +275,7 @@ public class B737AudioController : MonoBehaviour
         runwayRollSource = EnsureSource(
             "Runway Roll", transform, runwayRollClip, true, 1f);
         touchdownSource = EnsureSource(
-            "Touchdown", transform, touchdown1Clip, false, 1f);
+            "Touchdown", transform, touchdownNormalClip, false, 1f);
         stallSource = EnsureSource("Stall", transform, stallClip, true, 0f);
         overspeedSource = EnsureSource(
             "Overspeed", transform, overspeedClip, true, 0f);
@@ -369,10 +363,10 @@ public class B737AudioController : MonoBehaviour
         ApplyRunwayLevel(previewRunwaySpeed, false, 0f);
     }
 
-    public void PreviewTouchdown(int severity1To4)
+    public void PreviewTouchdown(int severity1To5)
     {
         InitializeIfNeeded();
-        int severity = Mathf.Clamp(severity1To4, 1, 4);
+        int severity = Mathf.Clamp(severity1To5, 1, 5);
         touchdownSource.clip = GetTouchdownClip(severity);
         PlayOneShot(touchdownSource, TouchdownGain);
     }
@@ -580,10 +574,7 @@ public class B737AudioController : MonoBehaviour
         LoadClip(ref engineStarterClip, "Audio/B737/Engine/starter");
         LoadClip(ref gearClip, "Audio/B737/Systems/gear");
         LoadClip(ref runwayRollClip, "Audio/B737/Ground/runway_roll");
-        LoadClip(ref touchdown1Clip, "Audio/B737/Ground/touchdown_1");
-        LoadClip(ref touchdown2Clip, "Audio/B737/Ground/touchdown_2");
-        LoadClip(ref touchdown3Clip, "Audio/B737/Ground/touchdown_3");
-        LoadClip(ref touchdown4Clip, "Audio/B737/Ground/touchdown_4");
+        LoadClip(ref touchdownNormalClip, "Audio/B737/Ground/touchdown_normal");
         LoadClip(ref stallClip, "Audio/B737/Alerts/stall");
         LoadClip(ref overspeedClip, "Audio/B737/Alerts/overspeed");
         LoadClip(ref callout1000Clip, "Audio/B737/Callouts/1000");
@@ -828,6 +819,7 @@ public class B737AudioController : MonoBehaviour
         }
 
         float maximumWheelSpeed = ReadMaximumWheelSpeed();
+        float horizontalSpeedMetersPerSecond = maximumWheelSpeed * FeetToMeters;
         float normalizedRunwaySpeed = anyWeightOnWheels
             ? Mathf.Clamp01(maximumWheelSpeed / RunwayFullSpeedFeetPerSecond)
             : 0f;
@@ -855,7 +847,8 @@ public class B737AudioController : MonoBehaviour
                         group,
                         wowValues[group],
                         compression,
-                        descentRateMetersPerSecond));
+                        descentRateMetersPerSecond,
+                        horizontalSpeedMetersPerSecond));
             }
         }
 
@@ -868,7 +861,8 @@ public class B737AudioController : MonoBehaviour
                     3,
                     aggregateWow,
                     compression,
-                    descentRateMetersPerSecond));
+                    descentRateMetersPerSecond,
+                    horizontalSpeedMetersPerSecond));
         }
 
         if (highestBoom > 0)
@@ -1386,17 +1380,7 @@ public class B737AudioController : MonoBehaviour
 
     private AudioClip GetTouchdownClip(int severity)
     {
-        switch (severity)
-        {
-            case 1:
-                return touchdown1Clip;
-            case 2:
-                return touchdown2Clip;
-            case 3:
-                return touchdown3Clip;
-            default:
-                return touchdown4Clip;
-        }
+        return touchdownNormalClip;
     }
 
     private AudioClip GetCalloutClip(int feet)

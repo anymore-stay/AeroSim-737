@@ -193,9 +193,17 @@ public sealed class CalloutTracker
 public sealed class TouchdownDetector
 {
     // Inputs are metres per second. Each boundary selects the next louder boom.
-    public const double Boom2SpeedMetersPerSecond = 1d;
+    public const double Boom2SpeedMetersPerSecond = 1.25d;
     public const double Boom3SpeedMetersPerSecond = 2d;
-    public const double Boom4SpeedMetersPerSecond = 3d;
+    public const double Boom4SpeedMetersPerSecond = 5d;
+    public const double Boom5SpeedMetersPerSecond = 8d;
+    public const double RollingLandingMinimumHorizontalSpeedMetersPerSecond = 20d;
+    public const double ShallowLandingAngleDegrees = 4d;
+    public const double ModerateLandingAngleDegrees = 7d;
+    public const double DesignLandingSinkRateMetersPerSecond = 10d * 0.3048d;
+
+    private const double MinimumAngleDescentMetersPerSecond = 0.05d;
+    private const double RadiansToDegrees = 180d / Math.PI;
 
     private readonly Dictionary<int, bool> previousWeightOnWheels =
         new Dictionary<int, bool>();
@@ -205,6 +213,21 @@ public sealed class TouchdownDetector
         bool weightOnWheels,
         double maximumCompressionVelocityMetersPerSecond,
         double descentRateMetersPerSecond)
+    {
+        return Update(
+            wheelGroup,
+            weightOnWheels,
+            maximumCompressionVelocityMetersPerSecond,
+            descentRateMetersPerSecond,
+            0d);
+    }
+
+    public int Update(
+        int wheelGroup,
+        bool weightOnWheels,
+        double maximumCompressionVelocityMetersPerSecond,
+        double descentRateMetersPerSecond,
+        double horizontalSpeedMetersPerSecond)
     {
         bool wasOnGround;
         if (!previousWeightOnWheels.TryGetValue(wheelGroup, out wasOnGround))
@@ -226,19 +249,71 @@ public sealed class TouchdownDetector
         double descentSpeed = B737AudioLogicMath.IsFinite(descentRateMetersPerSecond)
             ? Math.Abs(descentRateMetersPerSecond)
             : 0d;
+        double horizontalSpeed = B737AudioLogicMath.IsFinite(horizontalSpeedMetersPerSecond)
+            ? Math.Abs(horizontalSpeedMetersPerSecond)
+            : 0d;
         double impactSpeed = Math.Max(compressionSpeed, descentSpeed);
+
+        if (impactSpeed >= Boom5SpeedMetersPerSecond)
+        {
+            return ApplyRollingLandingCap(5, impactSpeed, descentSpeed, horizontalSpeed);
+        }
 
         if (impactSpeed >= Boom4SpeedMetersPerSecond)
         {
-            return 4;
+            return ApplyRollingLandingCap(4, impactSpeed, descentSpeed, horizontalSpeed);
         }
 
         if (impactSpeed >= Boom3SpeedMetersPerSecond)
         {
-            return 3;
+            return ApplyRollingLandingCap(3, impactSpeed, descentSpeed, horizontalSpeed);
         }
 
-        return impactSpeed >= Boom2SpeedMetersPerSecond ? 2 : 1;
+        int severity = impactSpeed >= Boom2SpeedMetersPerSecond ? 2 : 1;
+        return ApplyRollingLandingCap(severity, impactSpeed, descentSpeed, horizontalSpeed);
+    }
+
+    private static int ApplyRollingLandingCap(
+        int severity,
+        double impactSpeed,
+        double descentSpeed,
+        double horizontalSpeed)
+    {
+        if (severity <= 1 ||
+            horizontalSpeed < RollingLandingMinimumHorizontalSpeedMetersPerSecond ||
+            descentSpeed < MinimumAngleDescentMetersPerSecond)
+        {
+            return severity;
+        }
+
+        double angleDegrees = Math.Atan2(descentSpeed, horizontalSpeed) * RadiansToDegrees;
+        if (angleDegrees <= ShallowLandingAngleDegrees)
+        {
+            if (impactSpeed < Boom3SpeedMetersPerSecond)
+            {
+                return 1;
+            }
+
+            if (impactSpeed < Boom4SpeedMetersPerSecond)
+            {
+                return Math.Min(severity, 2);
+            }
+
+            if (descentSpeed <= DesignLandingSinkRateMetersPerSecond &&
+                impactSpeed < Boom5SpeedMetersPerSecond)
+            {
+                return Math.Min(severity, 3);
+            }
+        }
+
+        if (angleDegrees <= ModerateLandingAngleDegrees &&
+            descentSpeed <= DesignLandingSinkRateMetersPerSecond &&
+            impactSpeed < Boom4SpeedMetersPerSecond)
+        {
+            return Math.Min(severity, 2);
+        }
+
+        return severity;
     }
 }
 

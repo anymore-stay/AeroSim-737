@@ -58,10 +58,21 @@ public class B737NavigationDisplayGraphic : MaskableGraphic
 
     public void ConfigureGeometry(float size, Vector2 apex, float radius, float arcDeg)
     {
-        canvasSize = Mathf.Max(1f, size);
+        float nextSize = Mathf.Max(1f, size);
+        float nextRadius = Mathf.Max(1f, radius);
+        float nextArc = Mathf.Clamp(arcDeg, 10f, 180f);
+        if (Mathf.Approximately(canvasSize, nextSize)
+            && aircraftApex == apex
+            && Mathf.Approximately(arcRadius, nextRadius)
+            && Mathf.Approximately(visibleArcDeg, nextArc))
+        {
+            return;
+        }
+
+        canvasSize = nextSize;
         aircraftApex = apex;
-        arcRadius = Mathf.Max(1f, radius);
-        visibleArcDeg = Mathf.Clamp(arcDeg, 10f, 180f);
+        arcRadius = nextRadius;
+        visibleArcDeg = nextArc;
         SetVerticesDirty();
     }
 
@@ -95,13 +106,11 @@ public class B737NavigationDisplayGraphic : MaskableGraphic
 
     private void DrawRangeRings(VertexHelper vh)
     {
-        float range = Mathf.Max(5f, state.DisplayRangeNm <= 0f ? 40f : state.DisplayRangeNm);
-        float[] ranges = { range * 0.25f, range * 0.5f, range * 0.75f };
         float halfArc = visibleArcDeg * 0.5f;
 
-        for (int i = 0; i < ranges.Length; i++)
+        for (int i = 1; i <= 3; i++)
         {
-            float radius = arcRadius * (ranges[i] / range);
+            float radius = arcRadius * (i * 0.25f);
             AddDottedArc(vh, aircraftApex, radius, -halfArc, halfArc, 7f, 9f, 1.3f, DimGreen);
         }
 

@@ -84,7 +84,13 @@ public class EicasRadialFill : MaskableGraphic
         get => innerRadius;
         set
         {
-            innerRadius = Mathf.Max(0f, value);
+            float clamped = Mathf.Max(0f, value);
+            if (Mathf.Approximately(innerRadius, clamped))
+            {
+                return;
+            }
+
+            innerRadius = clamped;
             SetVerticesDirty();
         }
     }
@@ -94,7 +100,13 @@ public class EicasRadialFill : MaskableGraphic
         get => outerRadius;
         set
         {
-            outerRadius = Mathf.Max(0f, value);
+            float clamped = Mathf.Max(0f, value);
+            if (Mathf.Approximately(outerRadius, clamped))
+            {
+                return;
+            }
+
+            outerRadius = clamped;
             SetVerticesDirty();
         }
     }

@@ -9,8 +9,11 @@ public class StandbyJsbsimDataDriver : MonoBehaviour
     [SerializeField] private StandbyDisplayController displayController;
     [Tooltip("本项目当前输出真航向。磁差东偏为正，磁航向等于真航向减磁差。")]
     [SerializeField] private float magneticVariationDeg;
+    [SerializeField, Min(0.01f)] private float displayRefreshInterval = 1f / 30f;
 
     private JsbsimBridge subscribedBridge;
+    private bool stateUpdatePending;
+    private float nextDisplayRefreshTime;
 
     private void Awake()
     {
@@ -31,6 +34,15 @@ public class StandbyJsbsimDataDriver : MonoBehaviour
         if (subscribedBridge == null)
         {
             TryBindBridge();
+        }
+
+        if (stateUpdatePending
+            && subscribedBridge != null
+            && Time.unscaledTime >= nextDisplayRefreshTime)
+        {
+            stateUpdatePending = false;
+            nextDisplayRefreshTime = Time.unscaledTime + displayRefreshInterval;
+            ApplyBridgeState(subscribedBridge);
         }
     }
 
@@ -69,10 +81,7 @@ public class StandbyJsbsimDataDriver : MonoBehaviour
 
     private void HandleStateUpdated()
     {
-        if (subscribedBridge != null)
-        {
-            ApplyBridgeState(subscribedBridge);
-        }
+        stateUpdatePending = true;
     }
 
     private void ApplyBridgeState(JsbsimBridge state)

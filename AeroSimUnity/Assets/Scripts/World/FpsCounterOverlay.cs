@@ -25,6 +25,7 @@ public class FpsCounterOverlay : MonoBehaviour
     private int accumulatedFrames;
     private float currentFps;
     private GUIStyle style;
+    private string cachedLabel = "FPS: --";
 
     private void Update()
     {
@@ -34,6 +35,7 @@ public class FpsCounterOverlay : MonoBehaviour
         if (accumulatedTime >= updateInterval)
         {
             currentFps = accumulatedFrames / accumulatedTime;
+            cachedLabel = string.Format("FPS: {0:0}", currentFps);
             accumulatedFrames = 0;
             accumulatedTime = 0f;
         }
@@ -58,8 +60,7 @@ public class FpsCounterOverlay : MonoBehaviour
         style.fontSize = fontSize;
         style.normal.textColor = textColor;
 
-        string label = string.Format("FPS: {0:0}", currentFps);
         Rect rect = new Rect(0f, topPadding, Screen.width - rightPadding, fontSize + 8f);
-        GUI.Label(rect, label, style);
+        GUI.Label(rect, cachedLabel, style);
     }
 }

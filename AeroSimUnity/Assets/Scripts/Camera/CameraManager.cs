@@ -52,6 +52,7 @@ public class CameraManager : MonoBehaviour
 
     private static CameraManager instance;
     public static CameraManager Instance { get { return instance; } }
+    public Camera ActiveCamera { get; private set; }
 
     void Awake()
     {
@@ -100,6 +101,7 @@ public class CameraManager : MonoBehaviour
     {
         RebuildSlotMap();
         DisableAllRegisteredCameras();
+        ActiveCamera = null;
 
         if (defaultSlotIndex >= 0 && defaultSlotIndex < cameraSlots.Count)
         {
@@ -185,6 +187,7 @@ public class CameraManager : MonoBehaviour
 
         SetCameraSlotActive(slot, true);
         currentSlot = slot;
+        ActiveCamera = slot.cameraObject.GetComponent<Camera>();
 
         Debug.Log("[CameraManager] 切换到: " + slot.displayName + " (Shift+" + slot.hotkeyNumber + ")");
     }

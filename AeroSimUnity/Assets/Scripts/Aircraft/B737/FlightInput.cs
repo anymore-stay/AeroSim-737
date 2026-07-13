@@ -26,7 +26,7 @@ public class FlightInput : MonoBehaviour
     [SerializeField] private bool enableEscapePause = true;
 
     [Header("舵面灵敏度(每秒变化量)")]
-    [SerializeField] private float elevatorRate = 0.5f;
+    [SerializeField] private float elevatorRate = 0.8f;
     [SerializeField] private float aileronRate = 1.0f;
     [SerializeField] private float rudderRate = 0.8f;
     [Tooltip("松开按键后舵面回中速度。")]
@@ -80,6 +80,60 @@ public class FlightInput : MonoBehaviour
     [SerializeField] private float turnPitchCompensation = 0.012f;
     [Tooltip("中文名：最大俯仰辅助。限制自动抬头补偿的最大强度，避免机头拉得过猛。")]
     [SerializeField, Range(0f, 1f)] private float maxPitchAssist = 0.45f;
+
+    [Header("低空俯仰保持")]
+    [Tooltip("低空飞行且没有 W/S 输入时，自动保持很小的抬头姿态。")]
+    [SerializeField] private bool lowAltitudePitchAssist = true;
+    [Tooltip("低于此无线电高度时逐渐加入轻微抬头辅助。")]
+    [SerializeField, Min(1f)] private float lowAltitudeAssistCeilingAglFt = 1500f;
+    [Tooltip("低于此无线电高度时不启用，避免地面滑跑时自动抬轮。")]
+    [SerializeField, Min(0f)] private float lowAltitudeAssistMinimumAglFt = 20f;
+    [Tooltip("低空时在原目标俯仰上增加的最大抬头角，建议保持较小。")]
+    [SerializeField, Range(0f, 5f)] private float lowAltitudePitchUpDeg = 2f;
+    [Tooltip("低于此空速时不启用低空抬头辅助。")]
+    [SerializeField, Min(0f)] private float lowAltitudeAssistMinSpeedKts = 80f;
+    [Tooltip("低空抬头辅助允许增加的最大升降舵修正量。")]
+    [SerializeField, Range(0f, 0.3f)] private float maxLowAltitudePitchAssist = 0.12f;
+
+    [Header("侧滑保护")]
+    [Tooltip("限制飞行中的侧滑，防止持续偏航发展成旋转。")]
+    [SerializeField] private bool sideSlipProtection = true;
+    [Tooltip("在硬限制前多少度开始渐进介入。")]
+    [SerializeField, Min(0f)] private float sideSlipSoftZoneDeg = 2f;
+    [Tooltip("允许的最大气动侧滑角绝对值。")]
+    [SerializeField, Min(0.1f)] private float maxSideSlipDeg = 8f;
+    [Tooltip("超过软限制起点后，每度侧滑施加的方向舵修正量。")]
+    [SerializeField, Min(0f)] private float sideSlipCorrectionGain = 0.06f;
+    [Tooltip("侧滑保护允许使用的最大自动方向舵修正量。")]
+    [SerializeField, Range(0f, 1f)] private float maxSideSlipRudderCorrection = 0.45f;
+    [Tooltip("低于此校准空速时关闭保护，避免影响地面滑行转向。")]
+    [SerializeField, Min(0f)] private float sideSlipProtectionMinSpeedKts = 60f;
+
+    [Header("地面前轮转向")]
+    [Tooltip("中文名：启用地面前轮转向。开启后 Q/E 会同时控制 JSBSim 的前轮转向通道。")]
+    [SerializeField] private bool groundSteeringEnabled = true;
+    [Tooltip("中文名：地面转向力度。1 表示使用完整前轮转向范围，减小后滑行转弯会更缓。")]
+    [SerializeField, Range(0f, 1f)] private float groundSteeringAuthority = 1f;
+    [Tooltip("中文名：地面转向最大离地高度。高于该无线电高度后前轮转向自动归零。")]
+    [SerializeField, Min(0f)] private float groundSteeringMaxAglFt = 15f;
+    [Tooltip("中文名：反转 JSBSim 前轮转向。当前 737 场景保持关闭，使 Q 左转、E 右转。")]
+    [SerializeField] private bool invertGroundSteering = false;
+
+    [Header("坡度角保护")]
+    [Tooltip("限制飞行中的最大坡度角，防止持续按 A/D 导致飞机翻转。")]
+    [SerializeField] private bool bankAngleProtection = true;
+    [Tooltip("允许的最大坡度角绝对值。达到此角度后只允许副翼回正。")]
+    [SerializeField, Range(1f, 89f)] private float maxBankAngleDeg = 60f;
+    [Tooltip("在最大坡度角前多少度开始渐进削弱继续滚转的输入。")]
+    [SerializeField, Min(0f)] private float bankProtectionSoftZoneDeg = 15f;
+    [Tooltip("超过软限制后，每度坡度施加的自动回正副翼量。")]
+    [SerializeField, Min(0f)] private float bankProtectionCorrectionGain = 0.08f;
+    [Tooltip("坡度保护允许使用的最大自动回正副翼量。")]
+    [SerializeField, Range(0f, 1f)] private float maxBankProtectionCorrection = 1f;
+    [Tooltip("根据当前滚转角速度提前预测坡度，防止高速滚转因惯性越过限制。")]
+    [SerializeField, Range(0f, 1f)] private float bankProtectionLookAheadSeconds = 0.35f;
+    [Tooltip("低于此空速时关闭坡度保护，避免影响地面操纵。")]
+    [SerializeField, Min(0f)] private float bankProtectionMinSpeedKts = 60f;
 
     [Header("发送频率")]
     [Tooltip("每秒向 JSBSim 发送控制命令的次数。50 足够顺滑。")]
@@ -297,11 +351,34 @@ public class FlightInput : MonoBehaviour
 
         float elevatorCommand = Mathf.Clamp(elevator * elevatorAuthority + elevatorNeutralBias + pitchAssist, -1f, 1f);
         float aileronCommand = Mathf.Clamp(coordinatedAileron * aileronAuthority, -1f, 1f);
+        if (bankAngleProtection && bridge.HasState && bridge.SpeedKts >= bankProtectionMinSpeedKts)
+        {
+            float rollRateDeg = bridge.GetValue("p_rps", 0f) * Mathf.Rad2Deg;
+            float predictedBankAngleDeg = bridge.RollDeg + rollRateDeg * bankProtectionLookAheadSeconds;
+            aileronCommand = BankAngleProtectionMath.CalculateAileronCommand(
+                aileronCommand,
+                predictedBankAngleDeg,
+                maxBankAngleDeg,
+                bankProtectionSoftZoneDeg,
+                bankProtectionCorrectionGain,
+                maxBankProtectionCorrection);
+        }
         float rudderCommand = Mathf.Clamp(rudder * rudderAuthority, -1f, 1f);
+        if (sideSlipProtection && bridge.HasState && bridge.SpeedKts >= sideSlipProtectionMinSpeedKts)
+        {
+            rudderCommand = SideSlipProtectionMath.CalculateRudderCommand(
+                rudderCommand,
+                bridge.SideSlipDeg,
+                maxSideSlipDeg,
+                sideSlipSoftZoneDeg,
+                sideSlipCorrectionGain,
+                maxSideSlipRudderCorrection);
+        }
 
         bridge.SetProperty("fcs/elevator-cmd-norm", elevatorCommand);
         bridge.SetProperty("fcs/aileron-cmd-norm", aileronCommand);
         bridge.SetProperty("fcs/rudder-cmd-norm", rudderCommand);
+        bridge.SetProperty("fcs/steer-cmd-norm", CalculateGroundSteeringCommand());
         bridge.SetProperty("fcs/throttle-cmd-norm[0]", throttle);
         bridge.SetProperty("fcs/throttle-cmd-norm[1]", throttle);
         bridge.SetProperty("fcs/flap-cmd-norm", Flaps);
@@ -313,13 +390,56 @@ public class FlightInput : MonoBehaviour
         bridge.SetProperty("fcs/right-brake-cmd-norm", b);
     }
 
+    private float CalculateGroundSteeringCommand()
+    {
+        if (!groundSteeringEnabled || bridge == null || !bridge.HasState ||
+            bridge.AglFt > groundSteeringMaxAglFt)
+        {
+            return 0f;
+        }
+
+        float steeringInput = maxTurnRudderInput > 0.001f
+            ? rudder / maxTurnRudderInput
+            : rudder;
+        float steeringCommand = Mathf.Clamp(steeringInput * groundSteeringAuthority, -1f, 1f);
+        return invertGroundSteering ? -steeringCommand : steeringCommand;
+    }
+
     private float CalculatePitchAssist()
     {
         if (!pitchHoldAssist || bridge == null || !bridge.HasState)
             return 0f;
 
-        float pitchError = pitchHoldDeg - bridge.PitchDeg;
+        // 玩家拉杆或推杆时必须拥有完整俯仰权限，辅助仅在松杆后接管姿态保持。
+        if (Mathf.Abs(elevator) > 0.01f)
+            return 0f;
+
+        float targetPitchDeg = pitchHoldDeg;
+        float lowAltitudeAssistLimit = 0f;
+        if (lowAltitudePitchAssist &&
+            bridge.SpeedKts >= lowAltitudeAssistMinSpeedKts &&
+            bridge.AglFt >= lowAltitudeAssistMinimumAglFt &&
+            bridge.AglFt < lowAltitudeAssistCeilingAglFt)
+        {
+            float altitudeBlend = LowAltitudePitchAssistMath.CalculateBlend(
+                bridge.AglFt,
+                lowAltitudeAssistMinimumAglFt,
+                lowAltitudeAssistCeilingAglFt);
+            targetPitchDeg += lowAltitudePitchUpDeg * altitudeBlend;
+            lowAltitudeAssistLimit = maxLowAltitudePitchAssist * altitudeBlend;
+        }
+
+        float pitchError = targetPitchDeg - bridge.PitchDeg;
         float pitchHold = -pitchError * pitchHoldGain;
+        if (lowAltitudeAssistLimit > 0f)
+        {
+            float basePitchError = pitchHoldDeg - bridge.PitchDeg;
+            float basePitchHold = -basePitchError * pitchHoldGain;
+            pitchHold = basePitchHold + Mathf.Clamp(
+                pitchHold - basePitchHold,
+                -lowAltitudeAssistLimit,
+                lowAltitudeAssistLimit);
+        }
         float turnHold = -Mathf.Abs(bridge.RollDeg) * turnPitchCompensation;
         return Mathf.Clamp(pitchHold + turnHold, -maxPitchAssist, maxPitchAssist);
     }
