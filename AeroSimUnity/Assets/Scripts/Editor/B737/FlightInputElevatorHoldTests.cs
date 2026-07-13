@@ -28,6 +28,33 @@ public class FlightInputElevatorHoldTests
         Assert.That(result, Is.EqualTo(expected).Within(0.0001f));
     }
 
+    [Test]
+    public void ReleasedTrimKeysKeepCurrentTrimState()
+    {
+        float result = InvokeStepPitchTrim(0.35f, false, false, 0.25f, 1f);
+
+        Assert.That(result, Is.EqualTo(0.35f).Within(0.0001f));
+    }
+
+    [Test]
+    public void NoseUpAndNoseDownTrimUseOppositeDirections()
+    {
+        float noseUp = InvokeStepPitchTrim(0f, true, false, 0.25f, 1f);
+        float noseDown = InvokeStepPitchTrim(0f, false, true, 0.25f, 1f);
+
+        Assert.That(noseUp, Is.EqualTo(0.25f).Within(0.0001f));
+        Assert.That(noseDown, Is.EqualTo(-0.25f).Within(0.0001f));
+    }
+
+    [TestCase(0.9f, true, false, 1f)]
+    [TestCase(-0.9f, false, true, -1f)]
+    public void PitchTrimRemainsNormalized(float current, bool noseUp, bool noseDown, float expected)
+    {
+        float result = InvokeStepPitchTrim(current, noseUp, noseDown, 0.25f, 1f);
+
+        Assert.That(result, Is.EqualTo(expected).Within(0.0001f));
+    }
+
     private static float InvokeStepHeldAxis(float current, float input, float rate, float deltaTime)
     {
         MethodInfo method = typeof(FlightInput).GetMethod(
@@ -36,5 +63,20 @@ public class FlightInputElevatorHoldTests
         Assert.That(method, Is.Not.Null);
 
         return (float)method.Invoke(null, new object[] { current, input, rate, deltaTime });
+    }
+
+    private static float InvokeStepPitchTrim(
+        float current,
+        bool noseUp,
+        bool noseDown,
+        float rate,
+        float deltaTime)
+    {
+        MethodInfo method = typeof(FlightInput).GetMethod(
+            "StepPitchTrim",
+            BindingFlags.NonPublic | BindingFlags.Static);
+        Assert.That(method, Is.Not.Null);
+
+        return (float)method.Invoke(null, new object[] { current, noseUp, noseDown, rate, deltaTime });
     }
 }

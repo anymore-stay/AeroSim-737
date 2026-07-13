@@ -140,6 +140,10 @@ public class FlightHud : MonoBehaviour
                 input.Throttle,
                 input.ReverseThrustActive ? " 反推" : string.Empty));
             sb.AppendLine(string.Format("升降舵: {0,5:F2}", input.Elevator));
+            sb.AppendLine(string.Format(
+                "俯仰配平: {0,5:F2}  {1}",
+                input.PitchTrim,
+                input.PitchTrim > 0.001f ? "抬头" : input.PitchTrim < -0.001f ? "低头" : "中立"));
             sb.AppendLine(string.Format("副翼  : {0,5:F2}", input.Aileron));
             sb.AppendLine(string.Format("方向舵: {0,5:F2}", input.Rudder));
             sb.AppendLine(string.Format("襟翼  : {0}/{1}  {2,4:P0}", input.FlapStep, input.FlapStepCount, input.Flaps));
@@ -149,6 +153,7 @@ public class FlightHud : MonoBehaviour
         }
         sb.AppendLine("---- 飞行按键 ----");
         sb.AppendLine("W/S 俯仰   A/D 滚转   Q/E 偏航");
+        sb.AppendLine("Z 抬头配平   X 低头配平");
         sb.AppendLine("Shift 加油门  Ctrl 收油  Ctrl+Shift 反推");
         sb.AppendLine("F/V 襟翼增减  R/T 扰流板增减");
         sb.AppendLine("G 起落架收放  B 刹车开关  Esc 暂停");

@@ -7,6 +7,7 @@ using UnityEngine;
 ///   W / S        : 升降舵(俯仰)。W 推杆低头,S 拉杆抬头。
 ///   A / D        : 副翼(滚转)。A 左滚,D 右滚。
 ///   Q / E        : 方向舵(偏航)。
+///   Z / X        : 抬头配平 / 低头配平。
 ///   Shift / Ctrl : 油门加 / 收至怠速。
 ///   Shift + Ctrl : 在任何状态下增加反推。
 ///   F            : 襟翼切换(0 / 0.5 / 1)。
@@ -34,6 +35,17 @@ public class FlightInput : MonoBehaviour
     [SerializeField] private float rudderRate = 0.8f;
     [Tooltip("松开按键后副翼和方向舵的回中速度。升降舵不会自动回中。")]
     [SerializeField] private float centerRate = 0.75f;
+
+    [Header("俯仰配平")]
+    [Tooltip("按住时逐渐增加抬头配平，不会改变 W/S 保持的升降舵状态。")]
+    [InspectorName("抬头配平按键")]
+    [SerializeField] private KeyCode pitchTrimNoseUpKey = KeyCode.Z;
+    [Tooltip("按住时逐渐增加低头配平，不会改变 W/S 保持的升降舵状态。")]
+    [InspectorName("低头配平按键")]
+    [SerializeField] private KeyCode pitchTrimNoseDownKey = KeyCode.X;
+    [Tooltip("每秒改变的归一化配平量。")]
+    [InspectorName("配平变化速度")]
+    [SerializeField, Min(0f)] private float pitchTrimRate = 0.25f;
 
     [Header("油门")]
     [SerializeField] private float throttleRate = 0.5f;
@@ -124,6 +136,7 @@ public class FlightInput : MonoBehaviour
     private float keyboardElevator;
     private float keyboardAileron;
     private float keyboardRudder;
+    private float pitchTrim;
     private float turnInput;
     private float smoothedTurnBankTargetDeg;
     private float throttle = 0f;   // 地面起飞:初始油门怠速 0,推 Shift 才加速
@@ -167,6 +180,14 @@ public class FlightInput : MonoBehaviour
         keyboardElevator = StepHeldAxis(keyboardElevator, pitchInput, elevatorRate, dt);
         float joystickElevator = directJoystickControlActive ? sidestickInput.Pitch : 0f;
         elevator = Mathf.Clamp(joystickElevator + keyboardElevator, -1f, 1f);
+
+        // 配平使用独立状态，不修改升降舵及其松键保持值。
+        pitchTrim = StepPitchTrim(
+            pitchTrim,
+            Input.GetKey(pitchTrimNoseUpKey),
+            Input.GetKey(pitchTrimNoseDownKey),
+            pitchTrimRate,
+            dt);
 
         // ---- 副翼:A 左滚, D 右滚；键盘修正量与侧杆横滚叠加 ----
         float rollInput = 0f;
@@ -351,6 +372,22 @@ public class FlightInput : MonoBehaviour
         return Mathf.Clamp(current, -1f, 1f);
     }
 
+    /// <summary>正值表示抬头配平，负值表示低头配平；松键后保持当前值。</summary>
+    private static float StepPitchTrim(
+        float current,
+        bool noseUpPressed,
+        bool noseDownPressed,
+        float rate,
+        float dt)
+    {
+        float direction = 0f;
+        if (noseUpPressed) direction += 1f;
+        if (noseDownPressed) direction -= 1f;
+
+        current += direction * Mathf.Max(0f, rate) * Mathf.Max(0f, dt);
+        return Mathf.Clamp(current, -1f, 1f);
+    }
+
     private void SendControls()
     {
         if (bridge == null || !bridge.ControlConnected) return;
@@ -413,6 +450,8 @@ public class FlightInput : MonoBehaviour
         }
 
         bridge.SetProperty("fcs/elevator-cmd-norm", elevatorCommand);
+        // 737.xml 将配平与升降舵同号相加；模型中负升降舵产生抬头力矩。
+        bridge.SetProperty("fcs/pitch-trim-cmd-norm", -pitchTrim);
         bridge.SetProperty("fcs/aileron-cmd-norm", aileronCommand);
         bridge.SetProperty("fcs/rudder-cmd-norm", rudderCommand);
         bridge.SetProperty("fcs/steer-cmd-norm", CalculateGroundSteeringCommand());
@@ -453,6 +492,7 @@ public class FlightInput : MonoBehaviour
 
     // 给 HUD 读取
     public float Elevator => elevator;
+    public float PitchTrim => pitchTrim;
     public float Aileron => aileron;
     public float Rudder => rudder;
     public float Throttle => throttle;

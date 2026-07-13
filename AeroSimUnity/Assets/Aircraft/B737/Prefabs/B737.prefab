@@ -68646,6 +68646,9 @@ MonoBehaviour:
   aileronRate: 1
   rudderRate: 0.8
   centerRate: 0.75
+  pitchTrimNoseUpKey: 122
+  pitchTrimNoseDownKey: 120
+  pitchTrimRate: 0.25
   throttleRate: 0.5
   flapStepCount: 4
   spoilerStepCount: 4
