@@ -41,6 +41,12 @@ public class JsbsimBridge : MonoBehaviour
     [Tooltip("发送控制命令的 TCP 端口,需与脚本里 <input port> 一致。")]
     [SerializeField] private int controlTcpPort = 5502;
 
+    [Header("JSBSim 进程")]
+    [Tooltip("进入游戏时自动启动仓库中的 JSBSim bat 脚本，退出游戏时自动关闭其进程树。")]
+    [SerializeField] private bool startJsbsimAutomatically = true;
+    [Tooltip("相对于仓库根目录的启动脚本路径。程序会从 Unity Assets 目录向上查找仓库根目录。")]
+    [SerializeField] private string jsbsimStartScriptRelativePath = "JSBSimBridge/start_jsbsim.bat";
+
     [Header("被驱动的飞机")]
     [Tooltip("JSBSim 会驱动这个 Transform 的位置和姿态。留空则驱动本物体。")]
     [SerializeField] private Transform aircraft;
@@ -158,6 +164,7 @@ public class JsbsimBridge : MonoBehaviour
     private readonly object tcpLock = new object();
     private volatile bool controlConnected;
     private volatile bool jsbsimPauseRequested;
+    private JsbsimProcessLauncher jsbsimProcessLauncher;
     private bool timeScalePaused;
     private bool applicationPaused;
 #if UNITY_EDITOR
@@ -250,6 +257,7 @@ public class JsbsimBridge : MonoBehaviour
         UpdateJsbsimPauseRequest();
         running = true;
         StartUdpReceiver();
+        StartJsbsimProcess();
         StartTcpControl();
     }
 
@@ -264,6 +272,7 @@ public class JsbsimBridge : MonoBehaviour
         if (!usingCesiumCoordinates)
             FloatingOriginManager.OriginShifted -= HandleOriginShift;
         StopAll();
+        StopJsbsimProcess();
         if (Instance == this) Instance = null;
     }
 
@@ -271,6 +280,7 @@ public class JsbsimBridge : MonoBehaviour
     {
         RequestJsbsimPause(true);
         StopAll();
+        StopJsbsimProcess();
     }
 
     private void OnApplicationPause(bool pauseStatus)
@@ -288,6 +298,26 @@ public class JsbsimBridge : MonoBehaviour
 #endif
 
     // ====================== UDP 接收 ======================
+
+    private void StartJsbsimProcess()
+    {
+        if (!startJsbsimAutomatically)
+            return;
+
+        if (jsbsimProcessLauncher == null)
+            jsbsimProcessLauncher = new JsbsimProcessLauncher();
+
+        jsbsimProcessLauncher.Start(jsbsimStartScriptRelativePath);
+    }
+
+    private void StopJsbsimProcess()
+    {
+        if (jsbsimProcessLauncher == null)
+            return;
+
+        jsbsimProcessLauncher.Dispose();
+        jsbsimProcessLauncher = null;
+    }
 
     private void StartUdpReceiver()
     {
