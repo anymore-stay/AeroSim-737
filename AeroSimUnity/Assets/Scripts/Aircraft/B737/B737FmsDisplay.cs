@@ -47,6 +47,9 @@ public class B737FmsDisplay : MonoBehaviour
     private JsbsimBridge subscribedBridge;
     private FmsPage currentPage = FmsPage.Index;
     private bool isRebuilding;
+#if UNITY_EDITOR
+    private bool editorRebuildQueued;
+#endif
 
     private static readonly Color32 BackgroundColor = new Color32(0, 0, 0, 255);
     private static readonly Color32 WhiteTextColor = new Color32(242, 246, 242, 255);
@@ -72,7 +75,7 @@ public class B737FmsDisplay : MonoBehaviour
 
         if (isActiveAndEnabled)
         {
-            RebuildDisplay();
+            QueueEditorRebuild();
         }
     }
 
@@ -102,6 +105,38 @@ public class B737FmsDisplay : MonoBehaviour
         return false;
 #endif
     }
+
+    private void QueueEditorRebuild()
+    {
+#if UNITY_EDITOR
+        if (editorRebuildQueued)
+        {
+            return;
+        }
+
+        editorRebuildQueued = true;
+        EditorApplication.delayCall += RunQueuedEditorRebuild;
+#else
+        RebuildDisplay();
+#endif
+    }
+
+#if UNITY_EDITOR
+    private void RunQueuedEditorRebuild()
+    {
+        editorRebuildQueued = false;
+
+        if (this == null
+            || ShouldSuppressEditorRebuild()
+            || !gameObject.scene.IsValid()
+            || !isActiveAndEnabled)
+        {
+            return;
+        }
+
+        RebuildDisplay();
+    }
+#endif
 
     private void OnDisable()
     {

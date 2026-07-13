@@ -22658,6 +22658,7 @@ GameObject:
   - component: {fileID: 1589623298}
   - component: {fileID: 1589623299}
   - component: {fileID: 1589623300}
+  - component: {fileID: 1589623301}
   m_Layer: 0
   m_Name: UniStorm URP System
   m_TagString: Untagged
@@ -25568,6 +25569,62 @@ MonoBehaviour:
   referenceDistance: 2000
   farClipUsage: 0.9
   preserveAngularSize: 1
+--- !u!114 &1589623301
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1589623294}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4e37a2938a6944a88466f7123f9f0a37, type: 3}
+  m_Name:
+  m_EditorClassIdentifier:
+  uniStormSystem: {fileID: 1589623295}
+  starsRenderer: {fileID: 2061204057}
+  worldDarkeningRoots:
+  - {fileID: 2070957404}
+  excludedRoots:
+  - {fileID: 213095532}
+  - {fileID: 1757648890}
+  - {fileID: 1308498074}
+  nightStartHour: 19
+  nightEndHour: 5.5
+  transitionHours: 0.75
+  ambientIntensity: 0.015
+  reflectionIntensity: 0.02
+  ambientSkyColor: {r: 0.004, g: 0.005, b: 0.007, a: 1}
+  ambientEquatorColor: {r: 0.003, g: 0.0035, b: 0.0045, a: 1}
+  ambientGroundColor: {r: 0.0015, g: 0.0015, b: 0.0015, a: 1}
+  skyTintColor: {r: 0.002, g: 0.0025, b: 0.004, a: 1}
+  maximumMoonLightIntensity: 0.03
+  maximumMoonAtmosphericFogIntensity: 0
+  maximumSunAtmosphericFogIntensity: 0
+  starBrightnessMultiplier: 1.35
+  worldSurfaceBrightness: 0.08
+  rendererRefreshInterval: 2
+  excludedNameContains:
+  - B737
+  - UniStorm
+  - Light
+  - Lamp
+  - RunwayLight
+  - TaxiLight
+  - PAPI
+  - Beacon
+  - Strobe
+  - NAV
+  - EICAS
+  - EICAS1_Canvas
+  - EICAS2_Canvas
+  - EICAS1_Plane
+  - EICAS2_Plane
+  - Clock
+  - Clock_Canvas
+  - Clock1_Plane
+  - Clock2_Plane
+  - "\u706F"
 --- !u!128 &1591313071
 Font:
   m_ObjectHideFlags: 0
