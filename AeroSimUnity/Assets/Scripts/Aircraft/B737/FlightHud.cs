@@ -135,7 +135,10 @@ public class FlightHud : MonoBehaviour
         if (input != null)
         {
             sb.AppendLine("---- 控制 ----");
-            sb.AppendLine(string.Format("油门  : {0,5:P0}", input.Throttle));
+            sb.AppendLine(string.Format(
+                "油门  : {0,5:P0}{1}",
+                input.Throttle,
+                input.ReverseThrustActive ? " 反推" : string.Empty));
             sb.AppendLine(string.Format("升降舵: {0,5:F2}", input.Elevator));
             sb.AppendLine(string.Format("副翼  : {0,5:F2}", input.Aileron));
             sb.AppendLine(string.Format("方向舵: {0,5:F2}", input.Rudder));
@@ -146,7 +149,7 @@ public class FlightHud : MonoBehaviour
         }
         sb.AppendLine("---- 飞行按键 ----");
         sb.AppendLine("W/S 俯仰   A/D 滚转   Q/E 偏航");
-        sb.AppendLine("Shift/Ctrl 油门加减");
+        sb.AppendLine("Shift 加油门  Ctrl 收油  Ctrl+Shift 反推");
         sb.AppendLine("F/V 襟翼增减  R/T 扰流板增减");
         sb.AppendLine("G 起落架收放  B 刹车开关  Esc 暂停");
         sb.AppendLine("---- 相机按键 ----");

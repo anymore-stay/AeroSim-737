@@ -7,7 +7,8 @@ using UnityEngine;
 ///   W / S        : 升降舵(俯仰)。W 推杆低头,S 拉杆抬头。
 ///   A / D        : 副翼(滚转)。A 左滚,D 右滚。
 ///   Q / E        : 方向舵(偏航)。
-///   Shift / Ctrl : 油门加 / 减。
+///   Shift / Ctrl : 油门加 / 收至怠速。
+///   Shift + Ctrl : 接地后增加反推。
 ///   F            : 襟翼切换(0 / 0.5 / 1)。
 ///   方向键不再控制飞机:上下左右留给相机视角移动。
 ///
@@ -34,6 +35,10 @@ public class FlightInput : MonoBehaviour
 
     [Header("油门")]
     [SerializeField] private float throttleRate = 0.5f;
+    [Tooltip("允许使用反推的最大离地高度。接地信号存在时优先使用接地信号。")]
+    [SerializeField, Min(0f)] private float reverseThrustMaxAglFt = 10f;
+    [Tooltip("JSBSim 反推角度。2 rad 约产生正常推力 42% 的反向分量。")]
+    [SerializeField, Range(1.571f, 3.142f)] private float reverseThrustAngleRad = 2f;
 
     [Header("High Lift and Drag Controls")]
     [SerializeField, Min(1)] private int flapStepCount = 4;
@@ -139,7 +144,7 @@ public class FlightInput : MonoBehaviour
     [Tooltip("每秒向 JSBSim 发送控制命令的次数。50 足够顺滑。")]
     [SerializeField] private float sendRate = 50f;
 
-    // 当前归一化控制量 [-1,1],油门 [0,1]
+    // 当前归一化控制量 [-1,1]，油门 [-1,1]，负值表示反推。
     private float elevator;
     private float aileron;
     private float rudder;
@@ -209,10 +214,16 @@ public class FlightInput : MonoBehaviour
             rudder = StepAxis(rudder, yawInput, rudderRate, dt);
         }
 
-        // ---- 油门:LeftShift 加, LeftControl 减(保持型)----
-        if (Input.GetKey(KeyCode.LeftShift)) throttle += throttleRate * dt;
-        if (Input.GetKey(KeyCode.LeftControl)) throttle -= throttleRate * dt;
-        throttle = Mathf.Clamp01(throttle);
+        // ---- 油门:Shift 加，Ctrl 收至怠速，同时按下在地面增加反推 ----
+        bool increaseThrottle = Input.GetKey(KeyCode.LeftShift);
+        bool decreaseThrottle = Input.GetKey(KeyCode.LeftControl);
+        throttle = ReverseThrustMath.UpdateSignedThrottle(
+            throttle,
+            increaseThrottle,
+            decreaseThrottle,
+            IsReverseThrustAllowed(),
+            throttleRate,
+            dt);
 
         // ---- 襟翼:F 增加一级,V 减少一级 ----
         if (Input.GetKeyDown(KeyCode.F))
@@ -379,8 +390,18 @@ public class FlightInput : MonoBehaviour
         bridge.SetProperty("fcs/aileron-cmd-norm", aileronCommand);
         bridge.SetProperty("fcs/rudder-cmd-norm", rudderCommand);
         bridge.SetProperty("fcs/steer-cmd-norm", CalculateGroundSteeringCommand());
-        bridge.SetProperty("fcs/throttle-cmd-norm[0]", throttle);
-        bridge.SetProperty("fcs/throttle-cmd-norm[1]", throttle);
+        bool reverseThrustAllowed = IsReverseThrustAllowed();
+        ReverseThrustMath.CalculateEngineCommands(
+            throttle,
+            reverseThrustAllowed,
+            reverseThrustAngleRad,
+            out float engineThrottle,
+            out float reverserAngleRad);
+        // 先改变反推方向，再发送油门，避免切换瞬间产生错误方向的推力。
+        bridge.SetProperty("propulsion/engine[0]/reverser-angle-rad", reverserAngleRad);
+        bridge.SetProperty("propulsion/engine[1]/reverser-angle-rad", reverserAngleRad);
+        bridge.SetProperty("fcs/throttle-cmd-norm[0]", engineThrottle);
+        bridge.SetProperty("fcs/throttle-cmd-norm[1]", engineThrottle);
         bridge.SetProperty("fcs/flap-cmd-norm", Flaps);
         bridge.SetProperty("fcs/speedbrake-cmd-norm", Spoilers);
         bridge.SetProperty("gear/gear-cmd-norm", gearDown ? 1f : 0f);
@@ -403,6 +424,17 @@ public class FlightInput : MonoBehaviour
             : rudder;
         float steeringCommand = Mathf.Clamp(steeringInput * groundSteeringAuthority, -1f, 1f);
         return invertGroundSteering ? -steeringCommand : steeringCommand;
+    }
+
+    private bool IsReverseThrustAllowed()
+    {
+        if (!gearDown || bridge == null || !bridge.HasState)
+            return false;
+
+        bool weightOnWheels = bridge.GetValue("gear_wow", 0f) > 0.5f ||
+                              bridge.GetValue("gear_unit_1_wow", 0f) > 0.5f ||
+                              bridge.GetValue("gear_unit_2_wow", 0f) > 0.5f;
+        return weightOnWheels || bridge.AglFt <= reverseThrustMaxAglFt;
     }
 
     private float CalculatePitchAssist()
@@ -449,6 +481,7 @@ public class FlightInput : MonoBehaviour
     public float Aileron => aileron;
     public float Rudder => rudder;
     public float Throttle => throttle;
+    public bool ReverseThrustActive => throttle < 0f && IsReverseThrustAllowed();
     public float Flaps => flapStepCount > 0 ? (float)flapStep / flapStepCount : 0f;
     public int FlapStep => flapStep;
     public int FlapStepCount => flapStepCount;

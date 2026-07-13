@@ -187,7 +187,8 @@ AeroSimUnity/
   - `W/S` 控制升降舵
   - `A/D` 控制副翼
   - `Q/E` 控制方向舵
-  - `LeftShift/LeftControl` 控制油门
+  - `LeftShift` 增加正推油门，`LeftControl` 将油门收向怠速
+  - `LeftControl + LeftShift` 在接地后增加反推
   - `F` 循环切换襟翼档位
   - `B` 切换刹车
 - 让舵面输入在松手后自动回中
@@ -215,7 +216,7 @@ AeroSimUnity/
 
 - 运行时动态创建 Overlay Canvas、文字控件和描边
 - 显示速度、高度、离地高度、升降率、航向、俯仰、滚转、转速
-- 显示当前油门、舵面、襟翼和刹车状态
+- 显示当前油门、反推、舵面、襟翼和刹车状态；反推油门显示为负数
 - 显示操作说明和起飞提示
 - 按 `Tab` 显示/隐藏 HUD
 - 自动跟随当前活动相机的 `targetDisplay`，避免 HUD 出现在错误显示器

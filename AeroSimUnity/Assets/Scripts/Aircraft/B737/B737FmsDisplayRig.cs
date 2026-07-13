@@ -71,6 +71,9 @@ public class B737FmsDisplayRig : MonoBehaviour
     private bool ownsRuntimeMaterial;
     private MaterialPropertyBlock screenPropertyBlock;
     private bool isEnsuringRig;
+#if UNITY_EDITOR
+    private bool editorPreviewRefreshQueued;
+#endif
 
     public RenderTexture TargetTexture => targetTexture;
     public Material DisplayMaterial => displayMaterial;
@@ -94,7 +97,7 @@ public class B737FmsDisplayRig : MonoBehaviour
     {
         if (!ShouldSuppressEditorRebuild() && buildOnAwake)
         {
-            EnsureRig();
+            EnsureRigForCurrentContext();
         }
     }
 
@@ -102,7 +105,7 @@ public class B737FmsDisplayRig : MonoBehaviour
     {
         if (!ShouldSuppressEditorRebuild())
         {
-            EnsureRig();
+            EnsureRigForCurrentContext();
         }
     }
 
@@ -110,15 +113,28 @@ public class B737FmsDisplayRig : MonoBehaviour
     {
         if (!ShouldSuppressEditorRebuild())
         {
-            EnsureRig();
+            EnsureRigForCurrentContext();
         }
+    }
+
+    private void EnsureRigForCurrentContext()
+    {
+#if UNITY_EDITOR
+        if (!Application.isPlaying)
+        {
+            EnsureRig(false);
+            QueueEditorPreviewRefresh();
+            return;
+        }
+#endif
+        EnsureRig();
     }
 
     private void LateUpdate()
     {
         if (!Application.isPlaying)
         {
-            EnsureRig();
+            EnsureRig(false);
             RenderPreview();
             return;
         }
@@ -156,8 +172,14 @@ public class B737FmsDisplayRig : MonoBehaviour
 
         if (isActiveAndEnabled)
         {
+#if UNITY_EDITOR
+            if (!Application.isPlaying)
+            {
+                QueueEditorPreviewRefresh();
+                return;
+            }
+#endif
             EnsureRig();
-            RenderPreview();
         }
     }
 
@@ -194,6 +216,11 @@ public class B737FmsDisplayRig : MonoBehaviour
     [ContextMenu("Ensure FMS Rig")]
     public void EnsureRig()
     {
+        EnsureRig(true);
+    }
+
+    private void EnsureRig(bool renderPreview)
+    {
         if (isEnsuringRig)
         {
             return;
@@ -213,13 +240,47 @@ public class B737FmsDisplayRig : MonoBehaviour
             EnsureDisplayPlanes();
             EnsureButtonHitboxes();
             EnsureClickRaycaster();
-            RenderPreview();
+            if (renderPreview)
+            {
+                RenderPreview();
+            }
         }
         finally
         {
             isEnsuringRig = false;
         }
     }
+
+#if UNITY_EDITOR
+    private void QueueEditorPreviewRefresh()
+    {
+        if (editorPreviewRefreshQueued)
+        {
+            return;
+        }
+
+        editorPreviewRefreshQueued = true;
+        UnityEditor.EditorApplication.delayCall += RunDelayedEditorPreviewRefresh;
+    }
+
+    private void RunDelayedEditorPreviewRefresh()
+    {
+        editorPreviewRefreshQueued = false;
+
+        if (this == null || Application.isPlaying)
+        {
+            return;
+        }
+
+        if (ShouldSuppressEditorRebuild() || !gameObject.scene.IsValid() || !isActiveAndEnabled)
+        {
+            return;
+        }
+
+        EnsureRig(false);
+        RenderPreview();
+    }
+#endif
 
     private void RenderPreview()
     {
@@ -660,11 +721,22 @@ public class B737FmsDisplayRig : MonoBehaviour
         if (Application.isPlaying)
         {
             Destroy(target);
+            return;
         }
+#if UNITY_EDITOR
         else
         {
-            DestroyImmediate(target);
+            UnityEditor.EditorApplication.delayCall += () =>
+            {
+                if (target != null)
+                {
+                    DestroyImmediate(target);
+                }
+            };
         }
+#else
+        DestroyImmediate(target);
+#endif
     }
 
     private void ApplyMaterialToRenderer(MeshRenderer renderer)
