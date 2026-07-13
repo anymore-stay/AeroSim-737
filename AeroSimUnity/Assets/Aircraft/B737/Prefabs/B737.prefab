@@ -69006,14 +69006,26 @@ MonoBehaviour:
   leftRedPoint: {fileID: 0}
   rightGreenPoint: {fileID: 0}
   tailWhitePoint: {fileID: 0}
-  leftRedDefaultLocalPosition: {x: -8.2, y: 0.05, z: -1.2}
-  rightGreenDefaultLocalPosition: {x: 8.2, y: 0.05, z: -1.2}
-  tailWhiteDefaultLocalPosition: {x: 0, y: 1.05, z: 20.8}
+  leftRedParent: {fileID: 5225138133546940079}
+  rightGreenParent: {fileID: 8895612132844449442}
+  tailWhiteParent: {fileID: 250856549779857970}
+  leftRedDefaultLocalPosition: {x: 3.405, y: -1.249, z: 0.301}
+  rightGreenDefaultLocalPosition: {x: -3.428, y: -1.262, z: 0.297}
+  tailWhiteDefaultLocalPosition: {x: -0.001, y: -38.052, z: 1.446}
+  leftRedDefaultLocalScale: {x: 0.3, y: 0.3, z: 0.3}
+  rightGreenDefaultLocalScale: {x: 0.4, y: 0.4, z: 0.4}
+  tailWhiteDefaultLocalScale: {x: 0.4, y: 0.4, z: 0.4}
   leftRedColor: {r: 1, g: 0.05, b: 0.025, a: 1}
   rightGreenColor: {r: 0.02, g: 0.95, b: 0.18, a: 1}
   tailWhiteColor: {r: 1, g: 0.96, b: 0.9, a: 1}
   pointIntensity: 0.28
   pointRange: 3.2
+  leftRedIntensity: 10
+  rightGreenIntensity: 10
+  tailWhiteIntensity: 20
+  leftRedRange: 5
+  rightGreenRange: 5
+  tailWhiteRange: 10
   lensScale: 0.06
   glowScale: 0.24
   glowAlpha: 0.16
@@ -69038,9 +69050,15 @@ MonoBehaviour:
   leftWingStrobePoint: {fileID: 0}
   rightWingStrobePoint: {fileID: 0}
   tailStrobePoint: {fileID: 0}
-  leftWingDefaultLocalPosition: {x: -8.25, y: 0.08, z: -1.3}
-  rightWingDefaultLocalPosition: {x: 8.25, y: 0.08, z: -1.3}
-  tailDefaultLocalPosition: {x: 0, y: 1.05, z: 20.9}
+  leftWingStrobeParent: {fileID: 2346273240600294259}
+  rightWingStrobeParent: {fileID: 2902547706299308054}
+  tailStrobeParent: {fileID: 250856549779857970}
+  leftWingDefaultLocalPosition: {x: -3.632, y: -1.554, z: 0.278}
+  rightWingDefaultLocalPosition: {x: 3.6024, y: -1.3747, z: 0.3372}
+  tailDefaultLocalPosition: {x: -0.001, y: -38.052, z: 1.446}
+  leftWingDefaultLocalScale: {x: 0.4, y: 0.4, z: 0.4}
+  rightWingDefaultLocalScale: {x: 0.3, y: 0.3, z: 0.3}
+  tailDefaultLocalScale: {x: 0.4, y: 0.4, z: 0.4}
   forceWhenMovingOrAirborne: 1
   previewArmedWithoutJsbsim: 1
   armedModeConstantOn: 1
@@ -69053,6 +69071,12 @@ MonoBehaviour:
   strobeColor: {r: 1, g: 1, b: 1, a: 1}
   peakIntensity: 220
   range: 42
+  leftWingPeakIntensity: 50
+  rightWingPeakIntensity: 50
+  tailPeakIntensity: 50
+  leftWingRange: 20
+  rightWingRange: 20
+  tailRange: 20
   lensScale: 0.08
   flashGlowScale: 0.85
   flashGlowAlpha: 0.75

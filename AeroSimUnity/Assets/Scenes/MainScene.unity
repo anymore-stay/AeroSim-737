@@ -21482,36 +21482,6 @@ PrefabInstance:
       propertyPath: display
       value: 
       objectReference: {fileID: 801088678}
-    - target: {fileID: 313737240712000101, guid: dc7f122a1e38a1b488913bdc0004b385,
-        type: 3}
-      propertyPath: leftRedPoint
-      value: 
-      objectReference: {fileID: 525262155}
-    - target: {fileID: 313737240712000101, guid: dc7f122a1e38a1b488913bdc0004b385,
-        type: 3}
-      propertyPath: tailWhitePoint
-      value: 
-      objectReference: {fileID: 1165980876}
-    - target: {fileID: 313737240712000101, guid: dc7f122a1e38a1b488913bdc0004b385,
-        type: 3}
-      propertyPath: rightGreenPoint
-      value: 
-      objectReference: {fileID: 622924973}
-    - target: {fileID: 313737240712000102, guid: dc7f122a1e38a1b488913bdc0004b385,
-        type: 3}
-      propertyPath: tailStrobePoint
-      value: 
-      objectReference: {fileID: 1300128526}
-    - target: {fileID: 313737240712000102, guid: dc7f122a1e38a1b488913bdc0004b385,
-        type: 3}
-      propertyPath: leftWingStrobePoint
-      value: 
-      objectReference: {fileID: 861193048}
-    - target: {fileID: 313737240712000102, guid: dc7f122a1e38a1b488913bdc0004b385,
-        type: 3}
-      propertyPath: rightWingStrobePoint
-      value: 
-      objectReference: {fileID: 993285543}
     - target: {fileID: 910312676838202607, guid: dc7f122a1e38a1b488913bdc0004b385,
         type: 3}
       propertyPath: fmsCamera

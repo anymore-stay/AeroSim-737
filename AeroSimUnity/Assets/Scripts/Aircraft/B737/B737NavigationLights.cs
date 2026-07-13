@@ -18,17 +18,34 @@ public class B737NavigationLights : MonoBehaviour
     [SerializeField] private Transform rightGreenPoint;
     [SerializeField] private Transform tailWhitePoint;
 
+    [Header("Light Point Parents")]
+    [SerializeField] private Transform leftRedParent;
+    [SerializeField] private Transform rightGreenParent;
+    [SerializeField] private Transform tailWhiteParent;
+
     [Header("Default Local Positions")]
     [SerializeField] private Vector3 leftRedDefaultLocalPosition = new Vector3(-8.2f, 0.05f, -1.2f);
     [SerializeField] private Vector3 rightGreenDefaultLocalPosition = new Vector3(8.2f, 0.05f, -1.2f);
     [SerializeField] private Vector3 tailWhiteDefaultLocalPosition = new Vector3(0f, 1.05f, 20.8f);
 
+    [Header("Default Local Scales")]
+    [SerializeField] private Vector3 leftRedDefaultLocalScale = Vector3.one;
+    [SerializeField] private Vector3 rightGreenDefaultLocalScale = Vector3.one;
+    [SerializeField] private Vector3 tailWhiteDefaultLocalScale = Vector3.one;
+
     [Header("Initial Light Defaults")]
     [SerializeField] private Color leftRedColor = new Color(1f, 0.05f, 0.025f, 1f);
     [SerializeField] private Color rightGreenColor = new Color(0.02f, 0.95f, 0.18f, 1f);
     [SerializeField] private Color tailWhiteColor = new Color(1f, 0.96f, 0.9f, 1f);
-    [SerializeField, Min(0f)] private float pointIntensity = 0.28f;
-    [SerializeField, Min(0.1f)] private float pointRange = 3.2f;
+    [SerializeField, HideInInspector, Min(0f)] private float pointIntensity = 0.28f;
+    [SerializeField, HideInInspector, Min(0.1f)] private float pointRange = 3.2f;
+    [Header("Per-Light Defaults")]
+    [SerializeField, Min(0f)] private float leftRedIntensity = 0.28f;
+    [SerializeField, Min(0f)] private float rightGreenIntensity = 0.28f;
+    [SerializeField, Min(0f)] private float tailWhiteIntensity = 0.28f;
+    [SerializeField, Min(0.1f)] private float leftRedRange = 3.2f;
+    [SerializeField, Min(0.1f)] private float rightGreenRange = 3.2f;
+    [SerializeField, Min(0.1f)] private float tailWhiteRange = 3.2f;
 
     [Header("Lens Visuals")]
     [SerializeField, Min(0.01f)] private float lensScale = 0.06f;
@@ -79,6 +96,12 @@ public class B737NavigationLights : MonoBehaviour
     {
         pointIntensity = Mathf.Max(0f, pointIntensity);
         pointRange = Mathf.Max(0.1f, pointRange);
+        leftRedIntensity = Mathf.Max(0f, leftRedIntensity);
+        rightGreenIntensity = Mathf.Max(0f, rightGreenIntensity);
+        tailWhiteIntensity = Mathf.Max(0f, tailWhiteIntensity);
+        leftRedRange = Mathf.Max(0.1f, leftRedRange);
+        rightGreenRange = Mathf.Max(0.1f, rightGreenRange);
+        tailWhiteRange = Mathf.Max(0.1f, tailWhiteRange);
         lensScale = Mathf.Max(0.01f, lensScale);
         glowScale = Mathf.Max(0.01f, glowScale);
         emissionIntensity = Mathf.Max(0f, emissionIntensity);
@@ -92,26 +115,31 @@ public class B737NavigationLights : MonoBehaviour
         }
 
         Transform root = B737ExteriorLightUtility.FindOrCreateChild(transform, "B737_NavigationLights", Vector3.zero);
-        leftRedPoint = B737ExteriorLightUtility.FindOrCreatePoint(root, leftRedPoint, "NAV_Left_Red_Movable", leftRedDefaultLocalPosition);
-        rightGreenPoint = B737ExteriorLightUtility.FindOrCreatePoint(root, rightGreenPoint, "NAV_Right_Green_Movable", rightGreenDefaultLocalPosition);
-        tailWhitePoint = B737ExteriorLightUtility.FindOrCreatePoint(root, tailWhitePoint, "NAV_Tail_White_Movable", tailWhiteDefaultLocalPosition);
+        leftRedPoint = B737ExteriorLightUtility.FindOrCreatePoint(GetPointParent(leftRedParent, root), leftRedPoint, "NAV_Left_Red_Movable", leftRedDefaultLocalPosition, leftRedDefaultLocalScale);
+        rightGreenPoint = B737ExteriorLightUtility.FindOrCreatePoint(GetPointParent(rightGreenParent, root), rightGreenPoint, "NAV_Right_Green_Movable", rightGreenDefaultLocalPosition, rightGreenDefaultLocalScale);
+        tailWhitePoint = B737ExteriorLightUtility.FindOrCreatePoint(GetPointParent(tailWhiteParent, root), tailWhitePoint, "NAV_Tail_White_Movable", tailWhiteDefaultLocalPosition, tailWhiteDefaultLocalScale);
     }
 
     private void ApplyLights()
     {
-        ApplyNavigationPoint(leftRedPoint, leftRedColor);
-        ApplyNavigationPoint(rightGreenPoint, rightGreenColor);
-        ApplyNavigationPoint(tailWhitePoint, tailWhiteColor);
+        ApplyNavigationPoint(leftRedPoint, leftRedColor, leftRedIntensity, leftRedRange);
+        ApplyNavigationPoint(rightGreenPoint, rightGreenColor, rightGreenIntensity, rightGreenRange);
+        ApplyNavigationPoint(tailWhitePoint, tailWhiteColor, tailWhiteIntensity, tailWhiteRange);
     }
 
-    private void ApplyNavigationPoint(Transform point, Color color)
+    private Transform GetPointParent(Transform preferredParent, Transform fallbackParent)
+    {
+        return preferredParent != null ? preferredParent : fallbackParent;
+    }
+
+    private void ApplyNavigationPoint(Transform point, Color color, float intensity, float range)
     {
         if (point == null)
         {
             return;
         }
 
-        Light light = B737ExteriorLightUtility.EnsureLight(point, LightType.Point, color, pointIntensity, pointRange, 0f);
+        Light light = B737ExteriorLightUtility.EnsureLight(point, LightType.Point, color, intensity, range, 0f);
         B737ExteriorLightUtility.SetLightEnabled(light, lightsOn);
         B737ExteriorLightUtility.EnsureLensVisual(point, color, lensScale, glowScale, glowAlpha, emissionIntensity, lightsOn);
     }
@@ -137,6 +165,15 @@ internal static class B737ExteriorLightUtility
 
     public static Transform FindOrCreateChild(Transform parent, string childName, Vector3 defaultLocalPosition)
     {
+        return FindOrCreateChild(parent, childName, defaultLocalPosition, Vector3.one);
+    }
+
+    public static Transform FindOrCreateChild(
+        Transform parent,
+        string childName,
+        Vector3 defaultLocalPosition,
+        Vector3 defaultLocalScale)
+    {
         Transform child = parent.Find(childName);
         if (child != null)
         {
@@ -148,7 +185,7 @@ internal static class B737ExteriorLightUtility
         child.SetParent(parent, false);
         child.localPosition = defaultLocalPosition;
         child.localRotation = Quaternion.identity;
-        child.localScale = Vector3.one;
+        child.localScale = defaultLocalScale;
         return child;
     }
 
@@ -158,12 +195,22 @@ internal static class B737ExteriorLightUtility
         string pointName,
         Vector3 defaultLocalPosition)
     {
+        return FindOrCreatePoint(root, current, pointName, defaultLocalPosition, Vector3.one);
+    }
+
+    public static Transform FindOrCreatePoint(
+        Transform root,
+        Transform current,
+        string pointName,
+        Vector3 defaultLocalPosition,
+        Vector3 defaultLocalScale)
+    {
         if (current != null)
         {
             return current;
         }
 
-        return FindOrCreateChild(root, pointName, defaultLocalPosition);
+        return FindOrCreateChild(root, pointName, defaultLocalPosition, defaultLocalScale);
     }
 
     public static Light EnsureLight(

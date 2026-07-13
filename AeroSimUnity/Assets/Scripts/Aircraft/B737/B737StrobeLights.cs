@@ -29,10 +29,20 @@ public class B737StrobeLights : MonoBehaviour
     [SerializeField] private Transform rightWingStrobePoint;
     [SerializeField] private Transform tailStrobePoint;
 
+    [Header("Light Point Parents")]
+    [SerializeField] private Transform leftWingStrobeParent;
+    [SerializeField] private Transform rightWingStrobeParent;
+    [SerializeField] private Transform tailStrobeParent;
+
     [Header("Default Local Positions")]
     [SerializeField] private Vector3 leftWingDefaultLocalPosition = new Vector3(-8.25f, 0.08f, -1.3f);
     [SerializeField] private Vector3 rightWingDefaultLocalPosition = new Vector3(8.25f, 0.08f, -1.3f);
     [SerializeField] private Vector3 tailDefaultLocalPosition = new Vector3(0f, 1.05f, 20.9f);
+
+    [Header("Default Local Scales")]
+    [SerializeField] private Vector3 leftWingDefaultLocalScale = Vector3.one;
+    [SerializeField] private Vector3 rightWingDefaultLocalScale = Vector3.one;
+    [SerializeField] private Vector3 tailDefaultLocalScale = Vector3.one;
 
     [Header("Flight Logic")]
     [SerializeField] private bool forceWhenMovingOrAirborne = true;
@@ -49,8 +59,15 @@ public class B737StrobeLights : MonoBehaviour
 
     [Header("Initial Light Defaults")]
     [SerializeField] private Color strobeColor = Color.white;
-    [SerializeField, Min(0f)] private float peakIntensity = 220f;
-    [SerializeField, Min(0.1f)] private float range = 42f;
+    [SerializeField, HideInInspector, Min(0f)] private float peakIntensity = 220f;
+    [SerializeField, HideInInspector, Min(0.1f)] private float range = 42f;
+    [Header("Per-Light Defaults")]
+    [SerializeField, Min(0f)] private float leftWingPeakIntensity = 220f;
+    [SerializeField, Min(0f)] private float rightWingPeakIntensity = 220f;
+    [SerializeField, Min(0f)] private float tailPeakIntensity = 220f;
+    [SerializeField, Min(0.1f)] private float leftWingRange = 42f;
+    [SerializeField, Min(0.1f)] private float rightWingRange = 42f;
+    [SerializeField, Min(0.1f)] private float tailRange = 42f;
 
     [Header("Lens Visuals")]
     [SerializeField, Min(0.01f)] private float lensScale = 0.08f;
@@ -171,6 +188,12 @@ public class B737StrobeLights : MonoBehaviour
         restSeconds = Mathf.Max(0.001f, restSeconds);
         peakIntensity = Mathf.Max(0f, peakIntensity);
         range = Mathf.Max(0.1f, range);
+        leftWingPeakIntensity = Mathf.Max(0f, leftWingPeakIntensity);
+        rightWingPeakIntensity = Mathf.Max(0f, rightWingPeakIntensity);
+        tailPeakIntensity = Mathf.Max(0f, tailPeakIntensity);
+        leftWingRange = Mathf.Max(0.1f, leftWingRange);
+        rightWingRange = Mathf.Max(0.1f, rightWingRange);
+        tailRange = Mathf.Max(0.1f, tailRange);
     }
 
     private void ResolveBridge()
@@ -203,9 +226,9 @@ public class B737StrobeLights : MonoBehaviour
         }
 
         Transform root = B737ExteriorLightUtility.FindOrCreateChild(transform, "B737_StrobeLights", Vector3.zero);
-        leftWingStrobePoint = B737ExteriorLightUtility.FindOrCreatePoint(root, leftWingStrobePoint, "STROBE_LeftWing_Movable", leftWingDefaultLocalPosition);
-        rightWingStrobePoint = B737ExteriorLightUtility.FindOrCreatePoint(root, rightWingStrobePoint, "STROBE_RightWing_Movable", rightWingDefaultLocalPosition);
-        tailStrobePoint = B737ExteriorLightUtility.FindOrCreatePoint(root, tailStrobePoint, "STROBE_Tail_Movable", tailDefaultLocalPosition);
+        leftWingStrobePoint = B737ExteriorLightUtility.FindOrCreatePoint(GetPointParent(leftWingStrobeParent, root), leftWingStrobePoint, "STROBE_LeftWing_Movable", leftWingDefaultLocalPosition, leftWingDefaultLocalScale);
+        rightWingStrobePoint = B737ExteriorLightUtility.FindOrCreatePoint(GetPointParent(rightWingStrobeParent, root), rightWingStrobePoint, "STROBE_RightWing_Movable", rightWingDefaultLocalPosition, rightWingDefaultLocalScale);
+        tailStrobePoint = B737ExteriorLightUtility.FindOrCreatePoint(GetPointParent(tailStrobeParent, root), tailStrobePoint, "STROBE_Tail_Movable", tailDefaultLocalPosition, tailDefaultLocalScale);
     }
 
     private bool ShouldStrobeBeActive(float dt)
@@ -257,19 +280,24 @@ public class B737StrobeLights : MonoBehaviour
 
     private void ApplyLights(bool pulse)
     {
-        ApplyStrobePoint(leftWingStrobePoint, pulse);
-        ApplyStrobePoint(rightWingStrobePoint, pulse);
-        ApplyStrobePoint(tailStrobePoint, pulse);
+        ApplyStrobePoint(leftWingStrobePoint, pulse, leftWingPeakIntensity, leftWingRange);
+        ApplyStrobePoint(rightWingStrobePoint, pulse, rightWingPeakIntensity, rightWingRange);
+        ApplyStrobePoint(tailStrobePoint, pulse, tailPeakIntensity, tailRange);
     }
 
-    private void ApplyStrobePoint(Transform point, bool pulse)
+    private Transform GetPointParent(Transform preferredParent, Transform fallbackParent)
+    {
+        return preferredParent != null ? preferredParent : fallbackParent;
+    }
+
+    private void ApplyStrobePoint(Transform point, bool pulse, float intensity, float lightRange)
     {
         if (point == null)
         {
             return;
         }
 
-        Light light = B737ExteriorLightUtility.EnsureLight(point, LightType.Point, strobeColor, peakIntensity, range, 0f);
+        Light light = B737ExteriorLightUtility.EnsureLight(point, LightType.Point, strobeColor, intensity, lightRange, 0f);
         B737ExteriorLightUtility.SetLightEnabled(light, pulse);
         B737ExteriorLightUtility.EnsureLensVisual(point, strobeColor, lensScale, flashGlowScale, flashGlowAlpha, emissionIntensity, pulse);
     }
