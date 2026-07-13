@@ -247,4 +247,20 @@ public class B737NightVisualControllerTests
         Assert.That(result.b, Is.EqualTo(source.b).Within(0.0001f));
         Assert.That(result.a, Is.EqualTo(source.a).Within(0.0001f));
     }
+
+    [Test]
+    public void 航迹云在傍晚提前开始变黑()
+    {
+        Assert.That(B737ContrailController.CalculateDuskSmokeBlend(17.1f, 17.2f, 1.5f, 5.5f), Is.EqualTo(0f).Within(0.001f));
+        Assert.That(B737ContrailController.CalculateDuskSmokeBlend(17.95f, 17.2f, 1.5f, 5.5f), Is.EqualTo(0.5f).Within(0.001f));
+        Assert.That(B737ContrailController.CalculateDuskSmokeBlend(18.7f, 17.2f, 1.5f, 5.5f), Is.EqualTo(1f).Within(0.001f));
+    }
+
+    [Test]
+    public void 航迹云傍晚混合支持跨午夜保持满夜()
+    {
+        Assert.That(B737ContrailController.CalculateDuskSmokeBlend(23f, 17.2f, 1.5f, 5.5f), Is.EqualTo(1f).Within(0.001f));
+        Assert.That(B737ContrailController.CalculateDuskSmokeBlend(3f, 17.2f, 1.5f, 5.5f), Is.EqualTo(1f).Within(0.001f));
+        Assert.That(B737ContrailController.CalculateDuskSmokeBlend(10f, 17.2f, 1.5f, 5.5f), Is.EqualTo(0f).Within(0.001f));
+    }
 }

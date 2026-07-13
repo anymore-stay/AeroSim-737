@@ -59,14 +59,20 @@ public class B737ContrailController : MonoBehaviour
     [Tooltip("昼夜切换过渡小时数。")]
     [SerializeField, Min(0f)] private float nightTransitionHours = 0.75f;
 
+    [Tooltip("航迹云开始提前变黑的小时。比地景更早进入夜间混合，用于避免黄昏白烟过亮。")]
+    [SerializeField, Range(0f, 24f)] private float duskSmokeStartHour = 17.2f;
+
+    [Tooltip("航迹云从白色过渡到夜间黑灰色所需小时数。")]
+    [SerializeField, Min(0.01f)] private float duskSmokeTransitionHours = 1.5f;
+
     [Tooltip("满夜时白色航迹云的目标颜色。默认接近黑夜里的微弱冷灰。")]
-    [SerializeField] private Color nightSmokeTint = new Color(0.04f, 0.045f, 0.05f, 1f);
+    [SerializeField] private Color nightSmokeTint = new Color(0.015f, 0.016f, 0.018f, 1f);
 
     [Tooltip("满夜时航迹云颜色保留比例。数值越低，白色尾迹越不显眼。")]
-    [SerializeField, Range(0f, 1f)] private float nightSmokeBrightness = 0.08f;
+    [SerializeField, Range(0f, 1f)] private float nightSmokeBrightness = 0.05f;
 
     [Tooltip("满夜时航迹云透明度保留比例。数值越低，尾迹越淡。")]
-    [SerializeField, Range(0f, 1f)] private float nightSmokeAlphaMultiplier = 0.18f;
+    [SerializeField, Range(0f, 1f)] private float nightSmokeAlphaMultiplier = 0.12f;
 
     [Header("Cesium 回拉补偿")]
     [Tooltip("Cesium 原点变化时，飞机位移至少达到多少米才平移已有烟雾。用于忽略很小的坐标变化。")]
@@ -339,7 +345,7 @@ public class B737ContrailController : MonoBehaviour
     {
         EnsureSmokePropertyBlock();
 
-        float nightBlend = GetNightBlend();
+        float nightBlend = GetSmokeNightBlend();
         Material[] materials = renderer.sharedMaterials;
         for (int materialIndex = 0; materialIndex < materials.Length; materialIndex++)
         {
@@ -378,6 +384,19 @@ public class B737ContrailController : MonoBehaviour
         }
 
         return B737NightVisualController.CalculateNightBlend(hour, nightStartHour, nightEndHour, nightTransitionHours);
+    }
+
+    private float GetSmokeNightBlend()
+    {
+        float hour = 12f;
+        if (uniStormSystem != null)
+        {
+            hour = Mathf.Repeat(uniStormSystem.Hour + uniStormSystem.Minute / 60f, 24f);
+        }
+
+        float duskBlend = CalculateDuskSmokeBlend(hour, duskSmokeStartHour, duskSmokeTransitionHours, nightEndHour);
+        float nightBlend = B737NightVisualController.CalculateNightBlend(hour, nightStartHour, nightEndHour, nightTransitionHours);
+        return Mathf.Max(duskBlend, nightBlend);
     }
 
     private void ShiftRealisticSmokeParticles(Vector3 offset)
@@ -451,7 +470,7 @@ public class B737ContrailController : MonoBehaviour
             Vector3 direction = segment / distance;
             int emitCount = Mathf.Min(Mathf.FloorToInt(distance / spacing), maxParticlesPerFrame);
             ParticleSystem.EmitParams emitParams = new ParticleSystem.EmitParams();
-            float nightBlend = GetNightBlend();
+            float nightBlend = GetSmokeNightBlend();
             if (nightBlend > 0f)
             {
                 emitParams.startColor = CalculateCurrentNightSmokeColor(nightBlend);
@@ -473,7 +492,7 @@ public class B737ContrailController : MonoBehaviour
     {
         if (realisticSmokeTrails == null) return;
 
-        float nightBlend = GetNightBlend();
+        float nightBlend = GetSmokeNightBlend();
         if (nightBlend <= 0f) return;
 
         Color smokeColor = CalculateCurrentNightSmokeColor(nightBlend);
@@ -518,5 +537,38 @@ public class B737ContrailController : MonoBehaviour
             sourceColor.a * alphaMultiplier);
 
         return Color.Lerp(sourceColor, target, blend);
+    }
+
+    public static float CalculateDuskSmokeBlend(
+        float hour,
+        float duskSmokeStartHour,
+        float duskSmokeTransitionHours,
+        float nightEndHour)
+    {
+        float normalizedHour = Mathf.Repeat(hour, 24f);
+        float start = Mathf.Repeat(duskSmokeStartHour, 24f);
+        float end = Mathf.Repeat(nightEndHour, 24f);
+        float transition = Mathf.Max(0.01f, duskSmokeTransitionHours);
+        float fullStart = Mathf.Repeat(start + transition, 24f);
+
+        if (IsHourInRange(normalizedHour, start, fullStart))
+        {
+            float elapsed = Mathf.Repeat(normalizedHour - start, 24f);
+            return Mathf.Clamp01(elapsed / transition);
+        }
+
+        if (IsHourInRange(normalizedHour, fullStart, end))
+            return 1f;
+
+        return 0f;
+    }
+
+    private static bool IsHourInRange(float hour, float start, float end)
+    {
+        if (Mathf.Approximately(start, end)) return true;
+        if (start < end)
+            return hour >= start && hour <= end;
+
+        return hour >= start || hour <= end;
     }
 }
