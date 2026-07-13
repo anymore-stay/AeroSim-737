@@ -27,6 +27,8 @@ public class B737NightVisualController : MonoBehaviour
     [Header("夜晚时间")]
     [SerializeField, Range(0f, 24f)] private float eveningTransitionStartHour = 17f;
     [SerializeField, Range(0f, 24f)] private float nightStartHour = 19f;
+    [SerializeField, Range(0f, 24f)] private float surfaceDarkeningStartHour = 19f;
+    [SerializeField, Range(0f, 24f)] private float surfaceFullDarkHour = 21.5f;
     [SerializeField, Range(0f, 24f)] private float nightEndHour = 5.5f;
     [SerializeField, Min(0f)] private float transitionHours = 0.75f;
 
@@ -39,15 +41,13 @@ public class B737NightVisualController : MonoBehaviour
     [SerializeField] private Color skyTintColor = new Color(0.018f, 0.022f, 0.032f, 1f);
 
     [Header("UniStorm 夜间光")]
-    [SerializeField, Range(0f, 1f)] private float maximumMoonLightIntensity = 0.08f;
+    [SerializeField, Range(0f, 1f)] private float maximumMoonLightIntensity = 0.05f;
     [SerializeField, Range(0f, 2f)] private float maximumMoonAtmosphericFogIntensity = 0f;
     [SerializeField, Range(0f, 2f)] private float maximumSunAtmosphericFogIntensity = 0f;
     [SerializeField, Range(0f, 3f)] private float starBrightnessMultiplier = 1.35f;
 
     [Header("世界地表压暗")]
     [SerializeField, Range(0f, 1f)] private float worldSurfaceBrightness = 0.24f;
-    [SerializeField, Range(0f, 1f)] private float cesiumSurfaceBrightness = 0.22f;
-    [SerializeField, Range(0f, 1f)] private float airportSurfaceBrightness = 0.8f;
     [SerializeField, Min(0.1f)] private float rendererRefreshInterval = 2f;
     [SerializeField, Min(0.05f)] private float nightRendererScanInterval = 1f;
     [SerializeField, Min(1)] private int maximumNewRenderersPerScan = 256;
@@ -111,8 +111,6 @@ public class B737NightVisualController : MonoBehaviour
     private Color lastAppliedStarColor;
     private bool hasLastAppliedStarColor;
     private float lastAppliedWorldBrightness = -1f;
-    private float lastAppliedAirportBrightness = -1f;
-    private float lastAppliedCesiumBrightness = -1f;
     private bool hasScannedSceneAirportRoots;
     private bool hasOriginalRenderSettings;
     private float originalAmbientIntensity;
@@ -133,10 +131,7 @@ public class B737NightVisualController : MonoBehaviour
         ResolveReferences();
         CaptureOriginalRenderSettings();
         SubscribeToCesiumTilesets();
-        float nightBlend = GetCurrentNightBlend();
-        ApplyCesiumTilesetDarkening(
-            nightBlend,
-            GetCurrentCesiumBrightness());
+        ApplyCesiumTilesetNaturalLighting(GetCurrentNightBlend());
         RebuildWorldRendererCache();
     }
 
@@ -146,10 +141,7 @@ public class B737NightVisualController : MonoBehaviour
         ResolveReferences();
         CaptureOriginalRenderSettings();
         SubscribeToCesiumTilesets();
-        float nightBlend = GetCurrentNightBlend();
-        ApplyCesiumTilesetDarkening(
-            nightBlend,
-            GetCurrentCesiumBrightness());
+        ApplyCesiumTilesetNaturalLighting(GetCurrentNightBlend());
         RebuildWorldRendererCache();
     }
 
@@ -176,16 +168,20 @@ public class B737NightVisualController : MonoBehaviour
         ApplyEnvironment(nightBlend);
         ApplyUniStormNightLight(nightBlend);
 
-        float brightness = CalculateWorldBrightness(nightBlend);
-        float airportBrightness = CalculateAirportBrightness(nightBlend);
-        float cesiumBrightness = CalculateCesiumBrightness(nightBlend);
-        ApplyCesiumTilesetDarkening(nightBlend, cesiumBrightness);
+        float surfaceBlend = CalculateNightSurfaceBlend(
+            hour,
+            surfaceDarkeningStartHour,
+            surfaceFullDarkHour,
+            nightEndHour,
+            transitionHours);
+        float brightness = CalculateWorldBrightness(surfaceBlend);
+        ApplyCesiumTilesetNaturalLighting(nightBlend);
 
         if (ShouldScanWorldRenderers(
                 Time.unscaledTime,
                 nextRendererRefreshTime))
         {
-            ScanForNewAirportRenderers(airportBrightness, maximumNewAirportRenderersPerScan);
+            ScanForNewAirportRenderers(maximumNewAirportRenderersPerScan);
             ScanForNewWorldRenderers(brightness);
             nextRendererRefreshTime = Time.unscaledTime + GetNextWorldRendererScanInterval(
                 nightBlend,
@@ -198,10 +194,6 @@ public class B737NightVisualController : MonoBehaviour
             ApplyWorldBrightnessTo(cachedWorldRenderers, brightness);
             lastAppliedWorldBrightness = brightness;
         }
-
-        // 机场是静态场景，夜晚过渡必须每帧沿同一条亮度曲线更新，避免扫描/阈值刷新造成先黑后亮。
-        ApplyWorldBrightnessTo(cachedAirportRenderers, airportBrightness);
-        lastAppliedAirportBrightness = airportBrightness;
     }
 
     private void ResolveReferences()
@@ -247,14 +239,8 @@ public class B737NightVisualController : MonoBehaviour
 
     private float GetCurrentWorldBrightness()
     {
-        float nightBlend = GetCurrentNightBlend();
-        return CalculateWorldBrightness(nightBlend);
-    }
-
-    private float GetCurrentCesiumBrightness()
-    {
-        float nightBlend = GetCurrentNightBlend();
-        return CalculateCesiumBrightness(nightBlend);
+        float surfaceBlend = GetCurrentSurfaceBlend();
+        return CalculateWorldBrightness(surfaceBlend);
     }
 
     private float GetCurrentNightBlend()
@@ -267,19 +253,19 @@ public class B737NightVisualController : MonoBehaviour
             transitionHours);
     }
 
+    private float GetCurrentSurfaceBlend()
+    {
+        return CalculateNightSurfaceBlend(
+            GetCurrentHour(),
+            surfaceDarkeningStartHour,
+            surfaceFullDarkHour,
+            nightEndHour,
+            transitionHours);
+    }
+
     private float CalculateWorldBrightness(float nightBlend)
     {
         return CalculateSurfaceBrightness(nightBlend, worldSurfaceBrightness);
-    }
-
-    private float CalculateCesiumBrightness(float nightBlend)
-    {
-        return CalculateSurfaceBrightness(nightBlend, cesiumSurfaceBrightness);
-    }
-
-    private float CalculateAirportBrightness(float nightBlend)
-    {
-        return CalculateSurfaceBrightness(nightBlend, airportSurfaceBrightness);
     }
 
     private void ApplyEnvironment(float nightBlend)
@@ -430,11 +416,8 @@ public class B737NightVisualController : MonoBehaviour
         cachedAirportRenderers.Clear();
         cachedAirportRendererById.Clear();
         lastAppliedWorldBrightness = -1f;
-        lastAppliedAirportBrightness = -1f;
 
-        float nightBlend = GetCurrentNightBlend();
-        float airportBrightness = CalculateAirportBrightness(nightBlend);
-        ScanForNewAirportRenderers(airportBrightness, int.MaxValue);
+        ScanForNewAirportRenderers(int.MaxValue);
         ScanForNewWorldRenderers(1f, int.MaxValue);
     }
 
@@ -517,13 +500,13 @@ public class B737NightVisualController : MonoBehaviour
         return newlyRegisteredCount;
     }
 
-    private void ScanForNewAirportRenderers(float airportBrightness, int maxNewRenderers)
+    private void ScanForNewAirportRenderers(int maxNewRenderers)
     {
         RemoveMissingAirportRenderers();
-        ScanAirportRootsForNewRenderers(airportBrightness, maxNewRenderers);
+        ScanAirportRootsForNewRenderers(maxNewRenderers);
     }
 
-    private int ScanAirportRootsForNewRenderers(float airportBrightness, int remainingBudget)
+    private int ScanAirportRootsForNewRenderers(int remainingBudget)
     {
         if (remainingBudget <= 0)
         {
@@ -542,7 +525,6 @@ public class B737NightVisualController : MonoBehaviour
 
             newlyRegisteredCount += ScanAirportRootForNewRenderers(
                 root,
-                airportBrightness,
                 remainingBudget - newlyRegisteredCount);
             if (newlyRegisteredCount >= remainingBudget)
             {
@@ -555,7 +537,6 @@ public class B737NightVisualController : MonoBehaviour
 
     private int ScanAirportRootForNewRenderers(
         Transform root,
-        float airportBrightness,
         int remainingBudget)
     {
         if (root == null || remainingBudget <= 0)
@@ -580,7 +561,7 @@ public class B737NightVisualController : MonoBehaviour
 
             if (current.TryGetComponent(out Renderer renderer) && TryRegisterAirportRenderer(renderer, true))
             {
-                ApplyWorldBrightnessTo(renderer, airportBrightness);
+                ApplyNaturalLightingTo(renderer);
                 newlyRegisteredCount++;
                 if (newlyRegisteredCount >= remainingBudget)
                 {
@@ -597,7 +578,7 @@ public class B737NightVisualController : MonoBehaviour
         return newlyRegisteredCount;
     }
 
-    private void ApplyCesiumTilesetDarkening(float nightBlend, float brightness)
+    private void ApplyCesiumTilesetNaturalLighting(float nightBlend)
     {
         if (cesiumTilesets == null)
         {
@@ -609,17 +590,11 @@ public class B737NightVisualController : MonoBehaviour
 
         if (ShouldScanWorldRenderers(Time.unscaledTime, nextCesiumRendererRefreshTime))
         {
-            ScanForNewCesiumRenderers(brightness);
+            ScanForNewCesiumRenderers();
             nextCesiumRendererRefreshTime = Time.unscaledTime + GetNextWorldRendererScanInterval(
                 nightBlend,
                 nightRendererScanInterval,
                 rendererRefreshInterval);
-        }
-
-        if (ShouldApplyBrightnessChange(lastAppliedCesiumBrightness, brightness))
-        {
-            ApplyWorldBrightnessTo(cachedCesiumRenderers, brightness);
-            lastAppliedCesiumBrightness = brightness;
         }
     }
 
@@ -650,7 +625,7 @@ public class B737NightVisualController : MonoBehaviour
             return;
         }
 
-        RegisterCesiumRenderers(tileObject.transform, GetCurrentCesiumBrightness(), int.MaxValue);
+        RegisterCesiumRenderers(tileObject.transform, int.MaxValue);
     }
 
     private void RestoreCesiumTilesets()
@@ -666,13 +641,12 @@ public class B737NightVisualController : MonoBehaviour
         }
 
         subscribedCesiumTilesets.Clear();
-        ApplyWorldBrightnessTo(cachedCesiumRenderers, 1f);
+        ApplyNaturalLightingTo(cachedCesiumRenderers);
         cachedCesiumRenderers.Clear();
         cachedCesiumRendererById.Clear();
-        lastAppliedCesiumBrightness = -1f;
     }
 
-    private void ScanForNewCesiumRenderers(float brightness)
+    private void ScanForNewCesiumRenderers()
     {
         if (cesiumTilesets == null)
         {
@@ -690,7 +664,6 @@ public class B737NightVisualController : MonoBehaviour
 
             newlyRegisteredCount += RegisterCesiumRenderers(
                 tileset.transform,
-                brightness,
                 maximumNewCesiumRenderersPerScan - newlyRegisteredCount);
             if (newlyRegisteredCount >= maximumNewCesiumRenderersPerScan)
             {
@@ -699,7 +672,7 @@ public class B737NightVisualController : MonoBehaviour
         }
     }
 
-    private int RegisterCesiumRenderers(Transform root, float brightness, int remainingBudget)
+    private int RegisterCesiumRenderers(Transform root, int remainingBudget)
     {
         if (root == null || remainingBudget <= 0)
         {
@@ -723,7 +696,7 @@ public class B737NightVisualController : MonoBehaviour
 
             if (current.TryGetComponent(out Renderer renderer) && TryRegisterCesiumRenderer(renderer))
             {
-                ApplyWorldBrightnessTo(renderer, brightness);
+                ApplyNaturalLightingTo(renderer);
                 newlyRegisteredCount++;
                 if (newlyRegisteredCount >= remainingBudget)
                 {
@@ -1124,6 +1097,16 @@ public class B737NightVisualController : MonoBehaviour
         }
     }
 
+    private void ApplyNaturalLightingTo(List<Renderer> renderers)
+    {
+        ApplyWorldBrightnessTo(renderers, 1f);
+    }
+
+    private void ApplyNaturalLightingTo(Renderer renderer)
+    {
+        ApplyWorldBrightnessTo(renderer, 1f);
+    }
+
     private void ApplyWorldBrightnessTo(Renderer renderer, float brightness)
     {
         if (renderer == null)
@@ -1170,7 +1153,7 @@ public class B737NightVisualController : MonoBehaviour
 
     public static Color CalculateCesiumRuntimeMaterialColor(Color originalColor, float brightness)
     {
-        return CalculateDimmedColor(originalColor, brightness, 1f);
+        return originalColor;
     }
 
     public static float CalculateNightBlend(float hour, float nightStartHour, float nightEndHour, float transitionHours)
@@ -1218,6 +1201,41 @@ public class B737NightVisualController : MonoBehaviour
         if (eveningDuration > 0f && IsHourInForwardRange(hour, eveningTransitionStartHour, fullNightStartHour))
         {
             return Mathf.Clamp01(DeltaHours(eveningTransitionStartHour, hour) / eveningDuration);
+        }
+
+        if (morningTransitionHours > 0f)
+        {
+            float morningTransitionEndHour = Mathf.Repeat(nightEndHour + morningTransitionHours, 24f);
+            if (IsHourInForwardRange(hour, nightEndHour, morningTransitionEndHour))
+            {
+                return 1f - Mathf.Clamp01(DeltaHours(nightEndHour, hour) / morningTransitionHours);
+            }
+        }
+
+        return 0f;
+    }
+
+    public static float CalculateNightSurfaceBlend(
+        float hour,
+        float surfaceDarkeningStartHour,
+        float surfaceFullDarkHour,
+        float nightEndHour,
+        float morningTransitionHours)
+    {
+        hour = Mathf.Repeat(hour, 24f);
+        surfaceDarkeningStartHour = Mathf.Repeat(surfaceDarkeningStartHour, 24f);
+        surfaceFullDarkHour = Mathf.Repeat(surfaceFullDarkHour, 24f);
+        nightEndHour = Mathf.Repeat(nightEndHour, 24f);
+
+        if (IsHourInNightRange(hour, surfaceFullDarkHour, nightEndHour))
+        {
+            return 1f;
+        }
+
+        float darkeningDuration = DeltaHours(surfaceDarkeningStartHour, surfaceFullDarkHour);
+        if (darkeningDuration > 0f && IsHourInForwardRange(hour, surfaceDarkeningStartHour, surfaceFullDarkHour))
+        {
+            return Mathf.Clamp01(DeltaHours(surfaceDarkeningStartHour, hour) / darkeningDuration);
         }
 
         if (morningTransitionHours > 0f)

@@ -39,12 +39,29 @@ public class B737NightVisualControllerTests
     }
 
     [Test]
-    public void 机场亮度在傍晚过渡中逐步接近目标值()
+    public void 世界地表亮度在傍晚过渡中逐步接近目标值()
     {
         float blend = B737NightVisualController.CalculateNightVisualBlend(18f, 17f, 19f, 5.5f, 0.75f);
         float brightness = B737NightVisualController.CalculateSurfaceBrightness(blend, 0.8f);
 
         Assert.That(brightness, Is.EqualTo(0.9f).Within(0.001f));
+    }
+
+    [Test]
+    public void 地表压暗晚于天空夜晚视觉()
+    {
+        Assert.That(B737NightVisualController.CalculateNightSurfaceBlend(19f, 19f, 21.5f, 5.5f, 0.75f), Is.EqualTo(0f).Within(0.001f));
+        Assert.That(B737NightVisualController.CalculateNightSurfaceBlend(20.25f, 19f, 21.5f, 5.5f, 0.75f), Is.EqualTo(0.5f).Within(0.001f));
+        Assert.That(B737NightVisualController.CalculateNightSurfaceBlend(21.5f, 19f, 21.5f, 5.5f, 0.75f), Is.EqualTo(1f).Within(0.001f));
+    }
+
+    [Test]
+    public void 太阳刚落山时地表亮度仍接近白天()
+    {
+        float surfaceBlend = B737NightVisualController.CalculateNightSurfaceBlend(19f, 19f, 21.5f, 5.5f, 0.75f);
+        float brightness = B737NightVisualController.CalculateSurfaceBrightness(surfaceBlend, 0.4f);
+
+        Assert.That(brightness, Is.EqualTo(1f).Within(0.001f));
     }
 
     [Test]
@@ -69,7 +86,7 @@ public class B737NightVisualControllerTests
     }
 
     [Test]
-    public void 机场亮度过渡不会低于夜晚目标值()
+    public void 世界地表亮度过渡不会低于夜晚目标值()
     {
         float targetBrightness = 0.126f;
         float previous = 1f;
@@ -169,15 +186,15 @@ public class B737NightVisualControllerTests
     }
 
     [Test]
-    public void Cesium亮度按原始颜色压暗并保留透明度()
+    public void Cesium自然光模式保持原始底色()
     {
         Color original = new Color(0.6f, 0.4f, 0.2f, 0.75f);
 
         Color result = B737NightVisualController.CalculateCesiumRuntimeMaterialColor(original, 0.08f);
 
-        Assert.That(result.r, Is.EqualTo(0.048f).Within(0.0001f));
-        Assert.That(result.g, Is.EqualTo(0.032f).Within(0.0001f));
-        Assert.That(result.b, Is.EqualTo(0.016f).Within(0.0001f));
+        Assert.That(result.r, Is.EqualTo(original.r).Within(0.0001f));
+        Assert.That(result.g, Is.EqualTo(original.g).Within(0.0001f));
+        Assert.That(result.b, Is.EqualTo(original.b).Within(0.0001f));
         Assert.That(result.a, Is.EqualTo(0.75f).Within(0.0001f));
     }
 
