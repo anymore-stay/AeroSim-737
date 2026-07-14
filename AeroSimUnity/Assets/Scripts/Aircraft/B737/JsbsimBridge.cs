@@ -695,6 +695,11 @@ public class JsbsimBridge : MonoBehaviour
     private void ApplyCesiumPose(double3 ecefPosition, Quaternion rotation)
     {
         cesiumAnchor.positionGlobeFixed = ecefPosition;
+        ApplyCesiumRotation(rotation);
+    }
+
+    private void ApplyCesiumRotation(Quaternion rotation)
+    {
         cesiumAnchor.rotationEastUpNorth = new quaternion(
             rotation.x,
             rotation.y,
@@ -728,6 +733,7 @@ public class JsbsimBridge : MonoBehaviour
 
         sceneStartPos = aircraft.localPosition;
         sceneStartRot = aircraft.localRotation;
+        Vector3 sceneStartScale = aircraft.localScale;
 
         cesiumGeoreference.Initialize();
         cesiumStartLocalToEcef = cesiumGeoreference.localToEcefMatrix;
@@ -737,6 +743,15 @@ public class JsbsimBridge : MonoBehaviour
             cesiumAnchor = aircraft.gameObject.AddComponent<CesiumGlobeAnchor>();
         cesiumAnchor.detectTransformChanges = false;
         cesiumAnchor.adjustOrientationForGlobeWhenMoving = false;
+
+        // Adding a globe anchor can immediately align the Transform to the local tangent
+        // frame. Restore the authored pose, then make the authored rotation the initial
+        // East-Up-North rotation so Play mode starts at exactly the scene attitude.
+        aircraft.localPosition = sceneStartPos;
+        aircraft.localRotation = sceneStartRot;
+        aircraft.localScale = sceneStartScale;
+        cesiumAnchor.Sync();
+        ApplyCesiumRotation(sceneStartRot);
 
         cesiumOriginShift = aircraft.GetComponent<CesiumOriginShift>();
         if (cesiumOriginShift == null)
@@ -813,6 +828,9 @@ public class JsbsimBridge : MonoBehaviour
 
     private void HandleCesiumGeoreferenceChanged()
     {
+        if (!HasState && cesiumAnchor != null)
+            ApplyCesiumRotation(sceneStartRot);
+
         if (!preserveStaticCesiumChildRotation) return;
 
         for (int i = 0; i < staticCesiumChildren.Count; i++)
