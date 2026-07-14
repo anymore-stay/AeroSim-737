@@ -9285,7 +9285,7 @@ Transform:
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 3.6024, y: -1.3747, z: 0.3372}
-  m_LocalScale: {x: 0.3, y: 0.3, z: 0.3}
+  m_LocalScale: {x: 0.1, y: 0.1, z: 0.1}
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 8217023064306515292}
@@ -9304,8 +9304,8 @@ Light:
   m_Type: 2
   m_Shape: 0
   m_Color: {r: 1, g: 1, b: 1, a: 1}
-  m_Intensity: 50
-  m_Range: 20
+  m_Intensity: 1
+  m_Range: 10
   m_SpotAngle: 30
   m_InnerSpotAngle: 21.80208
   m_CookieSize: 10
@@ -14291,7 +14291,7 @@ Light:
   m_Type: 2
   m_Shape: 0
   m_Color: {r: 0.02, g: 0.95, b: 0.18, a: 1}
-  m_Intensity: 10
+  m_Intensity: 0.5
   m_Range: 5
   m_SpotAngle: 30
   m_InnerSpotAngle: 21.80208
@@ -17297,7 +17297,7 @@ Light:
   m_Type: 2
   m_Shape: 0
   m_Color: {r: 1, g: 0.05, b: 0.025, a: 1}
-  m_Intensity: 10
+  m_Intensity: 0.5
   m_Range: 5
   m_SpotAngle: 30
   m_InnerSpotAngle: 21.80208
@@ -23976,8 +23976,8 @@ Light:
   m_Type: 2
   m_Shape: 0
   m_Color: {r: 1, g: 0.96, b: 0.9, a: 1}
-  m_Intensity: 20
-  m_Range: 10
+  m_Intensity: 0.5
+  m_Range: 5
   m_SpotAngle: 30
   m_InnerSpotAngle: 21.80208
   m_CookieSize: 10
@@ -47885,7 +47885,7 @@ Transform:
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: -0.001, y: -38.052, z: 1.446}
-  m_LocalScale: {x: 0.4, y: 0.4, z: 0.4}
+  m_LocalScale: {x: 0.1, y: 0.1, z: 0.1}
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 2083900018812874791}
@@ -47904,8 +47904,8 @@ Light:
   m_Type: 2
   m_Shape: 0
   m_Color: {r: 1, g: 1, b: 1, a: 1}
-  m_Intensity: 50
-  m_Range: 20
+  m_Intensity: 1
+  m_Range: 10
   m_SpotAngle: 30
   m_InnerSpotAngle: 21.80208
   m_CookieSize: 10
@@ -58915,7 +58915,7 @@ Transform:
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: -3.632, y: -1.554, z: 0.278}
-  m_LocalScale: {x: 0.4, y: 0.4, z: 0.4}
+  m_LocalScale: {x: 0.1, y: 0.1, z: 0.1}
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 791003907520460950}
@@ -58934,8 +58934,8 @@ Light:
   m_Type: 2
   m_Shape: 0
   m_Color: {r: 1, g: 1, b: 1, a: 1}
-  m_Intensity: 50
-  m_Range: 20
+  m_Intensity: 1
+  m_Range: 10
   m_SpotAngle: 30
   m_InnerSpotAngle: 21.80208
   m_CookieSize: 10
@@ -70615,14 +70615,14 @@ MonoBehaviour:
   leftRedColor: {r: 1, g: 0.05, b: 0.025, a: 1}
   rightGreenColor: {r: 0.02, g: 0.95, b: 0.18, a: 1}
   tailWhiteColor: {r: 1, g: 0.96, b: 0.9, a: 1}
-  pointIntensity: 0.28
-  pointRange: 3.2
-  leftRedIntensity: 10
-  rightGreenIntensity: 10
-  tailWhiteIntensity: 20
+  pointIntensity: 0.5
+  pointRange: 5
+  leftRedIntensity: 0.5
+  rightGreenIntensity: 0.5
+  tailWhiteIntensity: 0.5
   leftRedRange: 5
   rightGreenRange: 5
-  tailWhiteRange: 10
+  tailWhiteRange: 5
   lensScale: 0.06
   glowScale: 0.24
   glowAlpha: 0.16
@@ -70653,9 +70653,9 @@ MonoBehaviour:
   leftWingDefaultLocalPosition: {x: -3.632, y: -1.554, z: 0.278}
   rightWingDefaultLocalPosition: {x: 3.6024, y: -1.3747, z: 0.3372}
   tailDefaultLocalPosition: {x: -0.001, y: -38.052, z: 1.446}
-  leftWingDefaultLocalScale: {x: 0.4, y: 0.4, z: 0.4}
-  rightWingDefaultLocalScale: {x: 0.3, y: 0.3, z: 0.3}
-  tailDefaultLocalScale: {x: 0.4, y: 0.4, z: 0.4}
+  leftWingDefaultLocalScale: {x: 0.1, y: 0.1, z: 0.1}
+  rightWingDefaultLocalScale: {x: 0.1, y: 0.1, z: 0.1}
+  tailDefaultLocalScale: {x: 0.1, y: 0.1, z: 0.1}
   forceWhenMovingOrAirborne: 1
   previewArmedWithoutJsbsim: 1
   armedModeConstantOn: 1
@@ -70666,14 +70666,14 @@ MonoBehaviour:
   gapSeconds: 0.05
   restSeconds: 1
   strobeColor: {r: 1, g: 1, b: 1, a: 1}
-  peakIntensity: 220
-  range: 42
-  leftWingPeakIntensity: 50
-  rightWingPeakIntensity: 50
-  tailPeakIntensity: 50
-  leftWingRange: 20
-  rightWingRange: 20
-  tailRange: 20
+  peakIntensity: 1
+  range: 10
+  leftWingPeakIntensity: 1
+  rightWingPeakIntensity: 1
+  tailPeakIntensity: 1
+  leftWingRange: 10
+  rightWingRange: 10
+  tailRange: 10
   lensScale: 0.08
   flashGlowScale: 0.85
   flashGlowAlpha: 0.75
