@@ -104,6 +104,108 @@ public class B737SignalLightBlinkerTests
     }
 
     [Test]
+    public void PulseLightIntensityCanBeScaledPerLamp()
+    {
+        Assert.That(
+            B737SignalLightBlinker.EvaluatePulseLightIntensity(1f, 85f, 0.45f),
+            Is.EqualTo(38.25f).Within(0.001f));
+        Assert.That(
+            B737SignalLightBlinker.EvaluatePulseLightIntensity(0.5f, 85f, 0.45f),
+            Is.EqualTo(19.125f).Within(0.001f));
+        Assert.That(
+            B737SignalLightBlinker.EvaluatePulseLightIntensity(1f, 85f, -1f),
+            Is.EqualTo(0f).Within(0.001f));
+    }
+
+    [Test]
+    public void PulseLightDefaultsUseRestrictedAnticollisionSpotCone()
+    {
+        Type blinkerType = Type.GetType("B737SignalLightBlinker, Assembly-CSharp");
+        Assert.That(blinkerType, Is.Not.Null);
+
+        FieldInfo typeField = blinkerType.GetField(
+            "DefaultPulseLightType",
+            BindingFlags.Public | BindingFlags.Static);
+        FieldInfo spotAngleField = blinkerType.GetField(
+            "DefaultPulseLightSpotAngle",
+            BindingFlags.Public | BindingFlags.Static);
+        FieldInfo beaconRedField = blinkerType.GetField(
+            "DefaultBeaconRed",
+            BindingFlags.Public | BindingFlags.Static);
+        FieldInfo lowerScaleField = blinkerType.GetField(
+            "DefaultLowerPulseLightIntensityScale",
+            BindingFlags.Public | BindingFlags.Static);
+        FieldInfo upperScaleField = blinkerType.GetField(
+            "DefaultUpperPulseLightIntensityScale",
+            BindingFlags.Public | BindingFlags.Static);
+
+        Assert.That(typeField, Is.Not.Null);
+        Assert.That(spotAngleField, Is.Not.Null);
+        Assert.That(beaconRedField, Is.Not.Null);
+        Assert.That(lowerScaleField, Is.Not.Null);
+        Assert.That(upperScaleField, Is.Not.Null);
+        Assert.That((LightType)typeField.GetValue(null), Is.EqualTo(LightType.Spot));
+        Assert.That((float)spotAngleField.GetValue(null), Is.EqualTo(150f).Within(0.001f));
+        Assert.That((float)lowerScaleField.GetValue(null), Is.EqualTo(0.09411765f).Within(0.001f));
+        Assert.That((float)upperScaleField.GetValue(null), Is.EqualTo(1.35f).Within(0.001f));
+
+        Color beaconRed = (Color)beaconRedField.GetValue(null);
+        Assert.That(beaconRed.r, Is.EqualTo(0.72f).Within(0.001f));
+        Assert.That(beaconRed.g, Is.EqualTo(0f).Within(0.001f));
+        Assert.That(beaconRed.b, Is.EqualTo(0f).Within(0.001f));
+    }
+
+    [Test]
+    public void PulseLightDirectionPointsOutwardFromBeaconBounds()
+    {
+        Type blinkerType = Type.GetType("B737SignalLightBlinker, Assembly-CSharp");
+        Assert.That(blinkerType, Is.Not.Null);
+
+        MethodInfo method = blinkerType.GetMethod(
+            "GetOutwardPulseLightLocalDirection",
+            BindingFlags.Public | BindingFlags.Static);
+
+        Assert.That(method, Is.Not.Null);
+
+        Bounds localBounds = new Bounds(Vector3.zero, new Vector3(2f, 2f, 10f));
+        Vector3 lowerDirection = (Vector3)method.Invoke(null, new object[] { new Vector3(0f, 0f, -5f), localBounds });
+        Vector3 upperDirection = (Vector3)method.Invoke(null, new object[] { new Vector3(0f, 0f, 5f), localBounds });
+
+        Assert.That(lowerDirection.x, Is.EqualTo(0f).Within(0.0001f));
+        Assert.That(lowerDirection.y, Is.EqualTo(0f).Within(0.0001f));
+        Assert.That(lowerDirection.z, Is.EqualTo(-1f).Within(0.0001f));
+        Assert.That(upperDirection.x, Is.EqualTo(0f).Within(0.0001f));
+        Assert.That(upperDirection.y, Is.EqualTo(0f).Within(0.0001f));
+        Assert.That(upperDirection.z, Is.EqualTo(1f).Within(0.0001f));
+    }
+
+    [Test]
+    public void PulseLightsUseBeaconClusterCentersWhenMeshVerticesAreAvailable()
+    {
+        Bounds localBounds = new Bounds(
+            Vector3.zero,
+            new Vector3(2f, 2f, 10f));
+
+        Vector3[] vertices =
+        {
+            new Vector3(-0.8f, -0.4f, -5f),
+            new Vector3(-0.4f, 0.2f, -4f),
+            new Vector3(0.6f, -0.1f, 4f),
+            new Vector3(1.0f, 0.5f, 5f)
+        };
+
+        Vector3[] results = B737SignalLightBlinker.GetAutoPulseLightLocalPositions(localBounds, vertices);
+
+        Assert.That(results, Has.Length.EqualTo(2));
+        Assert.That(results[0].x, Is.EqualTo(-0.6f).Within(0.0001f));
+        Assert.That(results[0].y, Is.EqualTo(-0.1f).Within(0.0001f));
+        Assert.That(results[0].z, Is.EqualTo(-4.5f).Within(0.0001f));
+        Assert.That(results[1].x, Is.EqualTo(0.8f).Within(0.0001f));
+        Assert.That(results[1].y, Is.EqualTo(0.2f).Within(0.0001f));
+        Assert.That(results[1].z, Is.EqualTo(4.5f).Within(0.0001f));
+    }
+
+    [Test]
     public void DefaultsDoNotTintSharedAircraftGlassOrCastSceneLight()
     {
         Type blinkerType = Type.GetType("B737SignalLightBlinker, Assembly-CSharp");
