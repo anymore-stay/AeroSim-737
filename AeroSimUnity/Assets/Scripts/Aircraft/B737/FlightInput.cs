@@ -491,6 +491,71 @@ public class FlightInput : MonoBehaviour
     }
 
     // 给 HUD 读取
+    public void SetThrottle(float value)
+    {
+        throttle = Mathf.Clamp(value, -1f, 1f);
+
+        if (sidestickInput != null && sidestickInput.ThrottleControlEnabled)
+        {
+            keyboardThrottleOverride = true;
+            joystickThrottleAtKeyboardTakeover = sidestickInput.Throttle;
+        }
+    }
+
+    public void SetFlapStep(int step)
+    {
+        flapStep = Mathf.Clamp(step, 0, flapStepCount);
+    }
+
+    public void SetSpoilerStep(int step)
+    {
+        spoilerStep = Mathf.Clamp(step, 0, spoilerStepCount);
+    }
+
+    public bool TrySetGearDown(bool down, out string rejectionReason)
+    {
+        rejectionReason = string.Empty;
+        if (gearDown == down)
+        {
+            return true;
+        }
+
+        if (!LandingGearToggleGate.CanUseToggleInputThisFrame)
+        {
+            rejectionReason = "起落架正在运动，请稍后重试";
+            return false;
+        }
+
+        if (!down && !CanRetractGear())
+        {
+            rejectionReason = string.Format(
+                "飞机尚未离地 {0:F0} 英尺，拒绝收起起落架",
+                minimumGearRetractionAglFt);
+            return false;
+        }
+
+        gearDown = down;
+        return true;
+    }
+
+    public void SetBrakes(bool enabled)
+    {
+        brakes = enabled;
+    }
+
+    public void AdjustPitchTrim(float delta)
+    {
+        pitchTrim = Mathf.Clamp(pitchTrim + delta, -1f, 1f);
+    }
+
+    public void SetPaused(bool paused)
+    {
+        if (escapePaused != paused)
+        {
+            SetEscapePaused(paused);
+        }
+    }
+
     public float Elevator => elevator;
     public float PitchTrim => pitchTrim;
     public float Aileron => aileron;
