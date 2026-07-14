@@ -61,6 +61,31 @@ public class CockpitCameraControllerTests
         }
     }
 
+    [Test]
+    public void AircraftColliderIsIgnoredWhenAircraftIsUnderCesiumGeoreference()
+    {
+        GameObject georeference = new GameObject("CesiumGeoreference");
+        GameObject aircraft = new GameObject("B737");
+        GameObject aircraftCollider = new GameObject("NoseCollider");
+        GameObject sceneryCollider = new GameObject("AirportCollider");
+
+        try
+        {
+            aircraft.transform.SetParent(georeference.transform, false);
+            aircraftCollider.transform.SetParent(aircraft.transform, false);
+            sceneryCollider.transform.SetParent(georeference.transform, false);
+
+            Assert.That(IsPartOfAircraft(aircraft.transform, aircraft.transform), Is.True);
+            Assert.That(IsPartOfAircraft(aircraftCollider.transform, aircraft.transform), Is.True);
+            Assert.That(IsPartOfAircraft(sceneryCollider.transform, aircraft.transform), Is.False);
+            Assert.That(IsPartOfAircraft(georeference.transform, aircraft.transform), Is.False);
+        }
+        finally
+        {
+            Object.DestroyImmediate(georeference);
+        }
+    }
+
     private static void SetInitialPose(
         CockpitCameraController controller,
         Vector3 position,
@@ -77,5 +102,14 @@ public class CockpitCameraControllerTests
             BindingFlags.Instance | BindingFlags.NonPublic);
         Assert.That(field, Is.Not.Null, "Missing field: " + fieldName);
         field.SetValue(controller, value);
+    }
+
+    private static bool IsPartOfAircraft(Transform candidate, Transform aircraftRoot)
+    {
+        MethodInfo method = typeof(CockpitCameraController).GetMethod(
+            "IsPartOfAircraft",
+            BindingFlags.Static | BindingFlags.NonPublic);
+        Assert.That(method, Is.Not.Null, "Missing method: IsPartOfAircraft");
+        return (bool)method.Invoke(null, new object[] { candidate, aircraftRoot });
     }
 }

@@ -576,7 +576,7 @@ public class CockpitCameraController : MonoBehaviour
                         continue;
                     }
 
-                    if (rootToIgnore != null && hitTransform.root == rootToIgnore)
+                    if (IsPartOfAircraft(hitTransform, rootToIgnore))
                     {
                         continue;
                     }
@@ -593,6 +593,13 @@ public class CockpitCameraController : MonoBehaviour
         }
 
         return safePosition;
+    }
+
+    private static bool IsPartOfAircraft(Transform candidate, Transform aircraftRoot)
+    {
+        return candidate != null &&
+               aircraftRoot != null &&
+               (candidate == aircraftRoot || candidate.IsChildOf(aircraftRoot));
     }
 
     private Vector3 ClampToLocalMovementBox(Vector3 targetWorld)
