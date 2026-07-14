@@ -3,15 +3,12 @@ using NUnit.Framework;
 public class ReverseThrustMathTests
 {
     [Test]
-    public void CombinedKeysMoveThrottleThroughIdleIntoReverse()
+    public void CombinedKeysImmediatelySelectFullReverse()
     {
-        float fromForward = ReverseThrustMath.UpdateSignedThrottle(
+        float result = ReverseThrustMath.UpdateSignedThrottle(
             0.25f, true, true, true, 0.5f, 0.5f);
-        float intoReverse = ReverseThrustMath.UpdateSignedThrottle(
-            fromForward, true, true, true, 0.5f, 0.5f);
 
-        Assert.That(fromForward, Is.Zero.Within(0.0001f));
-        Assert.That(intoReverse, Is.EqualTo(-0.25f).Within(0.0001f));
+        Assert.That(result, Is.EqualTo(-1f).Within(0.0001f));
     }
 
     [Test]
@@ -24,12 +21,21 @@ public class ReverseThrustMathTests
     }
 
     [Test]
-    public void ControlAloneReturnsReverseThrottleToIdle()
+    public void ControlAloneKeepsFullReverse()
     {
         float result = ReverseThrustMath.UpdateSignedThrottle(
             -0.75f, false, true, true, 0.5f, 1f);
 
-        Assert.That(result, Is.EqualTo(-0.25f).Within(0.0001f));
+        Assert.That(result, Is.EqualTo(-1f).Within(0.0001f));
+    }
+
+    [Test]
+    public void ShiftAloneReturnsReverseThrottleDirectlyToIdle()
+    {
+        float result = ReverseThrustMath.UpdateSignedThrottle(
+            -1f, true, false, true, 0.5f, 0.1f);
+
+        Assert.That(result, Is.Zero);
     }
 
     [Test]
@@ -38,7 +44,7 @@ public class ReverseThrustMathTests
         ReverseThrustMath.CalculateEngineCommands(
             -0.6f, true, 2f, out float throttle, out float angle);
 
-        Assert.That(throttle, Is.EqualTo(0.6f).Within(0.0001f));
+        Assert.That(throttle, Is.EqualTo(1f).Within(0.0001f));
         Assert.That(angle, Is.EqualTo(2f).Within(0.0001f));
     }
 

@@ -15,15 +15,22 @@ public static class ReverseThrustMath
 
         if (increasePressed && decreasePressed)
         {
-            float target = reverseAllowed ? -1f : 0f;
-            return Mathf.MoveTowards(currentThrottle, target, maxDelta);
+            return reverseAllowed ? -1f : 0f;
         }
 
         if (increasePressed)
+        {
+            if (currentThrottle < 0f)
+                return 0f;
             return Mathf.MoveTowards(currentThrottle, 1f, maxDelta);
+        }
 
         if (decreasePressed)
+        {
+            if (currentThrottle < 0f)
+                return -1f;
             return Mathf.MoveTowards(currentThrottle, 0f, maxDelta);
+        }
 
         return currentThrottle;
     }
@@ -37,7 +44,7 @@ public static class ReverseThrustMath
     {
         bool reverseActive = reverseAllowed && signedThrottle < 0f;
         engineThrottle = reverseActive
-            ? Mathf.Clamp01(-signedThrottle)
+            ? 1f
             : Mathf.Clamp01(signedThrottle);
         reverserAngleRad = reverseActive
             ? Mathf.Clamp(reverseAngleRad, Mathf.PI * 0.5f, Mathf.PI)

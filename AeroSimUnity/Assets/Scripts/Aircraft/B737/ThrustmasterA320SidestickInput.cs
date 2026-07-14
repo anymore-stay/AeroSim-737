@@ -71,6 +71,11 @@ public sealed class ThrustmasterA320SidestickInput : MonoBehaviour
     [InspectorName("断线重连间隔（秒）")]
     [SerializeField, Min(0.1f)] private float reconnectInterval = 1f;
 
+    [Header("输入过滤")]
+    [Tooltip("发送给飞机的轴和油门按此步进截断。0.1 表示只保留一位小数并忽略第二位小数。")]
+    [InspectorName("输出数值步进")]
+    [SerializeField, Range(0.01f, 0.5f)] private float inputValueStep = 0.1f;
+
     [Header("飞行轴映射")]
     [InspectorName("横滚（左右）")]
     [SerializeField] private AxisMapping roll = new AxisMapping(DeviceAxis.X, false)
@@ -101,6 +106,10 @@ public sealed class ThrustmasterA320SidestickInput : MonoBehaviour
     private uint connectedDeviceId;
     private float nextReconnectTime;
     private bool connected;
+    private float outputRoll;
+    private float outputPitch;
+    private float outputYaw;
+    private float outputThrottle;
     private string connectionMessage = "尚未扫描设备";
 
     public bool InputEnabled => inputEnabled;
@@ -133,10 +142,10 @@ public sealed class ThrustmasterA320SidestickInput : MonoBehaviour
     public float NormalizedU => NormalizeRawAxis(DeviceAxis.U);
     public float NormalizedV => NormalizeRawAxis(DeviceAxis.V);
 
-    public float Roll => EvaluateMapping(roll);
-    public float Pitch => EvaluateMapping(pitch);
-    public float Yaw => EvaluateMapping(yaw);
-    public float Throttle => Mathf.Clamp01((EvaluateMapping(throttle) + 1f) * 0.5f);
+    public float Roll => outputRoll;
+    public float Pitch => outputPitch;
+    public float Yaw => outputYaw;
+    public float Throttle => outputThrottle;
 
     private void OnEnable()
     {
@@ -170,6 +179,10 @@ public sealed class ThrustmasterA320SidestickInput : MonoBehaviour
             connectionMessage = "设备已断开，正在等待重连";
             nextReconnectTime = Time.unscaledTime + reconnectInterval;
             Debug.LogWarning($"[侧杆输入] 设备已断开：{disconnectedName}", this);
+        }
+        else
+        {
+            UpdateOutputValues();
         }
     }
 
@@ -219,6 +232,7 @@ public sealed class ThrustmasterA320SidestickInput : MonoBehaviour
         state = selected.state;
         connected = inputEnabled;
         connectionMessage = connected ? "设备已连接" : "侧杆输入已关闭";
+        UpdateOutputValues();
 
         if (changedDevice && connected)
         {
@@ -316,6 +330,28 @@ public sealed class ThrustmasterA320SidestickInput : MonoBehaviour
         if (mapping.invert)
             value = -value;
         return ApplyAxisResponse(value, mapping.deadzone, mapping.responseExponent, mapping.sensitivity);
+    }
+
+    private void UpdateOutputValues()
+    {
+        outputRoll = DiscardRemainder(EvaluateMapping(roll), inputValueStep);
+        outputPitch = DiscardRemainder(EvaluateMapping(pitch), inputValueStep);
+        outputYaw = DiscardRemainder(EvaluateMapping(yaw), inputValueStep);
+        float throttleValue = Mathf.Clamp01((EvaluateMapping(throttle) + 1f) * 0.5f);
+        outputThrottle = Mathf.Clamp01(DiscardRemainder(throttleValue, inputValueStep));
+    }
+
+    internal static float DiscardRemainder(float value, float step)
+    {
+        step = Mathf.Max(0.000001f, step);
+        if (Mathf.Approximately(value, 0f))
+            return 0f;
+
+        float scaled = value / step;
+        int wholeSteps = scaled > 0f
+            ? Mathf.FloorToInt(scaled + 0.000001f)
+            : Mathf.CeilToInt(scaled - 0.000001f);
+        return wholeSteps * step;
     }
 
     private float NormalizeRawAxis(DeviceAxis axis)

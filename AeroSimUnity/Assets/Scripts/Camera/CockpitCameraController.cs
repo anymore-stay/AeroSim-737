@@ -126,6 +126,18 @@ public class CockpitCameraController : MonoBehaviour
     [Tooltip("第三人称最高俯仰角。")]
     public float thirdPersonMaxPitch = 70f;
 
+    [Header("第三人称低空视角限制")]
+    [Tooltip("开启后，飞机低于指定离地高度时，第三人称相机不能旋转到机身下方。")]
+    public bool restrictBelowAircraftNearGround = true;
+
+    [Tooltip("低于该离地高度时启用机身下方视角限制，单位为英尺。")]
+    [Min(0f)]
+    public float thirdPersonBelowAircraftRestrictionAglFt = 100f;
+
+    [Tooltip("低空限制生效时允许的最大第三人称 Pitch。0 表示相机最低只能与机身观察点水平，不能到机身下方。")]
+    [Range(-89.5f, 0f)]
+    public float thirdPersonLowAltitudeMaxPitch = 0f;
+
     [Header("第三人称自动避障")]
     [Tooltip("第三人称相机离飞机整体包围盒的最小安全距离。越大越不容易穿进机身，但也越不能贴近飞机。")]
     public float thirdPersonKeepoutPadding = 1.5f;
@@ -358,7 +370,6 @@ public class CockpitCameraController : MonoBehaviour
         {
             orbitYaw += Input.GetAxis("Mouse X") * thirdPersonOrbitSensitivity;
             orbitPitch -= Input.GetAxis("Mouse Y") * thirdPersonOrbitSensitivity;
-            orbitPitch = Mathf.Clamp(orbitPitch, thirdPersonMinPitch, thirdPersonMaxPitch);
             orbitDirty = true;
         }
 
@@ -368,9 +379,10 @@ public class CockpitCameraController : MonoBehaviour
             float povDelta = povLookSpeed * Time.unscaledDeltaTime;
             orbitYaw += povLook.x * povDelta;
             orbitPitch -= povLook.y * povDelta;
-            orbitPitch = Mathf.Clamp(orbitPitch, thirdPersonMinPitch, thirdPersonMaxPitch);
             orbitDirty = true;
         }
+
+        ClampThirdPersonPitch();
 
         float scroll = Input.GetAxis("Mouse ScrollWheel");
         if (!Mathf.Approximately(scroll, 0f))
@@ -386,6 +398,7 @@ public class CockpitCameraController : MonoBehaviour
         // 每帧都要更新:飞机在持续高速移动,环绕目标点(飞机包围盒中心)随之变化,
         // 不能因为没有鼠标输入(orbitDirty=false)就跳过,否则相机会被飞机甩开。
         CacheAircraftBounds();
+        ClampThirdPersonPitch();
 
         Vector3 targetPoint = GetOrbitTargetPoint();
         Quaternion orbitRotation = Quaternion.Euler(orbitPitch, orbitYaw, 0f);
@@ -412,7 +425,7 @@ public class CockpitCameraController : MonoBehaviour
         if (useConfiguredInitialOrbit)
         {
             orbitYaw = thirdPersonInitialYaw;
-            orbitPitch = Mathf.Clamp(thirdPersonInitialPitch, thirdPersonMinPitch, thirdPersonMaxPitch);
+            orbitPitch = Mathf.Clamp(thirdPersonInitialPitch, thirdPersonMinPitch, GetEffectiveThirdPersonMaxPitch());
             orbitDistance = Mathf.Clamp(thirdPersonDistance, thirdPersonMinDistance, thirdPersonMaxDistance);
             orbitDirty = true;
             return;
@@ -429,8 +442,37 @@ public class CockpitCameraController : MonoBehaviour
         orbitDistance = Mathf.Clamp(toCamera.magnitude, thirdPersonMinDistance, thirdPersonMaxDistance);
         orbitYaw = Mathf.Atan2(toCamera.x, toCamera.z) * Mathf.Rad2Deg;
         orbitPitch = Mathf.Asin(Mathf.Clamp(toCamera.y / toCamera.magnitude, -1f, 1f)) * Mathf.Rad2Deg;
-        orbitPitch = Mathf.Clamp(orbitPitch, thirdPersonMinPitch, thirdPersonMaxPitch);
+        ClampThirdPersonPitch();
         orbitDirty = true;
+    }
+
+    private void ClampThirdPersonPitch()
+    {
+        float effectiveMaxPitch = Mathf.Max(thirdPersonMinPitch, GetEffectiveThirdPersonMaxPitch());
+        float clampedPitch = Mathf.Clamp(orbitPitch, thirdPersonMinPitch, effectiveMaxPitch);
+        if (!Mathf.Approximately(orbitPitch, clampedPitch))
+        {
+            orbitPitch = clampedPitch;
+            orbitDirty = true;
+        }
+    }
+
+    private float GetEffectiveThirdPersonMaxPitch()
+    {
+        if (!restrictBelowAircraftNearGround)
+            return thirdPersonMaxPitch;
+
+        JsbsimBridge bridge = JsbsimBridge.Instance;
+        bool hasUsableAgl = bridge != null &&
+                            bridge.HasState &&
+                            !float.IsNaN(bridge.AglFt) &&
+                            !float.IsInfinity(bridge.AglFt);
+        bool isNearGround = !hasUsableAgl ||
+                            bridge.AglFt < Mathf.Max(0f, thirdPersonBelowAircraftRestrictionAglFt);
+
+        return isNearGround
+            ? Mathf.Min(thirdPersonMaxPitch, thirdPersonLowAltitudeMaxPitch)
+            : thirdPersonMaxPitch;
     }
 
     private Vector3 GetOrbitTargetPoint()

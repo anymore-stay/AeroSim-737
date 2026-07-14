@@ -26,6 +26,10 @@ public class FlightInput : MonoBehaviour
     [Tooltip("检测到图马思特侧杆后优先使用侧杆；设备断开时自动恢复键盘控制。")]
     [SerializeField] private ThrustmasterA320SidestickInput sidestickInput;
 
+    private LandingGearDoorSequenceController[] landingGearDoorSequences;
+    private LandingGearSynchronizedDoorGearController[] synchronizedLandingGearControllers;
+    private LandingGearHingeRetractionController[] standaloneLandingGearHinges;
+
     [Header("Pause")]
     [SerializeField] private bool enableEscapePause = true;
 
@@ -49,8 +53,8 @@ public class FlightInput : MonoBehaviour
 
     [Header("油门")]
     [SerializeField] private float throttleRate = 0.5f;
-    [Tooltip("JSBSim 反推角度。2 rad 约产生正常推力 42% 的反向分量。")]
-    [SerializeField, Range(1.571f, 3.142f)] private float reverseThrustAngleRad = 2f;
+    [Tooltip("JSBSim 反推角度。π rad 使发动机推力完全反向，提供最大反推强度。")]
+    [SerializeField, Range(1.571f, 3.142f)] private float reverseThrustAngleRad = Mathf.PI;
 
     [Header("High Lift and Drag Controls")]
     [SerializeField, Min(1)] private int flapStepCount = 4;
@@ -146,6 +150,8 @@ public class FlightInput : MonoBehaviour
     private bool brakes = true;    // 地面起飞:初始刹车锁定,飞机停得住;松刹车(B)再滑跑
     private bool directJoystickControlActive;
     private bool keyboardThrottleOverride;
+    private bool shiftHoldingIdleAfterReverse;
+    private bool shiftWasUsedForReverse;
     private float joystickThrottleAtKeyboardTakeover;
 
     private float sendTimer;
@@ -158,6 +164,9 @@ public class FlightInput : MonoBehaviour
         if (flapController == null) flapController = GetComponent<B737FlapController>();
         if (mechanicalController == null) mechanicalController = GetComponent<B737MechanicalController>();
         if (sidestickInput == null) sidestickInput = GetComponent<ThrustmasterA320SidestickInput>();
+        landingGearDoorSequences = GetComponentsInChildren<LandingGearDoorSequenceController>(true);
+        synchronizedLandingGearControllers = GetComponentsInChildren<LandingGearSynchronizedDoorGearController>(true);
+        CacheStandaloneLandingGearHinges();
     }
 
     private void Update()
@@ -225,9 +234,53 @@ public class FlightInput : MonoBehaviour
         // ---- 油门:Shift 加，Ctrl 收至怠速，同时按下可在任何状态增加反推 ----
         bool increaseThrottle = Input.GetKey(KeyCode.LeftShift);
         bool decreaseThrottle = Input.GetKey(KeyCode.LeftControl);
+        if (!increaseThrottle)
+        {
+            shiftHoldingIdleAfterReverse = false;
+            shiftWasUsedForReverse = false;
+        }
+        if (increaseThrottle && decreaseThrottle)
+        {
+            shiftHoldingIdleAfterReverse = false;
+            shiftWasUsedForReverse = true;
+        }
+        if (Input.GetKeyDown(KeyCode.LeftShift) && !decreaseThrottle &&
+            !shiftWasUsedForReverse && throttle < 0f)
+            shiftHoldingIdleAfterReverse = true;
+
         bool hasKeyboardThrottleInput = increaseThrottle || decreaseThrottle;
         bool hasJoystickThrottle = sidestickInput != null && sidestickInput.ThrottleControlEnabled;
-        if (hasJoystickThrottle)
+        bool keepFullReverseUntilShiftRepress =
+            shiftWasUsedForReverse && increaseThrottle && !decreaseThrottle;
+        if (keepFullReverseUntilShiftRepress)
+        {
+            if (hasJoystickThrottle)
+            {
+                if (!keyboardThrottleOverride)
+                    joystickThrottleAtKeyboardTakeover = sidestickInput.Throttle;
+                keyboardThrottleOverride = true;
+            }
+            else
+            {
+                keyboardThrottleOverride = false;
+            }
+            throttle = -1f;
+        }
+        else if (shiftHoldingIdleAfterReverse && !decreaseThrottle)
+        {
+            if (hasJoystickThrottle)
+            {
+                if (!keyboardThrottleOverride)
+                    joystickThrottleAtKeyboardTakeover = sidestickInput.Throttle;
+                keyboardThrottleOverride = true;
+            }
+            else
+            {
+                keyboardThrottleOverride = false;
+            }
+            throttle = 0f;
+        }
+        else if (hasJoystickThrottle)
         {
             float joystickThrottle = sidestickInput.Throttle;
             if (hasKeyboardThrottleInput)
@@ -493,7 +546,7 @@ public class FlightInput : MonoBehaviour
     // 给 HUD 读取
     public void SetThrottle(float value)
     {
-        throttle = Mathf.Clamp(value, -1f, 1f);
+        throttle = value < 0f ? -1f : Mathf.Clamp01(value);
 
         if (sidestickInput != null && sidestickInput.ThrottleControlEnabled)
         {
@@ -515,11 +568,6 @@ public class FlightInput : MonoBehaviour
     public bool TrySetGearDown(bool down, out string rejectionReason)
     {
         rejectionReason = string.Empty;
-        if (gearDown == down)
-        {
-            return true;
-        }
-
         if (!LandingGearToggleGate.CanUseToggleInputThisFrame)
         {
             rejectionReason = "起落架正在运动，请稍后重试";
@@ -534,8 +582,68 @@ public class FlightInput : MonoBehaviour
             return false;
         }
 
+        if (!TrySetLandingGearVisuals(down))
+        {
+            rejectionReason = "起落架可视机构未能接受指令，请稍后重试";
+            return false;
+        }
+
         gearDown = down;
         return true;
+    }
+
+    private bool TrySetLandingGearVisuals(bool extended)
+    {
+        bool accepted = true;
+
+        if (landingGearDoorSequences != null)
+        {
+            foreach (LandingGearDoorSequenceController controller in landingGearDoorSequences)
+            {
+                if (controller != null && controller.isActiveAndEnabled)
+                    accepted &= controller.TrySetGearExtended(extended);
+            }
+        }
+
+        if (synchronizedLandingGearControllers != null)
+        {
+            foreach (LandingGearSynchronizedDoorGearController controller in synchronizedLandingGearControllers)
+            {
+                if (controller != null && controller.isActiveAndEnabled)
+                    accepted &= controller.TrySetGearExtended(extended);
+            }
+        }
+
+        if (standaloneLandingGearHinges != null)
+        {
+            foreach (LandingGearHingeRetractionController controller in standaloneLandingGearHinges)
+            {
+                if (controller != null && controller.isActiveAndEnabled)
+                    accepted &= controller.TrySetGearExtended(extended);
+            }
+        }
+
+        return accepted;
+    }
+
+    private void CacheStandaloneLandingGearHinges()
+    {
+        LandingGearHingeRetractionController[] allHinges =
+            GetComponentsInChildren<LandingGearHingeRetractionController>(true);
+        var standalone = new System.Collections.Generic.List<LandingGearHingeRetractionController>();
+        foreach (LandingGearHingeRetractionController hinge in allHinges)
+        {
+            if (hinge == null)
+                continue;
+
+            bool managedByDoorSequence =
+                hinge.GetComponentInParent<LandingGearDoorSequenceController>() != null ||
+                hinge.GetComponentInParent<LandingGearSynchronizedDoorGearController>() != null;
+            if (!managedByDoorSequence)
+                standalone.Add(hinge);
+        }
+
+        standaloneLandingGearHinges = standalone.ToArray();
     }
 
     public void SetBrakes(bool enabled)

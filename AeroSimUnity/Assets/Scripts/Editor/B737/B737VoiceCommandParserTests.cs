@@ -1,4 +1,5 @@
 using System;
+using System.Reflection;
 using NUnit.Framework;
 
 public class B737VoiceCommandParserTests
@@ -81,5 +82,21 @@ public class B737VoiceCommandParserTests
         Assert.That(uri.Query, Does.Contain("date="));
         Assert.That(uri.Query, Does.Contain("host="));
         Assert.That(uri.Query, Does.Not.Contain("test-api-secret"));
+    }
+
+    [TestCase(typeof(LandingGearDoorSequenceController))]
+    [TestCase(typeof(LandingGearSynchronizedDoorGearController))]
+    [TestCase(typeof(LandingGearHingeRetractionController))]
+    public void LandingGearVisualControllersExposeExplicitTargetCommand(Type controllerType)
+    {
+        MethodInfo method = controllerType.GetMethod(
+            "TrySetGearExtended",
+            BindingFlags.Public | BindingFlags.Instance);
+
+        Assert.That(method, Is.Not.Null);
+        Assert.That(method.ReturnType, Is.EqualTo(typeof(bool)));
+        ParameterInfo[] parameters = method.GetParameters();
+        Assert.That(parameters, Has.Length.EqualTo(1));
+        Assert.That(parameters[0].ParameterType, Is.EqualTo(typeof(bool)));
     }
 }

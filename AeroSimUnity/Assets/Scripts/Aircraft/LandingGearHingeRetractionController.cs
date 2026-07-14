@@ -188,6 +188,23 @@ public class LandingGearHingeRetractionController : MonoBehaviour
         targetAmount = 1f;
     }
 
+    public bool TrySetGearExtended(bool extendGear)
+    {
+        float requestedAmount = extendGear ? 1f : 0f;
+        if (Mathf.Approximately(targetAmount, requestedAmount))
+        {
+            return true;
+        }
+
+        if (!TryBeginGlobalMotion())
+        {
+            return false;
+        }
+
+        targetAmount = requestedAmount;
+        return true;
+    }
+
     public void SetGearAmount(float amount)
     {
         gearAmount = Mathf.Clamp01(amount);

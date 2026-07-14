@@ -154,7 +154,7 @@ public class FlightHud : MonoBehaviour
         sb.AppendLine("---- 飞行按键 ----");
         sb.AppendLine("W/S 俯仰   A/D 滚转   Q/E 偏航");
         sb.AppendLine("Z 抬头配平   X 低头配平");
-        sb.AppendLine("Shift 加油门  Ctrl 收油  Ctrl+Shift 反推");
+        sb.AppendLine("Shift 加油门/解除反推  Ctrl 收油  Ctrl+Shift 满反推");
         sb.AppendLine("F/V 襟翼增减  R/T 扰流板增减");
         sb.AppendLine("G 起落架收放  B 刹车开关  Esc 暂停");
         sb.AppendLine("---- 相机按键 ----");

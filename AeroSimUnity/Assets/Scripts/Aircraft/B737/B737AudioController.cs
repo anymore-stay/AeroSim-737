@@ -10,7 +10,7 @@ public class B737AudioController : MonoBehaviour
     private const double GearMotionHoldSeconds = 3.6d;
     private const double FlapMotionHoldSeconds = 1.4d;
 
-    private const float EngineLoopGain = 0.12f;
+    private const float EngineLoopGain = 0.22f;
     private const float EngineStarterGain = 0.55f;
     private const float GearGain = 1f;
     private const float FlapGain = 0f;
@@ -62,11 +62,11 @@ public class B737AudioController : MonoBehaviour
 
     [Header("Interior Mix")]
     [Tooltip("Extra multiplier applied to engine loop volume when CockpitCamera is the active listener.")]
-    [SerializeField, Range(0f, 1f)] private float cockpitEngineLoopVolumeMultiplier = 0.18f;
+    [SerializeField, Range(0f, 1f)] private float cockpitEngineLoopVolumeMultiplier = 0.28f;
     [Tooltip("Extra multiplier applied to engine loop volume when CabinCamera is the active listener.")]
-    [SerializeField, Range(0f, 1f)] private float cabinEngineLoopVolumeMultiplier = 0.3f;
+    [SerializeField, Range(0f, 1f)] private float cabinEngineLoopVolumeMultiplier = 0.42f;
     [Tooltip("Extra multiplier applied to engine loop volume for outside / third-person cameras.")]
-    [SerializeField, Range(0f, 1f)] private float outsideEngineLoopVolumeMultiplier = 1f;
+    [SerializeField, Range(0f, 4f)] private float outsideEngineLoopVolumeMultiplier = 2.73f;
 
     [Header("Runtime Debugging")]
     [SerializeField] private bool logAudioEvents = true;

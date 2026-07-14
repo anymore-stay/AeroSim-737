@@ -22326,6 +22326,9 @@ MonoBehaviour:
   thirdPersonOrbitSensitivity: 3
   thirdPersonMinPitch: -89.5
   thirdPersonMaxPitch: 70
+  restrictBelowAircraftNearGround: 1
+  thirdPersonBelowAircraftRestrictionAglFt: 100
+  thirdPersonLowAltitudeMaxPitch: 0
   thirdPersonKeepoutPadding: 1.5
   preventThirdPersonInsideAircraft: 1
   usePhysicsObstruction: 1
@@ -70204,7 +70207,7 @@ MonoBehaviour:
   pitchTrimNoseDownKey: 120
   pitchTrimRate: 0.25
   throttleRate: 0.5
-  reverseThrustAngleRad: 2
+  reverseThrustAngleRad: 3.1415927
   flapStepCount: 4
   spoilerStepCount: 4
   minimumGearRetractionAglFt: 10
@@ -70428,9 +70431,9 @@ MonoBehaviour:
   requireUserEngineAudioArm: 1
   engineAudioArmKey: 304
   engineAudioArmThrottleThreshold: 0.02
-  cockpitEngineLoopVolumeMultiplier: 0.18
-  cabinEngineLoopVolumeMultiplier: 0.3
-  outsideEngineLoopVolumeMultiplier: 1
+  cockpitEngineLoopVolumeMultiplier: 0.28
+  cabinEngineLoopVolumeMultiplier: 0.42
+  outsideEngineLoopVolumeMultiplier: 2.73
   logAudioEvents: 1
   hideRuntimeAudioObjects: 1
   engineLoopClip: {fileID: 0}
@@ -70538,7 +70541,7 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 5773677376619802584}
-  m_Enabled: 1
+  m_Enabled: 0
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 08333ceef2b2f354fad836cd0560bbe4, type: 3}
   m_Name: 
@@ -70548,7 +70551,7 @@ MonoBehaviour:
   realisticSmokeTrails:
   - {fileID: 7447325053990996381}
   - {fileID: 6658138434635948040}
-  minimumAltitudeFt: 300
+  minimumAltitudeFt: 9999999
   minimumSpeedKts: 180
   altitudeHysteresisFt: 500
   speedHysteresisKts: 10
@@ -70692,6 +70695,7 @@ MonoBehaviour:
   preferredHardwareIds: 044F:0406
   useOnlyConnectedDeviceAsFallback: 1
   reconnectInterval: 1
+  inputValueStep: 0.1
   roll:
     axis: 0
     invert: 0

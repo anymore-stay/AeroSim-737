@@ -71,7 +71,11 @@ public class LandingGearDoorSequenceController : MonoBehaviour
     private Coroutine sequenceRoutine;
     private bool gateMotionActive;
     private bool gearExtended;
+    private bool targetGearExtended;
     private bool loggedDoorBindings;
+
+    public bool IsMoving => sequenceRoutine != null;
+    public bool IsGearExtended => gearExtended;
 
     private void Awake()
     {
@@ -79,6 +83,7 @@ public class LandingGearDoorSequenceController : MonoBehaviour
         PrepareRuntimeDoorPivots();
         CaptureClosedDoorRotations();
         gearExtended = startGearExtended;
+        targetGearExtended = gearExtended;
         gearAmount = gearExtended ? 1f : 0f;
         doorAmount = gearExtended ? 1f : 0f;
         state = gearExtended ? SequenceState.Open : SequenceState.Closed;
@@ -177,17 +182,32 @@ public class LandingGearDoorSequenceController : MonoBehaviour
 
     public void StartSequence(bool extendGear)
     {
+        TrySetGearExtended(extendGear);
+    }
+
+    public bool TrySetGearExtended(bool extendGear)
+    {
+        LogDoorBindingsOnce();
+
         if (sequenceRoutine != null)
         {
-            return;
+            return targetGearExtended == extendGear;
+        }
+
+        if (gearExtended == extendGear)
+        {
+            targetGearExtended = extendGear;
+            return true;
         }
 
         if (!TryBeginGlobalMotion())
         {
-            return;
+            return false;
         }
 
+        targetGearExtended = extendGear;
         sequenceRoutine = StartCoroutine(RunSequence(extendGear));
+        return true;
     }
 
     private IEnumerator RunSequence(bool extendGear)
@@ -215,6 +235,7 @@ public class LandingGearDoorSequenceController : MonoBehaviour
             state = SequenceState.Closed;
         }
 
+        targetGearExtended = gearExtended;
         sequenceRoutine = null;
         EndGlobalMotion();
     }

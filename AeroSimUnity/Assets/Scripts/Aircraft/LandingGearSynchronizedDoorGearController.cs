@@ -68,6 +68,10 @@ public class LandingGearSynchronizedDoorGearController : MonoBehaviour
     private Coroutine sequenceRoutine;
     private bool gateMotionActive;
     private bool loggedDoorBindings;
+    private bool targetExtended;
+
+    public bool IsMoving => sequenceRoutine != null;
+    public bool IsGearExtended => state == SequenceState.Extended;
 
     private void Awake()
     {
@@ -78,6 +82,7 @@ public class LandingGearSynchronizedDoorGearController : MonoBehaviour
         doorAmount = startAmount;
         gearAmount = startAmount;
         state = startExtended ? SequenceState.Extended : SequenceState.Retracted;
+        targetExtended = startExtended;
     }
 
     private void Start()
@@ -156,9 +161,38 @@ public class LandingGearSynchronizedDoorGearController : MonoBehaviour
             return;
         }
 
+        targetExtended = extendGear;
         sequenceRoutine = extendGear
             ? StartCoroutine(AnimateSynchronized(1f, SequenceState.Extending, SequenceState.Extended))
             : StartCoroutine(AnimateSynchronized(0f, SequenceState.Retracting, SequenceState.Retracted));
+    }
+
+    public bool TrySetGearExtended(bool extendGear)
+    {
+        LogDoorBindingsOnce();
+
+        if (sequenceRoutine != null)
+        {
+            return targetExtended == extendGear;
+        }
+
+        bool currentlyExtended = state == SequenceState.Extended;
+        if (currentlyExtended == extendGear)
+        {
+            targetExtended = extendGear;
+            return true;
+        }
+
+        if (!TryBeginGlobalMotion())
+        {
+            return false;
+        }
+
+        targetExtended = extendGear;
+        sequenceRoutine = extendGear
+            ? StartCoroutine(AnimateSynchronized(1f, SequenceState.Extending, SequenceState.Extended))
+            : StartCoroutine(AnimateSynchronized(0f, SequenceState.Retracting, SequenceState.Retracted));
+        return true;
     }
 
     private IEnumerator AnimateSynchronized(float targetAmount, SequenceState movingState, SequenceState completedState)
@@ -190,6 +224,7 @@ public class LandingGearSynchronizedDoorGearController : MonoBehaviour
         ApplyGearAmount(gearAmount);
 
         state = completedState;
+        targetExtended = completedState == SequenceState.Extended;
         sequenceRoutine = null;
         EndGlobalMotion();
     }
