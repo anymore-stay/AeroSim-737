@@ -130,7 +130,7 @@ public class FlightHud : MonoBehaviour
             sb.AppendLine(string.Format("航向  : {0,6:F0} °", NormalizeHeading(bridge.HeadingDeg)));
             sb.AppendLine(string.Format("俯仰  : {0,6:F1} °", bridge.PitchDeg));
             sb.AppendLine(string.Format("滚转  : {0,6:F1} °", bridge.RollDeg));
-            sb.AppendLine(string.Format("转速  : {0,6:F0} rpm", bridge.Rpm));
+            sb.AppendLine(string.Format("N1    : {0,6:F1} %", bridge.Rpm));
         }
         if (input != null)
         {
