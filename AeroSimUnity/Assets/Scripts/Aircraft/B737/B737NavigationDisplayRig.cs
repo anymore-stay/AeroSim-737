@@ -38,6 +38,14 @@ public class B737NavigationDisplayRig : MonoBehaviour
     public Material DisplayMaterial => displayMaterial;
     public B737NavigationDisplay NavigationDisplay => navigationDisplay;
 
+    public static bool ShouldCreateDisplayPlane(
+        bool applicationIsPlaying,
+        bool hasDisplayPlaneRenderer,
+        bool allowDisplayPlaneCreation)
+    {
+        return allowDisplayPlaneCreation && !applicationIsPlaying && !hasDisplayPlaneRenderer;
+    }
+
     private void Awake()
     {
         if (buildOnAwake)
@@ -235,7 +243,7 @@ public class B737NavigationDisplayRig : MonoBehaviour
     {
         bool createdPlane = false;
 
-        if (displayPlaneRenderer == null && createDisplayPlane)
+        if (ShouldCreateDisplayPlane(Application.isPlaying, displayPlaneRenderer != null, createDisplayPlane))
         {
             Transform parent = displayPlaneParent != null ? displayPlaneParent : transform;
             Transform existing = parent.Find("ND_Plane");

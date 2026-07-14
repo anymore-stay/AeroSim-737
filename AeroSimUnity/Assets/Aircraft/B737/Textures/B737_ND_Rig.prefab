@@ -3691,7 +3691,7 @@ MonoBehaviour:
   ndCamera: {fileID: 3551960780885523506}
   ndCanvas: {fileID: 5656608704694028692}
   navigationDisplay: {fileID: 9066537758429341344}
-  createDisplayPlane: 1
+  createDisplayPlane: 0
   driveGeneratedPlaneTransform: 1
   displayPlaneParent: {fileID: 0}
   displayPlaneRenderer: {fileID: 0}
