@@ -7,15 +7,22 @@ public class B737SignalLightBlinker : MonoBehaviour
     public const float DefaultCycleSeconds = 1f;
     public const float DefaultPulseSeconds = 0.11f;
     public const float DefaultFadeSeconds = 0.02f;
-    public const float DefaultEmissionIntensity = 14f;
-    public const float DefaultPulseLightIntensity = 25f;
-    public const float DefaultPulseLightRange = 4f;
+    public static readonly Color DefaultBeaconRed = new Color(0.72f, 0f, 0f, 1f);
+    public const float DefaultEmissionIntensity = 30f;
+    public const float DefaultPulseLightIntensity = 85f;
+    public const float DefaultLowerPulseLightIntensityScale = 0.09411765f;
+    public const float DefaultUpperPulseLightIntensityScale = 1.35f;
+    public const float DefaultPulseLightRange = 22f;
+    public const LightType DefaultPulseLightType = LightType.Spot;
+    public const float DefaultPulseLightSpotAngle = 150f;
+    public const float DefaultPulseLightInnerSpotAngle = 95f;
+    public const float DefaultPulseLightSurfaceOffset = 0f;
+    public const LightShadows DefaultPulseLightShadows = LightShadows.Soft;
     public const bool DefaultAffectTargetRenderer = false;
     public const bool DefaultUsePulseLight = false;
     public const bool DefaultAutoCreateVisual = true;
     public const float DefaultVisualScale = 0.16f;
-    public const float DefaultVisualPeakAlpha = 0.65f;
-
+    public const float DefaultVisualPeakAlpha = 0.6f;
     private static readonly int BaseColorId = Shader.PropertyToID("_BaseColor");
     private static readonly int ColorId = Shader.PropertyToID("_Color");
     private static readonly int EmissionColorId = Shader.PropertyToID("_EmissionColor");
@@ -29,7 +36,7 @@ public class B737SignalLightBlinker : MonoBehaviour
 
     [Header("Visual")]
     [SerializeField] private Renderer targetRenderer;
-    [SerializeField] private Color onColor = Color.red;
+    [SerializeField] private Color onColor = DefaultBeaconRed;
     [SerializeField] private Color offColor = new Color(0.08f, 0f, 0f, 1f);
     [SerializeField] private float emissionIntensity = DefaultEmissionIntensity;
     [SerializeField] private bool toggleRendererVisibility;
@@ -46,18 +53,41 @@ public class B737SignalLightBlinker : MonoBehaviour
     [SerializeField] private bool usePulseLight = DefaultUsePulseLight;
     [SerializeField] private bool autoCreatePulseLight = true;
     [SerializeField] private Light pulseLight;
+    [SerializeField] private Light[] pulseLights;
     [SerializeField] private float pulseLightIntensity = DefaultPulseLightIntensity;
+    [SerializeField] private float[] pulseLightIntensityScales =
+    {
+        DefaultLowerPulseLightIntensityScale,
+        DefaultUpperPulseLightIntensityScale
+    };
     [SerializeField] private float pulseLightRange = DefaultPulseLightRange;
+    [SerializeField] private LightType pulseLightType = DefaultPulseLightType;
+    [SerializeField, Range(1f, 179f)] private float pulseLightSpotAngle = DefaultPulseLightSpotAngle;
+    [SerializeField, Range(0f, 179f)] private float pulseLightInnerSpotAngle = DefaultPulseLightInnerSpotAngle;
+    [SerializeField, Min(0f)] private float pulseLightSurfaceOffset = DefaultPulseLightSurfaceOffset;
+    [SerializeField] private LightShadows pulseLightShadows = DefaultPulseLightShadows;
 
     private MaterialPropertyBlock propertyBlock;
     private bool originalRendererEnabled;
     private bool hasOriginalRendererEnabled;
     private Material visualMaterial;
-    private bool originalPulseLightEnabled;
-    private float originalPulseLightIntensity;
-    private float originalPulseLightRange;
-    private Color originalPulseLightColor;
-    private bool hasOriginalPulseLightState;
+    private PulseLightState[] originalPulseLightStates;
+
+    private struct PulseLightState
+    {
+        public Light Light;
+        public bool Enabled;
+        public float Intensity;
+        public float Range;
+        public Color Color;
+        public LightType Type;
+        public float SpotAngle;
+        public float InnerSpotAngle;
+        public LightShadows Shadows;
+        public LightRenderMode RenderMode;
+        public Vector3 LocalPosition;
+        public Quaternion LocalRotation;
+    }
 
     public static float EvaluateBeaconIntensity(float elapsedSeconds, float cycleSeconds, float pulseSeconds, float fadeSeconds)
     {
@@ -95,11 +125,48 @@ public class B737SignalLightBlinker : MonoBehaviour
         return Mathf.Max(0f, peakIntensity) * Mathf.Clamp01(beaconIntensity);
     }
 
+    public static float EvaluatePulseLightIntensity(float beaconIntensity, float peakIntensity, float intensityScale)
+    {
+        return EvaluatePulseLightIntensity(beaconIntensity, peakIntensity) * Mathf.Max(0f, intensityScale);
+    }
+
     public static Color EvaluateVisualOverlayColor(Color color, float beaconIntensity, float peakAlpha)
     {
         Color result = color;
         result.a = Mathf.Clamp01(beaconIntensity) * Mathf.Clamp01(peakAlpha);
         return result;
+    }
+
+    public static Vector3[] GetAutoPulseLightLocalPositions(Bounds targetLocalBounds)
+    {
+        Vector3 lower = targetLocalBounds.center;
+        Vector3 upper = targetLocalBounds.center;
+        lower.z = targetLocalBounds.min.z;
+        upper.z = targetLocalBounds.max.z;
+        return new[] { lower, upper };
+    }
+
+    public static Vector3[] GetAutoPulseLightLocalPositions(Bounds targetLocalBounds, Vector3[] meshVertices)
+    {
+        return GetAutoVisualLocalPositions(targetLocalBounds, meshVertices);
+    }
+
+    public static Vector3 GetOutwardPulseLightLocalDirection(Vector3 localPosition, Bounds targetLocalBounds)
+    {
+        Vector3 offset = localPosition - targetLocalBounds.center;
+        Vector3 magnitudes = new Vector3(Mathf.Abs(offset.x), Mathf.Abs(offset.y), Mathf.Abs(offset.z));
+        int dominantAxis = GetDominantAxis(magnitudes);
+
+        if (magnitudes[dominantAxis] <= 0.0001f)
+        {
+            dominantAxis = GetDominantAxis(targetLocalBounds.size);
+            offset = localPosition - targetLocalBounds.center;
+        }
+
+        Vector3 direction = Vector3.zero;
+        float axisValue = GetAxisValue(offset, dominantAxis);
+        SetAxisValue(ref direction, dominantAxis, axisValue < 0f ? -1f : 1f);
+        return direction;
     }
 
     public static Vector3[] GetAutoVisualLocalPositions(Bounds targetLocalBounds)
@@ -195,6 +262,23 @@ public class B737SignalLightBlinker : MonoBehaviour
         return value.z;
     }
 
+    private static void SetAxisValue(ref Vector3 value, int axis, float axisValue)
+    {
+        if (axis == 0)
+        {
+            value.x = axisValue;
+            return;
+        }
+
+        if (axis == 1)
+        {
+            value.y = axisValue;
+            return;
+        }
+
+        value.z = axisValue;
+    }
+
     private static void EncapsulatePoint(ref Bounds bounds, ref bool hasBounds, Vector3 point)
     {
         if (!hasBounds)
@@ -266,12 +350,12 @@ public class B737SignalLightBlinker : MonoBehaviour
             }
         }
 
-        if (pulseLight != null && hasOriginalPulseLightState)
+        if (originalPulseLightStates != null)
         {
-            pulseLight.enabled = originalPulseLightEnabled;
-            pulseLight.intensity = originalPulseLightIntensity;
-            pulseLight.range = originalPulseLightRange;
-            pulseLight.color = originalPulseLightColor;
+            for (int index = 0; index < originalPulseLightStates.Length; index++)
+            {
+                RestorePulseLightState(originalPulseLightStates[index]);
+            }
         }
     }
 
@@ -454,42 +538,215 @@ public class B737SignalLightBlinker : MonoBehaviour
             return;
         }
 
-        if (pulseLight == null && autoCreatePulseLight)
-        {
-            GameObject lightObject = new GameObject("Beacon Pulse Light");
-            lightObject.transform.SetParent(transform, false);
-            pulseLight = lightObject.AddComponent<Light>();
-        }
+        EnsurePulseLights();
 
-        if (pulseLight == null)
+        if (pulseLights == null || pulseLights.Length == 0)
         {
             return;
         }
 
-        pulseLight.type = LightType.Point;
-        pulseLight.color = onColor;
-        pulseLight.range = pulseLightRange;
-        pulseLight.intensity = 0f;
-        pulseLight.enabled = false;
+        Bounds localBounds = GetTargetLocalBounds();
+        originalPulseLightStates = new PulseLightState[pulseLights.Length];
 
-        originalPulseLightEnabled = pulseLight.enabled;
-        originalPulseLightIntensity = pulseLight.intensity;
-        originalPulseLightRange = pulseLight.range;
-        originalPulseLightColor = pulseLight.color;
-        hasOriginalPulseLightState = true;
+        for (int index = 0; index < pulseLights.Length; index++)
+        {
+            Light light = pulseLights[index];
+            if (light == null)
+            {
+                continue;
+            }
+
+            originalPulseLightStates[index] = CapturePulseLightState(light);
+            ConfigurePulseLight(light, GetOutwardPulseLightLocalDirection(light.transform.localPosition, localBounds));
+        }
+    }
+
+    private void EnsurePulseLights()
+    {
+        if (pulseLights != null && pulseLights.Length > 0)
+        {
+            if (pulseLight == null)
+            {
+                pulseLight = pulseLights[0];
+            }
+
+            return;
+        }
+
+        if (pulseLight != null)
+        {
+            pulseLights = new[] { pulseLight };
+            return;
+        }
+
+        if (!autoCreatePulseLight)
+        {
+            return;
+        }
+
+        Vector3[] localPositions = GetPulseLightLocalPositionsFromTarget();
+        Bounds localBounds = GetTargetLocalBounds();
+        pulseLights = new Light[localPositions.Length];
+
+        for (int index = 0; index < localPositions.Length; index++)
+        {
+            Vector3 direction = GetOutwardPulseLightLocalDirection(localPositions[index], localBounds);
+            GameObject lightObject = new GameObject(GetPulseLightName(index, direction));
+            lightObject.transform.SetParent(transform, false);
+            lightObject.transform.localPosition = localPositions[index] + direction * Mathf.Max(0f, pulseLightSurfaceOffset);
+            lightObject.transform.localRotation = GetPulseLightLocalRotation(direction);
+            pulseLights[index] = lightObject.AddComponent<Light>();
+        }
+
+        if (pulseLights.Length > 0)
+        {
+            pulseLight = pulseLights[0];
+        }
     }
 
     private void ApplyPulseLight(float beaconIntensity)
     {
-        if (!usePulseLight || pulseLight == null)
+        if (!usePulseLight || pulseLights == null)
         {
             return;
         }
 
-        float lightIntensity = EvaluatePulseLightIntensity(beaconIntensity, pulseLightIntensity);
-        pulseLight.enabled = lightIntensity > 0.001f;
-        pulseLight.color = onColor;
-        pulseLight.range = pulseLightRange;
-        pulseLight.intensity = lightIntensity;
+        for (int index = 0; index < pulseLights.Length; index++)
+        {
+            float lightIntensity = EvaluatePulseLightIntensity(
+                beaconIntensity,
+                pulseLightIntensity,
+                GetPulseLightIntensityScale(index));
+            ApplyPulseLightIntensity(pulseLights[index], lightIntensity);
+        }
+    }
+
+    private Bounds GetTargetLocalBounds()
+    {
+        return targetRenderer != null ? targetRenderer.localBounds : new Bounds(Vector3.zero, Vector3.one);
+    }
+
+    private Vector3[] GetPulseLightLocalPositionsFromTarget()
+    {
+        if (targetRenderer == null)
+        {
+            return GetAutoPulseLightLocalPositions(GetTargetLocalBounds());
+        }
+
+        MeshFilter meshFilter = targetRenderer.GetComponent<MeshFilter>();
+        Mesh sharedMesh = meshFilter != null ? meshFilter.sharedMesh : null;
+        if (sharedMesh == null)
+        {
+            return GetAutoPulseLightLocalPositions(targetRenderer.localBounds);
+        }
+
+        return GetAutoPulseLightLocalPositions(targetRenderer.localBounds, sharedMesh.vertices);
+    }
+
+    private static string GetPulseLightName(int index, Vector3 direction)
+    {
+        if (Mathf.Abs(direction.z) >= Mathf.Abs(direction.x) && Mathf.Abs(direction.z) >= Mathf.Abs(direction.y))
+        {
+            return direction.z >= 0f ? "Beacon Pulse Light Upper" : "Beacon Pulse Light Lower";
+        }
+
+        if (Mathf.Abs(direction.y) >= Mathf.Abs(direction.x))
+        {
+            return direction.y >= 0f ? "Beacon Pulse Light Upper" : "Beacon Pulse Light Lower";
+        }
+
+        return $"Beacon Pulse Light {index + 1}";
+    }
+
+    private float GetPulseLightIntensityScale(int index)
+    {
+        if (pulseLightIntensityScales == null || index < 0 || index >= pulseLightIntensityScales.Length)
+        {
+            return 1f;
+        }
+
+        return Mathf.Max(0f, pulseLightIntensityScales[index]);
+    }
+
+    private static Quaternion GetPulseLightLocalRotation(Vector3 localDirection)
+    {
+        Vector3 forward = localDirection.sqrMagnitude > 0.0001f ? localDirection.normalized : Vector3.up;
+        Vector3 up = Mathf.Abs(Vector3.Dot(forward, Vector3.up)) > 0.98f ? Vector3.forward : Vector3.up;
+        return Quaternion.LookRotation(forward, up);
+    }
+
+    private void ConfigurePulseLight(Light light, Vector3 localDirection)
+    {
+        if (light == null)
+        {
+            return;
+        }
+
+        light.type = pulseLightType;
+        light.color = onColor;
+        light.range = Mathf.Max(0.1f, pulseLightRange);
+        light.intensity = 0f;
+        light.enabled = false;
+        light.shadows = pulseLightShadows;
+        light.renderMode = LightRenderMode.Auto;
+
+        if (pulseLightType == LightType.Spot)
+        {
+            light.spotAngle = Mathf.Clamp(pulseLightSpotAngle, 1f, 179f);
+            light.innerSpotAngle = Mathf.Clamp(pulseLightInnerSpotAngle, 0f, light.spotAngle);
+            light.transform.localRotation = GetPulseLightLocalRotation(localDirection);
+        }
+    }
+
+    private void ApplyPulseLightIntensity(Light light, float lightIntensity)
+    {
+        if (light == null)
+        {
+            return;
+        }
+
+        light.enabled = lightIntensity > 0.001f;
+        light.color = onColor;
+        light.range = Mathf.Max(0.1f, pulseLightRange);
+        light.intensity = lightIntensity;
+    }
+
+    private static PulseLightState CapturePulseLightState(Light light)
+    {
+        return new PulseLightState
+        {
+            Light = light,
+            Enabled = light.enabled,
+            Intensity = light.intensity,
+            Range = light.range,
+            Color = light.color,
+            Type = light.type,
+            SpotAngle = light.spotAngle,
+            InnerSpotAngle = light.innerSpotAngle,
+            Shadows = light.shadows,
+            RenderMode = light.renderMode,
+            LocalPosition = light.transform.localPosition,
+            LocalRotation = light.transform.localRotation
+        };
+    }
+
+    private static void RestorePulseLightState(PulseLightState state)
+    {
+        if (state.Light == null)
+        {
+            return;
+        }
+
+        state.Light.enabled = state.Enabled;
+        state.Light.intensity = state.Intensity;
+        state.Light.range = state.Range;
+        state.Light.color = state.Color;
+        state.Light.type = state.Type;
+        state.Light.spotAngle = state.SpotAngle;
+        state.Light.innerSpotAngle = state.InnerSpotAngle;
+        state.Light.shadows = state.Shadows;
+        state.Light.renderMode = state.RenderMode;
+        state.Light.transform.localPosition = state.LocalPosition;
+        state.Light.transform.localRotation = state.LocalRotation;
     }
 }
