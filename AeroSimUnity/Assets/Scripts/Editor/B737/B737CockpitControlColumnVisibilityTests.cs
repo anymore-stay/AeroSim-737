@@ -84,4 +84,13 @@ public class B737CockpitControlColumnVisibilityTests
         string hudSource = File.ReadAllText("Assets/Scripts/Aircraft/B737/FlightHud.cs");
         StringAssert.Contains("1 操纵杆显示/隐藏（仅驾驶舱）", hudSource);
     }
+
+    [Test]
+    public void Hud将发动机转速显示为N1百分比()
+    {
+        string hudSource = File.ReadAllText("Assets/Scripts/Aircraft/B737/FlightHud.cs");
+
+        StringAssert.Contains("N1    : {0,6:F1} %", hudSource);
+        StringAssert.DoesNotContain("转速  : {0,6:F0} rpm", hudSource);
+    }
 }
