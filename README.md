@@ -1,40 +1,46 @@
 # AeroSim-737
 
-AeroSim-737 是一个基于 Unity 的 Boeing 737-800 飞行模拟项目。项目使用 Unity 负责飞机可视化、驾驶舱/客舱视角、HUD、机场环境、天气系统和仪表界面，使用 JSBSim 作为外部飞行动力学进程，通过本仓库的 `JSBSimBridge/` 与 Unity 主场景通信。
+AeroSim-737 是一个基于 Unity 与 JSBSim 的 Boeing 737-800 飞行模拟项目。Unity 负责飞机与机场画面、驾驶舱交互、仪表、相机、天气、地图、声音和可视动画；JSBSim 作为外部飞行动力学进程，通过本仓库的双向桥接与 Unity 实时通信。
 
-项目当前重点是把 737 飞机、北京大兴机场环境、动态天气、驾驶舱仪表和 JSBSim 飞行链路整合成一个可演示、可继续迭代的飞行模拟原型。
+> 当前状态（2026-07-14）：主功能链路已经完成，可从开始界面选择画质并进入模拟，从地面静止状态开始滑跑、起飞、空中操纵并使用接地反推，同时支持动态天气、三类相机、驾驶舱仪表、飞行地图、A320 侧杆和讯飞语音控制。项目现已进入验收、稳定性回归和资源收口阶段。
+
+本项目用于飞行模拟演示、课程/小组项目和后续技术扩展，不是商用级或训练认证级飞行模拟器。
 
 ## 项目概览
 
-| 项目 | 内容 |
+| 项目 | 当前配置 |
 | --- | --- |
 | 机型 | Boeing 737-800 |
-| 引擎 | Unity 2022.3 LTS |
-| 渲染管线 | URP |
-| 飞行动力学 | JSBSim |
+| Unity | `2022.3.62f3c1` |
+| 渲染管线 | URP `14.0.12` |
+| 飞行动力学 | JSBSim `1.3.x`，仓库附带 `1.3.1` 安装包 |
+| 地理/大世界 | Cesium for Unity `1.24.0` + Floating Origin |
 | 天气系统 | UniStorm URP |
-| 地理/大世界 | Cesium for Unity |
+| 相机 | 驾驶舱、客舱、第三人称 |
+| 构建入口 | `AeroSimUnity/Assets/Scenes/StartMenu.unity` |
 | 主场景 | `AeroSimUnity/Assets/Scenes/MainScene.unity` |
-| Unity 工程 | `AeroSimUnity/` |
+| 主飞机 | `AeroSimUnity/Assets/Aircraft/B737/Prefabs/B737.prefab` |
+| 推荐平台 | Windows 10/11 |
 
-## 功能亮点
+## 已完成功能
 
-- 737-800 飞机模型与主 Prefab 管理。
-- 驾驶舱、客舱、第三人称三类视角切换。
-- HUD 实时显示飞行数据、控制状态和操作提示。
-- UniStorm 动态天气：晴天、雨天、雷暴、昼夜和时间调节。
-- 右上角天气/时间菜单，按 `2` 打开，支持中文天气名称和当前时间显示。
-- 北京大兴机场环境，地面材质已按近景飞行视角重新调整。
-- PFD、ND、EICAS、备用仪表等驾驶舱显示系统的基础实现入口。
-- JSBSim 外部飞行动力学桥接，支持 Unity 接收飞行状态并发送控制指令。
-- Cesium 地理参考与大世界坐标支持，用于后续扩展真实地景。
-
-> 说明：项目仍在开发中，目前更适合作为飞行模拟原型、课程/小组项目展示和后续开发基础，不是完整商用级飞行模拟器。
-
----
+| 功能域 | 当前能力 |
+| --- | --- |
+| 开始界面与构建 | 流畅 `1080p`、均衡 `2K`、最高 `4K` 三档全屏画质，Windows x64 一键构建，场景顺序为 `StartMenu -> MainScene` |
+| 飞行动力学 | JSBSim 地面起步、双发怠速、UDP 状态输出、TCP 控制输入、Unity 自动启动与退出清理 |
+| 飞行控制 | 俯仰、滚转、偏航、油门、俯仰配平、襟翼、扰流板、起落架、刹车、正推和反推 |
+| 操纵保护 | 协调转弯、坡度角保护、侧滑保护、地面前轮转向、起落架低空收起限制、推油门自动松刹车 |
+| 输入设备 | 键盘与图马思特 TCA/A320 侧杆并行输入，支持侧杆油门、扭转方向舵、POV 帽和断线重连 |
+| 语音控制 | 讯飞语音听写，支持油门、起落架、襟翼、扰流板、刹车、配平和暂停指令 |
+| 飞机动画 | 操纵盘/操纵柱、驾驶舱油门杆、舵面、襟翼、起落架、机轮、发动机风扇和外部灯光 |
+| 驾驶舱仪表 | PFD、ND、EICAS、备用仪表、Clock ET、可点击 FMS 基础页面和 HUD |
+| 飞行地图 | `M` 键打开，显示航迹、飞机朝向和飞行数据，支持缩放、拖动、平移和调整窗口尺寸 |
+| 相机系统 | 驾驶舱、客舱、第三人称强制互斥切换，驾驶舱重新进入时复位，支持自由观察、POV 控制、第三人称环绕、避障和近地限制 |
+| 天气与环境 | 北京大兴机场、Cesium 地理参考、昼夜变化、云层、雨雪、雷暴、雾、天气菜单和夜间视觉 |
+| 声音与特效 | 发动机、飞行气流、接地/起落架、天气声音、航迹云、发动机热浪和机体外部灯光 |
+| 性能与回归 | 仪表相机优化、机体视角裁剪、Floating Origin，以及覆盖飞控、仪表、天气、声音和桥接的 EditMode 测试 |
 
 ## 画面展示
-
 
 ### 飞行视角
 
@@ -72,29 +78,16 @@ AeroSim-737 是一个基于 Unity 的 Boeing 737-800 飞行模拟项目。项目
 
 ![天空与云层](Pictures/天空.png)
 
----
+## 环境准备
 
-## 当前开发状态
+建议准备以下环境：
 
-当前项目已经完成主场景基本整合：
-
-- 主飞机统一使用 `B737.prefab`。
-- 主场景统一为 `MainScene.unity`。
-- JSBSim 桥接文件集中在 `JSBSimBridge/`。
-- 天气系统已真实合入主场景，不再依赖临时运行时注入。
-- HUD、相机切换、天气菜单、时间调节和基础仪表显示已经接入。
-- 降水天气声音已调整为切换后立即出现，云层和雨滴视觉仍保持自然过渡。
-- 机场地面材质已改为项目内资源路径，避免依赖本机绝对路径。
-
-仍在继续打磨：
-
-- 太阳直射、机舱阴影和整体光照表现。
-- 飞机起飞、地面接触和 JSBSim 姿态同步细节。
-- 仪表数据覆盖和显示精度。
-- 天气、发动机和座舱音频的混音平衡。
-- 场景资源和 Unity 自动脏改动的提交筛选。
-
----
+- Windows 10/11。
+- Git 与 Git LFS。
+- Unity Hub 和 Unity `2022.3.62f3c1`。
+- JSBSim `1.3.x`。
+- 可选：图马思特 TCA/A320 侧杆。
+- 可选：麦克风、网络连接和已开通语音听写 WebAPI 的讯飞账号。
 
 ## 快速开始
 
@@ -107,14 +100,14 @@ cd AeroSim-737
 
 ### 2. 拉取 Git LFS 资源
 
-项目中的 FBX、贴图、音频、图片等大文件由 Git LFS 管理。首次打开 Unity 前请执行：
+项目中的 FBX、贴图、音频、图片和其他大文件由 Git LFS 管理。首次打开 Unity 前执行：
 
 ```powershell
 git lfs install
 git lfs pull
 ```
 
-如果资源文件打开后只看到类似下面的文本，说明 LFS 文件还没有真正拉下来：
+如果资源文件内容只有下面这种文本，说明当前拿到的是 LFS 指针：
 
 ```text
 version https://git-lfs.github.com/spec/v1
@@ -124,56 +117,106 @@ size ...
 
 重新执行 `git lfs pull` 即可。
 
-### 3. 打开 Unity 工程
+### 3. 安装并配置 JSBSim
 
-用 Unity 打开下面这个目录：
-
-```text
-AeroSimUnity/
-```
-
-推荐 Unity 版本：
-
-```text
-Unity 2022.3.62f3c1
-```
-
-首次打开时 Unity 会导入包、编译脚本和重建资源缓存，等待完成即可。
-
-### 4. 打开主场景
-
-主场景路径：
-
-```text
-AeroSimUnity/Assets/Scenes/MainScene.unity
-```
-
-进入 Play 后，如果只想看画面、切相机、调天气和测试部分本地交互，可以不启动 JSBSim。  
-如果要测试真实飞行动力学和 HUD 飞行数据，请继续启动 JSBSim。
-
-### 5. 启动 JSBSim（可选但推荐）
-
-项目提供了启动脚本：
-
-```text
-JSBSimBridge/start_jsbsim.bat
-```
-
-JSBSim 安装包位于：
+仓库附带安装包：
 
 ```text
 JSBSimBridge/Install/JSBSim-1.3.1-1837-setup.exe
 ```
 
-如果团队成员本机安装路径不同，推荐设置环境变量：
+安装后建议设置用户环境变量 `JSBSIM_DIR`。它可以指向包含 `JSBSim.exe` 的目录，也可以直接指向 `JSBSim.exe`：
 
-```text
-JSBSIM_DIR=<包含 JSBSim.exe 的目录>
+```powershell
+[Environment]::SetEnvironmentVariable(
+    "JSBSIM_DIR",
+    "<JSBSim 安装目录或 JSBSim.exe 路径>",
+    "User")
 ```
 
-然后再运行 `start_jsbsim.bat`。
+设置后重新启动 Unity Hub 和 Unity Editor，让新进程读取环境变量。
 
----
+### 4. 打开 Unity 工程
+
+在 Unity Hub 中打开：
+
+```text
+AeroSimUnity/
+```
+
+不要把仓库根目录直接作为 Unity 工程打开。首次打开时等待包导入、脚本编译和资源缓存重建完成。
+
+### 5. 在编辑器中运行
+
+完整入口流程可打开：
+
+```text
+AeroSimUnity/Assets/Scenes/StartMenu.unity
+```
+
+选择流畅 `1080p`、均衡 `2K` 或最高 `4K`，再点击“开始飞行”进入 `MainScene`。
+
+需要直接调试飞行功能时，也可以打开：
+
+```text
+AeroSimUnity/Assets/Scenes/MainScene.unity
+```
+
+进入 Play 后，`JsbsimBridge` 默认会在 Windows 上自动运行 `JSBSimBridge/start_jsbsim.bat`。正常情况下会出现 JSBSim 命令行窗口，HUD 随后显示状态和控制通道均已连接。
+
+如果自动启动失败，可保持 Unity Play 状态，再手动运行：
+
+```text
+JSBSimBridge/start_jsbsim.bat
+```
+
+停止 Play 时，Unity 会清理由当前会话自动启动的 JSBSim 进程。
+
+### 6. 构建 Windows x64
+
+Unity 菜单提供以下入口：
+
+```text
+AeroSim/Build/生成开始界面场景
+AeroSim/Build/配置 Windows 构建场景
+AeroSim/Build/验证开始界面配置
+AeroSim/Build/构建 Windows x64
+```
+
+执行“构建 Windows x64”会重新生成开始界面、校验三档画质与场景顺序，并输出：
+
+```text
+Builds/Windows/AeroSim-737.exe
+```
+
+### 7. 可选：配置讯飞语音控制
+
+语音凭据只从用户环境变量读取，具体配置和支持的口令见 [讯飞语音控制接入说明](Docs/讯飞语音控制接入说明.md)。
+
+## 第一次起飞
+
+进入 Play 后，飞机默认处于地面静止状态：双发已经运转，油门怠速，起落架放下，刹车锁定。
+
+1. 按 `B` 松开刹车，或直接推油门，正推超过阈值后会自动松刹车。
+2. 按住 `LeftShift` 增加油门并开始滑跑。
+3. 空速接近约 `150 kt` 时按 `S` 抬轮。
+4. 离地超过约 `10 ft AGL` 后按 `G` 收起起落架。
+5. 使用 `F/V` 调整襟翼，使用 `Z/X` 调整俯仰配平。
+6. 接地后同时按住 `LeftControl + LeftShift` 使用满反推，再按 `B` 刹车。
+
+反推代码当前允许随时触发，但实际操作应只在接地后使用。
+
+## 开始界面与画质档位
+
+Windows 构建默认先进入 `StartMenu`，选择结果会保存到 `PlayerPrefs`，下次启动继续使用上次选择。
+
+| 选项 | 分辨率 | Unity 画质档位 |
+| --- | --- | --- |
+| 流畅 1080p | `1920 × 1080` | `Performant` |
+| 均衡 2K | `2560 × 1440` | `Balanced` |
+| 最高 4K | `3840 × 2160` | `High Fidelity` |
+
+三个档位均使用独占全屏。开始界面还提供“开始飞行”和“退出”按钮。
 
 ## 操作按键
 
@@ -181,43 +224,110 @@ JSBSIM_DIR=<包含 JSBSim.exe 的目录>
 
 | 按键 | 功能 |
 | --- | --- |
-| `W` | 低头 |
-| `S` | 抬头 |
-| `A` | 左滚 |
-| `D` | 右滚 |
-| `Q` | 左偏航 |
-| `E` | 右偏航 |
-| `LeftShift` | 增加正推油门 |
+| `W` | 推杆低头；松键后保持当前升降舵修正 |
+| `S` | 拉杆抬头；松键后保持当前升降舵修正 |
+| `A` / `D` | 左滚 / 右滚，松键后副翼平滑回中 |
+| `Q` / `E` | 左偏航 / 右偏航，同时参与协调转弯和地面前轮转向 |
+| `Z` / `X` | 抬头配平 / 低头配平 |
+| `LeftShift` | 增加正推；退出反推后重新建立正推 |
 | `LeftControl` | 将油门收向怠速 |
-| `LeftControl + LeftShift` | 接地后增加反推，HUD 油门显示为负数 |
-| `B` | 切换刹车 |
-| `G` | 起落架收放 |
-| `F` | 放下襟翼 |
-| `V` | 收回襟翼 |
-| `R` | 增加扰流板 |
-| `T` | 减少扰流板 |
+| `LeftControl + LeftShift` | 满反推 |
+| `F` / `V` | 襟翼增加 / 减少一级 |
+| `R` / `T` | 扰流板增加 / 减少一级 |
+| `G` | 起落架收放；过低或动画进行中时可能拒绝指令 |
+| `B` | 刹车开关 |
+| `Esc` | 暂停 / 恢复 Unity 与 JSBSim |
 
-### 相机与视角
+### 相机、界面与语音
 
-| 按键 | 功能 |
+| 按键/输入 | 功能 |
 | --- | --- |
 | `Shift + 7` | 客舱视角 |
-| `Shift + 8` | 驾驶舱视角 |
+| `Shift + 8` | 驾驶舱视角，并恢复驾驶舱初始机位 |
 | `Shift + 9` | 第三人称视角 |
-| `鼠标右键拖动` | 转动视角 |
-| `方向键` | 移动视角 |
-| `PageUp / PageDown` | 上下移动视角 |
-| `鼠标滚轮` | 第三人称缩放 |
-
-### 界面与天气
-
-| 按键 | 功能 |
-| --- | --- |
+| 鼠标右键拖动 | 转动当前视角 |
+| 方向键 | 在驾驶舱或客舱内前后左右移动 |
+| `PageUp / PageDown` | 在驾驶舱或客舱内上下移动 |
+| 鼠标滚轮 | 第三人称缩放；光标位于地图内时缩放地图 |
 | `Tab` | 显示 / 隐藏 HUD |
-| `1` | 操纵杆显示 / 隐藏 |
-| `2` | 打开 / 关闭天气和时间选择 |
+| `1` | 驾驶舱操纵杆显示 / 隐藏 |
+| `2` | 打开 / 关闭天气和时间菜单 |
+| `M` | 打开 / 关闭飞行地图 |
+| 按住 `Y` 说话，松开 `Y` | 发送语音识别并执行飞行指令 |
 
----
+## TCA/A320 侧杆
+
+项目在 Windows 上通过系统多媒体摇杆接口读取图马思特 TCA/A320 侧杆，默认匹配硬件 ID `044F:0406`，并支持名称匹配和单控制器降级连接。
+
+- X/Y 轴控制横滚和俯仰。
+- 扭转轴控制方向舵。
+- 侧杆油门轴控制正推油门。
+- POV 帽控制当前相机视角。
+- 设备断开后会自动重连，断开期间键盘仍可继续控制。
+- 键盘修正量会与侧杆输入叠加，油门键盘输入可暂时接管侧杆油门。
+
+该输入实现依赖 Windows，其他平台不会启用侧杆接口。
+
+## 讯飞语音控制
+
+运行 `MainScene` 后，按住 `Y` 说话，松开后发送本次录音。识别结果和执行结果会显示在屏幕顶部，并写入 Unity Console。
+
+当前支持的指令类型包括：
+
+- 设置油门百分比、怠速或最大油门。
+- 放下/收起起落架。
+- 增减或全收/全放襟翼。
+- 增减或全收/全开扰流板。
+- 开启/解除刹车。
+- 抬头/低头配平。
+- 暂停/继续飞行。
+
+语音反推暂时禁用。起落架和刹车指令仍受本地安全条件限制。讯飞凭据严禁写入代码、Prefab、Scene 或 Git 提交；正式对外发布时应把签名和请求代理放到自己的服务端。
+
+## 飞行地图
+
+按 `M` 打开独立飞行地图。地图会在运行时自动创建，不需要手动把 UI 拖入场景。
+
+- 显示飞机位置、平滑后的朝向、飞行数据、航迹和航点。
+- 鼠标滚轮调整显示范围。
+- 拖动标题栏移动窗口。
+- 在地图区域拖动可平移地图中心。
+- 拖动窗口边缘可调整地图尺寸。
+- 默认提供本地地图背景；代码也保留 Cesium 场景底图和在线瓦片配置入口。
+
+## 天气与时间
+
+项目使用 UniStorm URP 天气系统。主场景中已接入太阳、月亮、风区、体积云、云影、星空、降水、雾和天气声音。
+
+按 `2` 打开右上角天气/时间菜单，可以选择天气、调节时间并查看当前时间。切换到降水天气后，声音会立即到达目标音量，云层、雨滴和地面湿润效果仍保持自然过渡。
+
+驾驶舱、客舱和第三人称相机之间的降水跟随、雾距离、太阳盘和天气声音已做统一处理。相关排查方法见 [UniStorm 相机天气效果指南](Docs/UniStorm-Camera-Weather-Effects-Guide.md)。
+
+## JSBSim 桥接
+
+Unity 与 JSBSim 的数据流如下：
+
+```text
+键盘 / TCA A320 侧杆 / 讯飞语音
+                    ↓
+                FlightInput
+                    ↓ TCP 5502
+                 JSBSim
+                    ↓ UDP 5501
+              JsbsimBridge
+        ┌───────────┼───────────┐
+        ↓           ↓           ↓
+   飞机位置姿态   HUD/仪表    舵面/发动机/声音
+```
+
+- JSBSim 以 `120 Hz` 进行物理步进，并以 `60 Hz` 向 Unity 输出状态。
+- Unity 默认监听 UDP `5501`，控制连接使用 TCP `5502`。
+- 初始条件来自 `JSBSimBridge/unity_air.xml`，当前为地面静止起步。
+- `JSBSimBridge/b737_unity.xml` 会启动双发并将油门保持在怠速。
+- HUD 中的发动机转速显示为 `N1 %`，不是 RPM。
+- 发动机风扇视觉速度按 `100% N1 -> 4657.5 RPM` 映射，即 CFM56 约 `5175 RPM` 最大 N1 转速的 `90%`。
+
+油门为 `0%` 时风扇仍旋转是正常现象，因为这表示双发正在怠速运转，并不表示发动机已经关车。
 
 ## 项目结构
 
@@ -225,131 +335,156 @@ JSBSIM_DIR=<包含 JSBSim.exe 的目录>
 AeroSim-737/
 ├── AeroSimUnity/                         # Unity 工程
 │   ├── Assets/
-│   │   ├── Aircraft/B737/               # 737 飞机资源、Prefab、仪表资源
-│   │   ├── Environment/                 # 机场与环境资源
-│   │   ├── Scenes/                      # 主场景
+│   │   ├── Aircraft/B737/               # 飞机模型、Prefab、材质、涂装和仪表
+│   │   ├── Environment/                 # 北京大兴机场与环境资源
+│   │   ├── Resources/                   # 运行时资源，包括地图背景
+│   │   ├── Scenes/                      # StartMenu 构建入口与 MainScene 飞行场景
 │   │   ├── Scripts/
-│   │   │   ├── Aircraft/B737/           # 737 运行时脚本
-│   │   │   ├── Camera/                  # 相机切换与视角控制
-│   │   │   ├── Map/                     # 地图/航图覆盖层
-│   │   │   ├── World/                   # 大世界与原点管理
-│   │   │   └── Editor/B737/             # 编辑器工具与测试
+│   │   │   ├── Aircraft/B737/           # 737 运行时逻辑与 Voice 子目录
+│   │   │   ├── Camera/                  # 相机切换、视角和 AudioListener 管理
+│   │   │   ├── Map/                     # 飞行地图
+│   │   │   ├── World/                   # Floating Origin 与大世界逻辑
+│   │   │   └── Editor/B737/             # 编辑器工具、Windows 构建工具与 EditMode 测试
 │   │   ├── UniStorm Weather System/     # 天气系统资源
-│   │   └── Settings/                    # 渲染和工程内设置
+│   │   └── Settings/                    # URP 和工程内设置
 │   ├── Packages/
 │   └── ProjectSettings/
-├── JSBSimBridge/                        # JSBSim 配置、安装包和启动脚本
+├── JSBSimBridge/                        # JSBSim 安装包、初始条件、启动和通信配置
+├── XplaneAssets/                        # 原始机模/场景导入源与辅助脚本
 ├── Pictures/                            # README 图片
-├── Docs/                                # 项目文档
-├── AGENTS.md                            # Codex 协作说明
-├── CLAUDE.md                            # Claude 协作说明
+├── Docs/                                # 专题说明与历史设计/实施记录
+├── AGENTS.md                            # Codex 协作基线
+├── CLAUDE.md                            # Claude Code 协作基线
 └── README.md
 ```
-
----
 
 ## 关键文件
 
 | 文件/目录 | 说明 |
 | --- | --- |
+| `AeroSimUnity/Assets/Scenes/StartMenu.unity` | Windows 构建启动场景和画质选择入口 |
 | `AeroSimUnity/Assets/Scenes/MainScene.unity` | Unity 主场景 |
-| `AeroSimUnity/Assets/Aircraft/B737/Prefabs/B737.prefab` | 主飞机 Prefab |
-| `AeroSimUnity/Assets/Scripts/Aircraft/B737/JsbsimBridge.cs` | JSBSim 与 Unity 的状态/控制桥接 |
-| `AeroSimUnity/Assets/Scripts/Aircraft/B737/FlightInput.cs` | 键盘输入与控制发送 |
-| `AeroSimUnity/Assets/Scripts/Aircraft/B737/FlightHud.cs` | HUD 显示 |
+| `AeroSimUnity/Assets/Aircraft/B737/Prefabs/B737.prefab` | 主飞机 Prefab 和运行配置基线 |
+| `AeroSimUnity/Assets/Scripts/Aircraft/B737/JsbsimBridge.cs` | JSBSim 状态接收、控制连接、位置姿态与进程管理入口 |
+| `AeroSimUnity/Assets/Scripts/Aircraft/B737/JsbsimProcessLauncher.cs` | Windows 下自动启动和清理 JSBSim |
+| `AeroSimUnity/Assets/Scripts/Aircraft/B737/FlightInput.cs` | 键盘、侧杆叠加、飞控保护和控制发送 |
+| `AeroSimUnity/Assets/Scripts/Aircraft/B737/ThrustmasterA320SidestickInput.cs` | TCA/A320 侧杆读取、映射和重连 |
+| `AeroSimUnity/Assets/Scripts/Aircraft/B737/Voice/` | 讯飞语音客户端、命令解析和执行 |
+| `AeroSimUnity/Assets/Scripts/Aircraft/B737/FlightHud.cs` | HUD 状态、N1 与操作提示 |
+| `AeroSimUnity/Assets/Scripts/Aircraft/B737/B737EngineSpinner.cs` | 发动机风扇视觉转速 |
+| `AeroSimUnity/Assets/Scripts/Camera/CameraManager.cs` | 三类相机切换 |
+| `AeroSimUnity/Assets/Scripts/Camera/CockpitCameraController.cs` | 驾驶舱/客舱移动和第三人称环绕、避障、近地限制 |
+| `AeroSimUnity/Assets/Scripts/Map/FlightMapOverlay.cs` | 运行时飞行地图 |
+| `AeroSimUnity/Assets/Scripts/Aircraft/B737/AeroSimStartMenuController.cs` | 开始界面、画质预设和场景切换 |
+| `AeroSimUnity/Assets/Scripts/Editor/B737/AeroSimWindowsBuildUtility.cs` | 生成开始场景、校验配置并构建 Windows x64 |
 | `AeroSimUnity/Assets/Scripts/Aircraft/B737/B737UniStormWeatherMenuController.cs` | 天气菜单中文化和布局 |
-| `AeroSimUnity/Assets/Scripts/Camera/CameraManager.cs` | 相机切换 |
+| `AeroSimUnity/Assets/Aircraft/B737/Instruments/` | PFD、ND、EICAS、FMS、备用仪表等资源 |
 | `JSBSimBridge/start_jsbsim.bat` | JSBSim 启动脚本 |
-| `JSBSimBridge/b737_unity.xml` | JSBSim 场景配置 |
-| `JSBSimBridge/unity_output.xml` | JSBSim 输出配置 |
+| `JSBSimBridge/b737_unity.xml` | JSBSim 运行脚本 |
+| `JSBSimBridge/unity_air.xml` | 地面初始条件 |
+| `JSBSimBridge/unity_output.xml` | UDP 状态输出字段 |
 
----
+## 测试与验收
 
-## 天气系统
-
-项目当前使用 UniStorm URP 天气系统。主场景中包含：
-
-- `UniStorm URP System`
-- `UniStorm Sun`
-- `UniStorm Moon`
-- `UniStorm Windzone`
-- `UniStorm Volumetric Clouds`
-- `Clouds Shadows`
-- `UniStorm Stars`
-
-天气菜单按 `2` 打开，位于右上角。可以选择天气、调节时间，并直接看到当前时间文本。降水天气的声音会在切换后立即出现，但云层、雨滴和地面湿润效果仍保持逐渐变化，让画面过渡更自然。
-
----
-
-## JSBSim 桥接
-
-Unity 与 JSBSim 的职责分工如下：
+EditMode 测试位于：
 
 ```text
-键盘输入 -> Unity FlightInput -> JSBSim 控制通道
-JSBSim 飞行动力学 -> UDP 状态输出 -> Unity JsbsimBridge -> 飞机姿态/HUD/仪表
+AeroSimUnity/Assets/Scripts/Editor/B737/
 ```
 
-常用文件：
+当前测试覆盖开始界面画质预设、JSBSim 文本解析、地面防穿透、升降舵保持、反推、侧杆输入、坡度/侧滑保护、仪表、天气、声音、灯光、相机相关配置和 HUD 文案等关键行为。
 
-- `JSBSimBridge/start_jsbsim.bat`
-- `JSBSimBridge/b737_unity.xml`
-- `JSBSimBridge/unity_output.xml`
-- `AeroSimUnity/Assets/Scripts/Aircraft/B737/JsbsimBridge.cs`
+在 Unity 中打开 Test Runner，运行 EditMode 测试。最终验收还应从 `StartMenu` 进入 `MainScene`，完成一次完整 Play 流程：
 
-不启动 JSBSim 时，仍可以测试画面、天气、相机、HUD 开关和部分本地动画；启动 JSBSim 后，HUD 和仪表数据会随飞行动力学状态更新。
+1. `StartMenu` 三档画质可选，“开始飞行”进入 `MainScene`，“退出”行为正常。
+2. JSBSim 自动启动并建立 UDP/TCP 通信。
+3. 地面静止、刹车、滑跑和起飞正常。
+4. 键盘与侧杆输入均可用，飞控保护没有明显异常。
+5. 起落架、襟翼、扰流板、油门杆、发动机和声音反馈一致。
+6. HUD、PFD、ND、EICAS、FMS、备用仪表和地图显示正常。
+7. 三种相机、天气切换、昼夜、降水和天气声音表现一致。
+8. 接地后反推和刹车可用，退出 Play 后 JSBSim 进程被正确清理。
 
----
+## 当前边界
+
+- FMS 当前提供可点击页面和基础状态显示，不是完整 FMC 航路规划系统。
+- 项目没有完整实现真实 737 的自动驾驶、自动油门、全部电气/液压/气源系统和标准运行程序。
+- JSBSim 自动启动和 TCA/A320 侧杆读取依赖 Windows。
+- 讯飞语音需要网络、麦克风和用户自己的 WebAPI 凭据；语音反推保持禁用。
+- 天气、Cesium、机模、机场、音频和其他第三方资源各自受原授权约束。仓库当前没有统一的根级开源许可证，公开发布或二次分发前必须逐项核对授权。
 
 ## 开发约定
 
 - 737 运行时脚本放在 `AeroSimUnity/Assets/Scripts/Aircraft/B737/`。
-- 相机脚本放在 `AeroSimUnity/Assets/Scripts/Camera/`。
-- 地图/航图脚本放在 `AeroSimUnity/Assets/Scripts/Map/`。
-- 编辑器工具和编辑器测试放在 `AeroSimUnity/Assets/Scripts/Editor/B737/`。
-- Unity 资源移动、复制、重命名时必须连同 `.meta` 文件一起处理。
-- 修改场景、Prefab、材质后，需要回 Unity 检查 Missing Script / Missing Reference。
-- 提交前请确认 `Library/`、`Temp/`、`Logs/`、`obj/`、`UserSettings/`、`.vs/`、`*.csproj`、`*.sln` 没有被加入版本控制。
+- 相机、地图和大世界逻辑分别放在 `Scripts/Camera/`、`Scripts/Map/` 和 `Scripts/World/`。
+- 编辑器工具与 EditMode 测试放在 `AeroSimUnity/Assets/Scripts/Editor/B737/`。
+- 主场景飞机统一使用 `B737.prefab`，不要长期直接编辑裸 FBX。
+- Windows 构建场景顺序保持 `StartMenu -> MainScene`，画质档位修改后同步更新开始界面控制器、构建工具和测试。
+- 移动、复制或重命名 Unity 资源时必须连同 `.meta` 文件一起处理。
+- 修改 Scene、Prefab、材质、RenderTexture 或贴图后，回 Unity 检查 Missing Script、Missing Reference 和 Console 错误。
+- 提交前确认 `Library/`、`Temp/`、`Logs/`、`obj/`、`UserSettings/`、`.vs/`、`*.csproj`、`*.sln` 没有进入版本控制。
+- Commit Message 使用中文，建议格式为 `<类型>：<简述>`。
 
----
+更完整的协作和子系统约束见 [AGENTS.md](AGENTS.md) 与 [CLAUDE.md](CLAUDE.md)。
 
 ## 常见问题
 
-### 图片或模型变成文本
+### 图片、模型或音频变成文本
 
-这是 Git LFS 资源没有拉下来。执行：
+Git LFS 资源没有完整拉取，执行：
 
 ```powershell
 git lfs pull
 ```
 
-### HUD 不显示
+### 进入 Play 后 JSBSim 没有启动
 
-按 `Tab` 切换 HUD 显示。如果仍然看不到，检查当前相机和 HUD Canvas 是否输出到同一个 Display。
+检查：
 
-### 天气菜单打不开
+- `JSBSIM_DIR` 是否指向正确目录或 `JSBSim.exe`。
+- `JSBSimBridge/start_jsbsim.bat` 是否存在。
+- Unity Console 是否显示启动脚本或端口错误。
+- UDP `5501`、TCP `5502` 是否被其他程序占用。
 
-按 `2`。如果仍无反应，检查 `UniStorm URP System` 是否启用，以及 Console 是否存在脚本错误。
+保持 Play 状态手动运行 `JSBSimBridge/start_jsbsim.bat`，可以直接看到启动脚本的错误提示。
 
-### 下雨没有声音
+### HUD 一直显示等待 JSBSim 数据
 
-先检查当前相机是否启用了 `AudioListener`。再查看 Play 后 Hierarchy 中 `UniStorm Sounds` 下的雨声 AudioSource 是否正在播放。
+确认 JSBSim 命令行窗口正在运行，并检查 `unity_output.xml` 是否仍向 UDP `5501` 输出。HUD 的状态连接和控制连接是两条独立链路，二者都应显示已连接。
 
-### JSBSim 没有数据
+### 油门是 0%，发动机为什么还在转
 
-确认：
+当前启动脚本会让双发保持运行。油门 `0%` 表示怠速，不是发动机停止，因此 HUD 仍会显示非零 N1，发动机风扇也会继续旋转。
 
-- `JSBSimBridge/start_jsbsim.bat` 已运行。
-- `JSBSIM_DIR` 指向包含 `JSBSim.exe` 的目录。
-- Unity Console 没有 UDP/TCP 端口错误。
-- HUD 不再显示“等待 JSBSim 数据”。
+### 天气菜单或地图打不开
 
----
+- 天气菜单按 `2`。
+- 飞行地图按 `M`。
+- HUD 按 `Tab`。
 
-## 后续计划
+如果按键无反应，先检查 Unity Console 是否存在脚本编译错误，以及当前 Game 视图是否获得键盘焦点。
 
-- 继续优化太阳方向、机舱阴影和天气光照。
-- 完善仪表数据链路和异常状态显示。
-- 改进起飞、接地、滑跑和姿态同步细节。
-- 继续整理主场景资源，减少 Unity 自动脏改动对协作的影响。
-- 扩展更多飞行流程和演示任务。
+### 语音控制没有反应
+
+确认系统检测到麦克风，并已设置 `XFYUN_APP_ID`、`XFYUN_API_KEY`、`XFYUN_API_SECRET`。设置环境变量后需要完全退出并重新启动 Unity Hub 和 Unity Editor。
+
+### 侧杆没有连接
+
+在 Windows“设置 USB 游戏控制器”中确认设备可见。项目默认识别图马思特 TCA/A320 的 `044F:0406`，设备断开后每秒尝试重连；未连接时键盘控制仍然有效。
+
+## 相关文档
+
+- [讯飞语音控制接入说明](Docs/讯飞语音控制接入说明.md)
+- [UniStorm 相机天气效果指南](Docs/UniStorm-Camera-Weather-Effects-Guide.md)
+- [AeroSimUnity 早期脚本说明](Docs/AeroSimUnity_脚本说明.md)，该文档是阶段性历史资料，当前行为以代码、Prefab 和本 README 为准。
+
+## 维护方向
+
+主功能已经完成，后续工作以回归和收口为主：
+
+- 保持 `StartMenu.unity`、`MainScene.unity`、`B737.prefab`、JSBSim 和三类相机引用稳定。
+- 验证三档画质、Windows x64 构建产物和从开始界面进入飞行的完整流程。
+- 完成键盘、TCA/A320 侧杆和讯飞语音三条输入链路的联合验收。
+- 继续微调最终光照、机舱阴影、天气过渡、音量混合和仪表可读性。
+- 清理 Missing Reference、材质异常和 Unity 自动产生的无关脏改动。
+- 在对外发布前补充统一许可证、第三方资源授权清单和构建发布说明。
