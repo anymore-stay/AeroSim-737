@@ -4,7 +4,10 @@ public class FpsCounterOverlay : MonoBehaviour
 {
     [Header("Display")]
     [Tooltip("是否显示右上角 FPS。")]
-    [SerializeField] private bool showFps = true;
+    [SerializeField] private bool showFps;
+
+    [Tooltip("切换 FPS 显示的按键。")]
+    [SerializeField] private KeyCode toggleKey = KeyCode.Alpha0;
 
     [Tooltip("刷新间隔，单位秒。数值越小跳动越频繁。")]
     [SerializeField, Min(0.05f)] private float updateInterval = 0.25f;
@@ -27,8 +30,16 @@ public class FpsCounterOverlay : MonoBehaviour
     private GUIStyle style;
     private string cachedLabel = "FPS: --";
 
+    public static bool ResolveVisibilityAfterToggle(bool currentVisible, bool togglePressed)
+    {
+        return togglePressed ? !currentVisible : currentVisible;
+    }
+
     private void Update()
     {
+        bool togglePressed = Input.GetKeyDown(toggleKey) || Input.GetKeyDown(KeyCode.Keypad0);
+        showFps = ResolveVisibilityAfterToggle(showFps, togglePressed);
+
         accumulatedTime += Time.unscaledDeltaTime;
         accumulatedFrames++;
 
