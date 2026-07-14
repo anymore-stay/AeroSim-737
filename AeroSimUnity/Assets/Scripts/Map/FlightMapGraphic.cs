@@ -1,3 +1,4 @@
+using System;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -15,6 +16,9 @@ public struct FlightMapRenderState
 [RequireComponent(typeof(CanvasRenderer))]
 public class FlightMapGraphic : MaskableGraphic
 {
+    private const int SafeMeshVertexLimit = 62000;
+    private const int TrackSegmentVertexCost = 4;
+
     [SerializeField] private float mapSize = 480f;
     [SerializeField] private bool drawBackground = true;
 
@@ -121,20 +125,106 @@ public class FlightMapGraphic : MaskableGraphic
             return;
         }
 
-        for (int i = 0; i < points.Length - 1; i++)
+        int maxSegments = CalculateTrackSegmentBudget(vh.currentVertCount);
+        int step = CalculateTrackSampleStep(points.Length, maxSegments);
+        int previousIndex = 0;
+
+        for (int i = step; i < points.Length; i += step)
         {
-            if (!IsReasonablePoint(points[i]) || !IsReasonablePoint(points[i + 1]))
-            {
-                continue;
-            }
-
-            if (!IsNearViewport(points[i]) && !IsNearViewport(points[i + 1]))
-            {
-                continue;
-            }
-
-            AddLine(vh, points[i], points[i + 1], 2.4f, TrackLine);
+            AddTrackSegment(vh, points[previousIndex], points[i]);
+            previousIndex = i;
         }
+
+        int lastIndex = points.Length - 1;
+        if (previousIndex != lastIndex)
+        {
+            AddTrackSegment(vh, points[previousIndex], points[lastIndex]);
+        }
+    }
+
+    public static int CalculateTrackSampleStep(int pointCount, int maxRenderableSegments)
+    {
+        if (pointCount < 2)
+        {
+            return 1;
+        }
+
+        int segmentCount = pointCount - 1;
+        int safeSegmentBudget = Mathf.Max(1, maxRenderableSegments);
+        return Mathf.Max(1, Mathf.CeilToInt(segmentCount / (float)safeSegmentBudget));
+    }
+
+    public static int EstimateRenderedTrackSegments(int pointCount, int sampleStep)
+    {
+        if (pointCount < 2)
+        {
+            return 0;
+        }
+
+        int safeStep = Mathf.Max(1, sampleStep);
+        int segmentCount = pointCount - 1;
+        return Mathf.CeilToInt(segmentCount / (float)safeStep);
+    }
+
+    private static int CalculateTrackSegmentBudget(int currentVertexCount)
+    {
+        int remainingVertices = SafeMeshVertexLimit - currentVertexCount;
+        return Mathf.Max(1, remainingVertices / TrackSegmentVertexCost);
+    }
+
+    private void AddTrackSegment(VertexHelper vh, Vector2 a, Vector2 b)
+    {
+        if (!IsReasonablePoint(a) || !IsReasonablePoint(b))
+        {
+            return;
+        }
+
+        AddLineBody(vh, a, b, 2.4f, TrackLine);
+    }
+
+    public static Vector2[] SampleTrackForRendering(Vector2[] points, int maxRenderableSegments)
+    {
+        if (points == null || points.Length == 0)
+        {
+            return Array.Empty<Vector2>();
+        }
+
+        if (points.Length == 1)
+        {
+            return new[] { points[0] };
+        }
+
+        int step = CalculateTrackSampleStep(points.Length, maxRenderableSegments);
+        int renderedSegments = EstimateRenderedTrackSegments(points.Length, step);
+        Vector2[] sampled = new Vector2[renderedSegments + 1];
+        int output = 0;
+        sampled[output++] = points[0];
+
+        for (int i = step; i < points.Length; i += step)
+        {
+            sampled[output++] = points[i];
+        }
+
+        int lastIndex = points.Length - 1;
+        if (sampled[output - 1] != points[lastIndex])
+        {
+            sampled[output++] = points[lastIndex];
+        }
+
+        if (output == sampled.Length)
+        {
+            return sampled;
+        }
+
+        Vector2[] trimmed = new Vector2[output];
+        Array.Copy(sampled, trimmed, output);
+        return trimmed;
+    }
+
+    public static int EstimateTrackVertexCount(int pointCount, int maxRenderableSegments)
+    {
+        int step = CalculateTrackSampleStep(pointCount, maxRenderableSegments);
+        return EstimateRenderedTrackSegments(pointCount, step) * TrackSegmentVertexCost;
     }
 
     private void DrawAircraft(VertexHelper vh)

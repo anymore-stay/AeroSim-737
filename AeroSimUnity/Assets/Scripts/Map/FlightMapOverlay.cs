@@ -58,7 +58,7 @@ public class FlightMapOverlay : MonoBehaviour
 
     [Header("Track")]
     [SerializeField] private bool recordTrack = true;
-    [SerializeField, Min(2)] private int maxTrackPoints = 900;
+    [SerializeField, Min(0)] private int maxTrackPoints;
     [SerializeField, Min(0.001f)] private float trackMinDistanceNm = 0.01f;
 
     [Header("Aircraft Symbol")]
@@ -736,10 +736,21 @@ public class FlightMapOverlay : MonoBehaviour
         }
 
         trackPoints.Add(new GeoPoint(aircraftLat, aircraftLon));
-        while (trackPoints.Count > maxTrackPoints)
+        while (maxTrackPoints > 0 && trackPoints.Count > maxTrackPoints)
         {
             trackPoints.RemoveAt(0);
         }
+    }
+
+    public static int ResolveTrackPointCountAfterAppend(int currentCount, int maxTrackPoints)
+    {
+        int nextCount = Mathf.Max(0, currentCount) + 1;
+        if (maxTrackPoints <= 0)
+        {
+            return nextCount;
+        }
+
+        return Mathf.Min(nextCount, maxTrackPoints);
     }
 
     private float ResolveAircraftDisplayHeading(float fallbackHeadingDeg)
