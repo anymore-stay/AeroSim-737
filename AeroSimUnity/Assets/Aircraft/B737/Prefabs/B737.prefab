@@ -50130,6 +50130,9 @@ MonoBehaviour:
   thirdPersonOrbitSensitivity: 3
   thirdPersonMinPitch: -15
   thirdPersonMaxPitch: 70
+  restrictBelowAircraftNearGround: 1
+  thirdPersonBelowAircraftRestrictionAglFt: 100
+  thirdPersonLowAltitudeMaxPitch: 0
   thirdPersonKeepoutPadding: 1.2
   preventThirdPersonInsideAircraft: 0
   usePhysicsObstruction: 1
@@ -70294,8 +70297,8 @@ MonoBehaviour:
   leftWheelRollAxis: {x: 0, y: 1, z: 0}
   rightWheelRollAxis: {x: 0, y: 1, z: 0}
   pitchAngleMultiplier: 1
-  leftWheelAngleMultiplier: -1
-  rightWheelAngleMultiplier: -1
+  leftWheelAngleMultiplier: 1
+  rightWheelAngleMultiplier: 1
   useVirtualPitchPivot: 0
   useVirtualWheelPivots: 1
   hideGeneratedPivots: 0
@@ -90743,6 +90746,9 @@ MonoBehaviour:
   thirdPersonOrbitSensitivity: 3
   thirdPersonMinPitch: -15
   thirdPersonMaxPitch: 70
+  restrictBelowAircraftNearGround: 1
+  thirdPersonBelowAircraftRestrictionAglFt: 100
+  thirdPersonLowAltitudeMaxPitch: 0
   thirdPersonKeepoutPadding: 1.2
   preventThirdPersonInsideAircraft: 0
   usePhysicsObstruction: 1
