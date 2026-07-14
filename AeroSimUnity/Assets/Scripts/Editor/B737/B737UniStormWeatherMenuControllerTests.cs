@@ -1,4 +1,5 @@
 using System;
+using System.IO;
 using System.Linq;
 using System.Reflection;
 using NUnit.Framework;
@@ -39,5 +40,16 @@ public class B737UniStormWeatherMenuControllerTests
         string timeText = (string)method.Invoke(null, new object[] { hour, minute });
 
         Assert.That(timeText, Is.EqualTo(expected));
+    }
+
+    [Test]
+    public void 主场景默认天气为大部多云()
+    {
+        const string mostlyCloudyGuid = "b1b04f0270cfa784588fdc5818097ad3";
+        string sceneText = File.ReadAllText("Assets/Scenes/MainScene.unity");
+        string mostlyCloudyMetaText = File.ReadAllText("Assets/UniStorm Weather System/Weather Types/Non-Precipitation/Mostly Cloudy.asset.meta");
+
+        Assert.That(mostlyCloudyMetaText, Does.Contain($"guid: {mostlyCloudyGuid}"));
+        Assert.That(sceneText, Does.Contain($"CurrentWeatherType: {{fileID: 11400000, guid: {mostlyCloudyGuid}, type: 2}}"));
     }
 }

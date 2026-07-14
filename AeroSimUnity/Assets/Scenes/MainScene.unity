@@ -22312,7 +22312,7 @@ MonoBehaviour:
   - {fileID: 11400000, guid: 1c574a7c95db0204d8f2627686dde9dd, type: 2}
   - {fileID: 11400000, guid: 2c22445a1c49d7f4587aad0d120738bb, type: 2}
   - {fileID: 11400000, guid: 9c9c95d0c839e12409171dc4a845551a, type: 2}
-  CurrentWeatherType: {fileID: 11400000, guid: 865815ce607d94c4cb41162c44555e7c, type: 2}
+  CurrentWeatherType: {fileID: 11400000, guid: b1b04f0270cfa784588fdc5818097ad3, type: 2}
   NextWeatherType: {fileID: 0}
   ByPassCoverageTransition: 0
   m_PrecipitationOdds: 50
