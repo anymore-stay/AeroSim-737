@@ -145,43 +145,43 @@ public class FlightMapGraphic : MaskableGraphic
         }
 
         Vector2 forward = BearingVector(state.AircraftHeadingDeg);
-        Vector2 right = new Vector2(forward.y, -forward.x);
+        Vector2 right = new Vector2(-forward.y, forward.x);
         Vector2 center = state.AircraftPoint;
 
         float scale = Mathf.Clamp(mapSize / 520f, 0.78f, 1.22f);
-        float bodyHalf = 4.2f * scale;
+        float bodyHalf = 4.4f * scale;
 
-        Vector2 nose = center + forward * (22f * scale);
-        Vector2 neckLeft = center + forward * (13f * scale) - right * bodyHalf;
-        Vector2 neckRight = center + forward * (13f * scale) + right * bodyHalf;
-        Vector2 tailLeft = center - forward * (17f * scale) - right * (3.6f * scale);
-        Vector2 tailRight = center - forward * (17f * scale) + right * (3.6f * scale);
+        Vector2 nose = center + forward * (25f * scale);
+        Vector2 shoulderLeft = center + forward * (8f * scale) - right * bodyHalf;
+        Vector2 shoulderRight = center + forward * (8f * scale) + right * bodyHalf;
+        Vector2 tailLeft = center - forward * (18f * scale) - right * (3.1f * scale);
+        Vector2 tailRight = center - forward * (18f * scale) + right * (3.1f * scale);
         Vector2 tail = center - forward * (23f * scale);
 
-        AddTriangle(vh, nose, neckLeft, neckRight, AircraftColor);
-        AddQuad(vh, neckLeft, neckRight, tailRight, tailLeft, AircraftColor);
+        AddTriangle(vh, nose, shoulderLeft, shoulderRight, AircraftColor);
+        AddQuad(vh, shoulderLeft, shoulderRight, tailRight, tailLeft, AircraftColor);
         AddTriangle(vh, tail, tailLeft, tailRight, AircraftColor);
 
         AddTriangle(vh,
-            center + forward * (3f * scale) - right * bodyHalf,
-            center - forward * (7f * scale) - right * (27f * scale),
-            center - forward * (10f * scale) - right * (5.8f * scale),
+            center + forward * (2f * scale) - right * (4.6f * scale),
+            center - forward * (4f * scale) - right * (22f * scale),
+            center - forward * (8f * scale) - right * (4.6f * scale),
             AircraftColor);
         AddTriangle(vh,
-            center + forward * (3f * scale) + right * bodyHalf,
-            center - forward * (7f * scale) + right * (27f * scale),
-            center - forward * (10f * scale) + right * (5.8f * scale),
+            center + forward * (2f * scale) + right * (4.6f * scale),
+            center - forward * (4f * scale) + right * (22f * scale),
+            center - forward * (8f * scale) + right * (4.6f * scale),
             AircraftColor);
 
         AddTriangle(vh,
-            center - forward * (15f * scale) - right * (3.6f * scale),
-            center - forward * (19f * scale) - right * (14f * scale),
-            center - forward * (19f * scale) - right * (3.6f * scale),
+            center - forward * (16f * scale) - right * (3.2f * scale),
+            center - forward * (20f * scale) - right * (9f * scale),
+            center - forward * (20f * scale) - right * (3.2f * scale),
             AircraftColor);
         AddTriangle(vh,
-            center - forward * (15f * scale) + right * (3.6f * scale),
-            center - forward * (19f * scale) + right * (14f * scale),
-            center - forward * (19f * scale) + right * (3.6f * scale),
+            center - forward * (16f * scale) + right * (3.2f * scale),
+            center - forward * (20f * scale) + right * (9f * scale),
+            center - forward * (20f * scale) + right * (3.2f * scale),
             AircraftColor);
     }
 

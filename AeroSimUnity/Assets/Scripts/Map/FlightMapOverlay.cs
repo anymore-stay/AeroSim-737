@@ -44,13 +44,14 @@ public class FlightMapOverlay : MonoBehaviour
     [SerializeField] private KeyCode toggleKey = KeyCode.M;
     [SerializeField] private bool visibleOnStart;
     [SerializeField] private bool allowMouseWheelRange = true;
+    [SerializeField, Min(0.02f)] private float mapRefreshIntervalSeconds = 0.1f;
 
     [Header("Data")]
     [SerializeField] private JsbsimBridge bridge;
     [SerializeField] private Waypoint[] route;
     [SerializeField, Min(0.1f)] private float minimumRangeNm = 0.5f;
-    [SerializeField, Min(0.2f)] private float defaultRangeNm = 3.2f;
-    [SerializeField, Min(2f)] private float maximumRangeNm = 80f;
+    [SerializeField, Min(0.2f)] private float defaultRangeNm = 8f;
+    [SerializeField, Min(2f)] private float maximumRangeNm = 12f;
     [SerializeField] private bool autoFitRoute;
     [SerializeField, Range(0.5f, 0.95f)] private float routeFitFill = 0.72f;
     [SerializeField] private bool keepAircraftCentered;
@@ -59,18 +60,17 @@ public class FlightMapOverlay : MonoBehaviour
     [SerializeField] private bool recordTrack = true;
     [SerializeField, Min(2)] private int maxTrackPoints = 900;
     [SerializeField, Min(0.001f)] private float trackMinDistanceNm = 0.01f;
-    [SerializeField, Min(0.000001f)] private float trackDisplayAppendMinDistanceNm = 0.00001f;
 
     [Header("Aircraft Symbol")]
     [SerializeField] private Vector3 aircraftNoseLocalAxis = new Vector3(0f, 0f, -1f);
-    [SerializeField, Range(0f, 1f)] private float headingSmoothing = 0.18f;
-    [SerializeField, Min(1f)] private float motionHeadingMinPixels = 8f;
+    [SerializeField] private bool useAircraftTransformHeading = true;
+    [SerializeField] private float aircraftHeadingOffsetDeg;
 
     [Header("Window")]
-    [SerializeField, Min(260f)] private float mapSize = 520f;
+    [SerializeField, Min(260f)] private float mapSize = 320f;
     [SerializeField, Min(260f)] private float minMapSize = 320f;
     [SerializeField, Min(420f)] private float maxMapSize = 920f;
-    [SerializeField] private Vector2 screenOffset = new Vector2(-24f, -24f);
+    [SerializeField] private Vector2 screenOffset = new Vector2(-12f, -12f);
     [SerializeField] private int fontSize = 15;
     [SerializeField] private int labelFontSize = 13;
     [SerializeField] private int sortingOrder = 32755;
@@ -81,10 +81,13 @@ public class FlightMapOverlay : MonoBehaviour
     [SerializeField] private bool generateFallbackMapTexture;
 
     [Header("Cesium Scene Basemap")]
-    [SerializeField] private bool useCesiumSceneBasemap;
-    [SerializeField, Range(256, 2048)] private int cesiumMapTextureSize = 1024;
+    [SerializeField] private bool useCesiumSceneBasemap = true;
+    [SerializeField, Range(256, 2048)] private int cesiumMapTextureSize = 256;
+    [SerializeField, Min(0.05f)] private float cesiumRenderIntervalSeconds = 1f;
+    [SerializeField, Min(1f)] private float cesiumVisibleRangeLimitNm = 12f;
     [SerializeField, Min(300f)] private float cesiumMinimumCameraHeightMeters = 1200f;
     [SerializeField, Min(1000f)] private float cesiumFarPaddingMeters = 12000f;
+    [SerializeField, Min(1f)] private float cesiumTileLoadRangeMultiplier = 1f;
     [SerializeField] private LayerMask cesiumSceneLayerMask = ~0;
     [SerializeField] private Color cesiumImageTint = new Color(0.82f, 0.90f, 0.82f, 1f);
     [SerializeField] private Color cesiumMapColorWash = new Color(0.58f, 0.72f, 0.58f, 0.22f);
@@ -151,10 +154,17 @@ public class FlightMapOverlay : MonoBehaviour
     private Texture2D tilePlaceholderTexture;
     private RenderTexture cesiumMapTexture;
     private Camera cesiumMapCamera;
+    private Camera cesiumTileLoadCamera;
     private CesiumGeoreference cesiumGeoreference;
     private CesiumGlobeAnchor aircraftGlobeAnchor;
     private CesiumCameraManager cesiumCameraManager;
     private bool mapVisible;
+    private bool mapDirty = true;
+    private float nextMapRenderTime;
+    private float nextCesiumRenderTime;
+    private double lastCesiumRenderCenterLat = double.NaN;
+    private double lastCesiumRenderCenterLon = double.NaN;
+    private float lastCesiumRenderRangeNm = -1f;
     private bool cesiumSceneBasemapAvailable;
     private bool manualRangeOverride;
     private float manualRangeNm;
@@ -169,8 +179,6 @@ public class FlightMapOverlay : MonoBehaviour
     private bool departurePointInitialized;
     private GeoPoint departurePoint = new GeoPoint(DaxingLatitudeDeg, DaxingLongitudeDeg);
     private GeoPoint staticMapCenter = new GeoPoint(DaxingLatitudeDeg, DaxingLongitudeDeg);
-    private bool headingInitialized;
-    private float lastResolvedHeadingDeg;
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
     private static void CreateRuntimeOverlay()
@@ -200,9 +208,10 @@ public class FlightMapOverlay : MonoBehaviour
         activeInstance = this;
         DontDestroyOnLoad(gameObject);
         EnsureDefaultRoute();
-        ConfigureStaticMapBackground();
+        ConfigureCesiumMapBackground();
         BuildUi();
         mapVisible = visibleOnStart;
+        mapDirty = true;
         canvas.gameObject.SetActive(mapVisible);
     }
 
@@ -237,6 +246,11 @@ public class FlightMapOverlay : MonoBehaviour
         {
             mapVisible = !mapVisible;
             canvas.gameObject.SetActive(mapVisible);
+            mapDirty = mapVisible;
+            if (!mapVisible)
+            {
+                ReleaseCesiumSceneBasemap();
+            }
         }
 
         if (!mapVisible)
@@ -258,8 +272,17 @@ public class FlightMapOverlay : MonoBehaviour
             }
         }
 
-        HandleRangeInput();
-        RenderMap();
+        if (HandleRangeInput())
+        {
+            mapDirty = true;
+        }
+
+        if (mapDirty || Time.unscaledTime >= nextMapRenderTime)
+        {
+            RenderMap();
+            mapDirty = false;
+            nextMapRenderTime = Time.unscaledTime + Mathf.Max(0.02f, mapRefreshIntervalSeconds);
+        }
     }
 
     private void BuildUi()
@@ -338,7 +361,9 @@ public class FlightMapOverlay : MonoBehaviour
 
         statusText = CreateText("MapData", statusPanelRt, 10f, 7f, 230f, 62f, fontSize - 2, new Color32(230, 241, 235, 255), TextAnchor.UpperLeft);
 
-        infoText = CreateText("Info", panelRt, 12f, mapSize + 43f, mapSize - 48f, 34f, fontSize - 1, new Color32(224, 238, 232, 255), TextAnchor.UpperLeft);
+        infoText = CreateText("Info", panelRt, 10f, mapSize + 45f, mapSize - 20f, 24f, fontSize - 3, new Color32(224, 238, 232, 255), TextAnchor.UpperLeft);
+        infoText.horizontalOverflow = HorizontalWrapMode.Wrap;
+        infoText.verticalOverflow = VerticalWrapMode.Truncate;
 
         Image panHandle = CreateHandle("MapPanHandle", mapViewportRt, FlightMapWindowHandle.Mode.Pan);
         mapPanHandleRt = panHandle.rectTransform;
@@ -351,18 +376,17 @@ public class FlightMapOverlay : MonoBehaviour
         ApplyWindowLayout();
     }
 
-    private void ConfigureStaticMapBackground()
+    private void ConfigureCesiumMapBackground()
     {
-        useCesiumSceneBasemap = false;
+        useCesiumSceneBasemap = true;
         useOnlineTileBasemap = false;
-        autoFitRoute = false;
         allowMouseWheelRange = true;
+        mapSize = minMapSize;
         minimumRangeNm = Mathf.Clamp(minimumRangeNm, 0.2f, 2f);
+        maximumRangeNm = Mathf.Clamp(maximumRangeNm, minimumRangeNm, Mathf.Max(minimumRangeNm, cesiumVisibleRangeLimitNm));
         defaultRangeNm = Mathf.Clamp(defaultRangeNm, minimumRangeNm, maximumRangeNm);
+        manualRangeNm = Mathf.Clamp(manualRangeNm, minimumRangeNm, maximumRangeNm);
         backgroundTextureRangeNm = Mathf.Max(defaultRangeNm * 2f, backgroundTextureRangeNm);
-        maximumRangeNm = Mathf.Min(maximumRangeNm, backgroundTextureRangeNm * 0.5f);
-        defaultRangeNm = Mathf.Clamp(defaultRangeNm, minimumRangeNm, maximumRangeNm);
-        ReleaseCesiumSceneBasemap();
     }
 
     private Image CreateHandle(string name, RectTransform parent, FlightMapWindowHandle.Mode mode)
@@ -482,7 +506,7 @@ public class FlightMapOverlay : MonoBehaviour
             }
         }
 
-        SetTopLeft(infoText.rectTransform, 12f, mapSize + 43f, mapSize - 48f, 36f);
+        SetTopLeft(infoText.rectTransform, 10f, mapSize + 45f, mapSize - 20f, 24f);
         SetTopLeft(resizeLeftRt, 0f, 0f, BorderResizeThickness, panelHeight);
         SetTopLeft(resizeRightRt, mapSize - BorderResizeThickness, 0f, BorderResizeThickness, panelHeight);
         SetTopLeft(resizeTopRt, 0f, 0f, mapSize, BorderResizeThickness);
@@ -493,6 +517,7 @@ public class FlightMapOverlay : MonoBehaviour
     {
         bool hasAircraft = TryReadAircraft(out double aircraftLat, out double aircraftLon, out float headingDeg);
         UpdateDeparturePoint(hasAircraft, aircraftLat, aircraftLon);
+
         double centerLat = manualCenterOverride ? manualCenterLatDeg : GetDisplayCenterLat(hasAircraft, aircraftLat);
         double centerLon = manualCenterOverride ? manualCenterLonDeg : GetDisplayCenterLon(hasAircraft, aircraftLon);
         currentCenterLatDeg = centerLat;
@@ -520,13 +545,8 @@ public class FlightMapOverlay : MonoBehaviour
         Vector2 aircraftPoint = hasAircraft
             ? Project(aircraftLat, aircraftLon, centerLat, centerLon, rangeNm)
             : new Vector2(mapSize * 0.5f, mapSize * 0.5f);
-        Vector2[] projectedTrack = BuildTrackPoints(centerLat, centerLon, rangeNm, hasAircraft, aircraftLat, aircraftLon, aircraftPoint);
-        if (hasAircraft)
-        {
-            headingDeg = ResolveAircraftHeadingFromMap(projectedTrack, aircraftPoint, headingDeg);
-        }
+        Vector2[] projectedTrack = BuildTrackPoints(centerLat, centerLon, rangeNm);
 
-        UpdateFallbackBackground(centerLat, centerLon, rangeNm);
         if (useCesiumSceneBasemap)
         {
             UpdateCesiumSceneBasemap(centerLat, centerLon, rangeNm);
@@ -535,6 +555,8 @@ public class FlightMapOverlay : MonoBehaviour
         {
             cesiumSceneBasemapAvailable = false;
         }
+
+        UpdateFallbackBackground(centerLat, centerLon, rangeNm);
         if (ShouldUseOnlineTileBasemap())
         {
             UpdateTileBasemap(centerLat, centerLon, rangeNm);
@@ -544,12 +566,13 @@ public class FlightMapOverlay : MonoBehaviour
             tileRootRt.gameObject.SetActive(false);
         }
 
+        float aircraftHeadingDeg = hasAircraft ? ResolveAircraftDisplayHeading(headingDeg) : headingDeg;
         mapGraphic.SetState(new FlightMapRenderState
         {
             RoutePoints = routePoints ?? emptyRoutePoints,
             TrackPoints = projectedTrack ?? emptyRoutePoints,
             AircraftPoint = aircraftPoint,
-            AircraftHeadingDeg = headingDeg,
+            AircraftHeadingDeg = aircraftHeadingDeg,
             HasAircraft = hasAircraft,
             ActiveLegIndex = activeLeg,
             RangeNm = rangeNm
@@ -558,27 +581,28 @@ public class FlightMapOverlay : MonoBehaviour
         UpdateInfo(hasAircraft, aircraftLat, aircraftLon, headingDeg, rangeNm, activeLeg);
     }
 
-    private void HandleRangeInput()
+    private bool HandleRangeInput()
     {
         if (!allowMouseWheelRange || mapViewportRt == null)
         {
-            return;
+            return false;
         }
 
         float scroll = Input.mouseScrollDelta.y;
         if (Mathf.Abs(scroll) < 0.01f)
         {
-            return;
+            return false;
         }
 
         if (!RectTransformUtility.RectangleContainsScreenPoint(mapViewportRt, Input.mousePosition, null))
         {
-            return;
+            return false;
         }
 
         float baseRange = manualRangeOverride ? manualRangeNm : Mathf.Max(minimumRangeNm, currentRangeNm > 0f ? currentRangeNm : defaultRangeNm);
         manualRangeNm = Mathf.Clamp(baseRange * Mathf.Pow(0.86f, scroll), minimumRangeNm, maximumRangeNm);
         manualRangeOverride = true;
+        return true;
     }
 
     private Vector2[] BuildRoutePoints(double centerLat, double centerLon, float rangeNm)
@@ -589,45 +613,18 @@ public class FlightMapOverlay : MonoBehaviour
         };
     }
 
-    private Vector2[] BuildTrackPoints(
-        double centerLat,
-        double centerLon,
-        float rangeNm,
-        bool hasAircraft,
-        double aircraftLat,
-        double aircraftLon,
-        Vector2 aircraftPoint)
+    private Vector2[] BuildTrackPoints(double centerLat, double centerLon, float rangeNm)
     {
-        if (!recordTrack || trackPoints.Count == 0)
+        if (!recordTrack || trackPoints.Count < 2)
         {
             return emptyRoutePoints;
         }
 
-        bool appendAircraftPoint = false;
-        if (hasAircraft)
-        {
-            GeoPoint last = trackPoints[trackPoints.Count - 1];
-            CalculateBearingDistance(last.LatitudeDeg, last.LongitudeDeg, aircraftLat, aircraftLon, out _, out double distanceNm);
-            double displayThresholdNm = Math.Min(Math.Max(trackDisplayAppendMinDistanceNm, 0.000001f), 0.00001f);
-            appendAircraftPoint = distanceNm >= displayThresholdNm;
-        }
-
-        int pointCount = trackPoints.Count + (appendAircraftPoint ? 1 : 0);
-        if (pointCount < 2)
-        {
-            return emptyRoutePoints;
-        }
-
-        Vector2[] points = new Vector2[pointCount];
+        Vector2[] points = new Vector2[trackPoints.Count];
         for (int i = 0; i < trackPoints.Count; i++)
         {
             GeoPoint point = trackPoints[i];
             points[i] = Project(point.LatitudeDeg, point.LongitudeDeg, centerLat, centerLon, rangeNm);
-        }
-
-        if (appendAircraftPoint)
-        {
-            points[points.Length - 1] = aircraftPoint;
         }
 
         return points;
@@ -745,58 +742,15 @@ public class FlightMapOverlay : MonoBehaviour
         }
     }
 
-    private float ResolveAircraftHeadingFromMap(Vector2[] projectedTrack, Vector2 aircraftPoint, float fallbackHeadingDeg)
+    private float ResolveAircraftDisplayHeading(float fallbackHeadingDeg)
     {
-        float targetHeadingDeg = Normalize360(fallbackHeadingDeg);
-        if (TryResolveProjectedTrackHeading(projectedTrack, aircraftPoint, out float trackHeadingDeg))
+        float headingDeg = Normalize360(fallbackHeadingDeg);
+        if (useAircraftTransformHeading && TryReadAircraftTransformHeading(out float transformHeadingDeg))
         {
-            targetHeadingDeg = trackHeadingDeg;
-            lastResolvedHeadingDeg = targetHeadingDeg;
-            headingInitialized = true;
-            return lastResolvedHeadingDeg;
-        }
-        else if (TryReadAircraftTransformHeading(out float transformHeadingDeg))
-        {
-            targetHeadingDeg = transformHeadingDeg;
+            headingDeg = transformHeadingDeg;
         }
 
-        if (!headingInitialized)
-        {
-            lastResolvedHeadingDeg = targetHeadingDeg;
-            headingInitialized = true;
-            return lastResolvedHeadingDeg;
-        }
-
-        lastResolvedHeadingDeg = Normalize360(Mathf.LerpAngle(
-            lastResolvedHeadingDeg,
-            targetHeadingDeg,
-            Mathf.Clamp01(headingSmoothing)));
-        return lastResolvedHeadingDeg;
-    }
-
-    private bool TryResolveProjectedTrackHeading(Vector2[] projectedTrack, Vector2 aircraftPoint, out float headingDeg)
-    {
-        headingDeg = 0f;
-        if (projectedTrack == null || projectedTrack.Length < 2)
-        {
-            return false;
-        }
-
-        float minHeadingDistanceSqr = motionHeadingMinPixels * motionHeadingMinPixels;
-        for (int i = projectedTrack.Length - 1; i >= 0; i--)
-        {
-            Vector2 previous = projectedTrack[i];
-            Vector2 screenDelta = aircraftPoint - previous;
-            if (screenDelta.sqrMagnitude < minHeadingDistanceSqr)
-            {
-                continue;
-            }
-
-            headingDeg = Normalize360(Mathf.Atan2(screenDelta.x, -screenDelta.y) * Mathf.Rad2Deg);
-            return true;
-        }
-
-        return false;
+        return Normalize360(headingDeg + aircraftHeadingOffsetDeg);
     }
 
     private bool TryReadAircraftTransformHeading(out float headingDeg)
@@ -810,10 +764,18 @@ public class FlightMapOverlay : MonoBehaviour
 
         Vector3 localNose = aircraftNoseLocalAxis.sqrMagnitude > 0.0001f
             ? aircraftNoseLocalAxis.normalized
-            : Vector3.forward;
+            : Vector3.back;
         Vector3 worldNose = aircraftTransform.TransformDirection(localNose);
-        Vector3 referenceNose = aircraftTransform.parent != null
-            ? aircraftTransform.parent.InverseTransformDirection(worldNose)
+        if (TryReadCameraProjectedHeading(worldNose, out headingDeg))
+        {
+            return true;
+        }
+
+        Transform referenceTransform = cesiumGeoreference != null
+            ? cesiumGeoreference.transform
+            : aircraftTransform.parent;
+        Vector3 referenceNose = referenceTransform != null
+            ? referenceTransform.InverseTransformDirection(worldNose)
             : worldNose;
         referenceNose.y = 0f;
         if (referenceNose.sqrMagnitude < 0.0001f)
@@ -825,9 +787,55 @@ public class FlightMapOverlay : MonoBehaviour
         return true;
     }
 
+    private bool TryReadCameraProjectedHeading(Vector3 worldNose, out float headingDeg)
+    {
+        headingDeg = 0f;
+        Vector3 cameraForward;
+        Vector3 cameraRight;
+        Vector3 cameraUp;
+        if (cesiumMapCamera != null)
+        {
+            cameraForward = cesiumMapCamera.transform.forward;
+            cameraRight = cesiumMapCamera.transform.right;
+            cameraUp = cesiumMapCamera.transform.up;
+        }
+        else
+        {
+            return false;
+        }
+
+        Vector3 projectedNose = Vector3.ProjectOnPlane(worldNose, cameraForward);
+        if (projectedNose.sqrMagnitude < 0.0001f)
+        {
+            return false;
+        }
+
+        projectedNose.Normalize();
+        float right = Vector3.Dot(projectedNose, cameraRight);
+        float up = Vector3.Dot(projectedNose, cameraUp);
+        if (Mathf.Abs(right) + Mathf.Abs(up) < 0.0001f)
+        {
+            return false;
+        }
+
+        headingDeg = Normalize360(Mathf.Atan2(right, up) * Mathf.Rad2Deg);
+        return true;
+    }
+
     private void UpdateFallbackBackground(double centerLat, double centerLon, float rangeNm)
     {
         if (mapBackgroundImage == null)
+        {
+            return;
+        }
+
+        bool showFallback = !useCesiumSceneBasemap || !cesiumSceneBasemapAvailable;
+        if (mapBackgroundImage.gameObject.activeSelf != showFallback)
+        {
+            mapBackgroundImage.gameObject.SetActive(showFallback);
+        }
+
+        if (!showFallback)
         {
             return;
         }
@@ -849,20 +857,17 @@ public class FlightMapOverlay : MonoBehaviour
         float groundSpeedKts = ReadGroundSpeedKts(iasKts);
         string legText = "--";
         string nextText = "--";
-        string sourceText = GetBasemapStatusLabel();
-
         infoBuilder.Length = 0;
         if (hasAircraft)
         {
-            infoBuilder.AppendFormat(CultureInfo.InvariantCulture, "POS {0:F5}, {1:F5}   MAP RNG {2:0}NM   {3}",
+            infoBuilder.AppendFormat(CultureInfo.InvariantCulture, "POS {0:F3}, {1:F3}  RNG {2:0}NM",
                 lat,
                 lon,
-                rangeNm,
-                sourceText);
+                rangeNm);
         }
         else
         {
-            infoBuilder.AppendFormat(CultureInfo.InvariantCulture, "WAITING JSBSIM POSITION   MAP RNG {0:0}NM   {1}", rangeNm, sourceText);
+            infoBuilder.AppendFormat(CultureInfo.InvariantCulture, "WAITING JSBSIM  RNG {0:0}NM", rangeNm);
         }
 
         if (route != null && route.Length > 1 && activeLeg >= 0 && activeLeg + 1 < route.Length)
@@ -1156,20 +1161,49 @@ public class FlightMapOverlay : MonoBehaviour
         Vector3 north = cesiumGeoreference.transform.TransformDirection(Vector3.forward).normalized;
         float halfRangeMeters = Mathf.Max(minimumRangeNm, rangeNm) * 1852f;
         float cameraHeight = Mathf.Max(cesiumMinimumCameraHeightMeters, halfRangeMeters * 2.2f);
+        float loadHalfRangeMeters = halfRangeMeters * Mathf.Max(1f, cesiumTileLoadRangeMultiplier);
+        float loadCameraHeight = Mathf.Max(cesiumMinimumCameraHeightMeters, loadHalfRangeMeters * 2.2f);
 
-        cesiumMapCamera.transform.position = center + up * cameraHeight;
-        cesiumMapCamera.transform.rotation = Quaternion.LookRotation(-up, north);
-        cesiumMapCamera.orthographicSize = halfRangeMeters;
-        cesiumMapCamera.nearClipPlane = 0.1f;
-        cesiumMapCamera.farClipPlane = cameraHeight + Mathf.Max(cesiumFarPaddingMeters, halfRangeMeters * 1.5f);
-        cesiumMapCamera.backgroundColor = cesiumMapClearColor;
-        cesiumMapCamera.cullingMask = cesiumSceneLayerMask;
-        cesiumMapCamera.Render();
+        ConfigureCesiumMapCamera(cesiumMapCamera, center, up, north, halfRangeMeters, cameraHeight);
+        if (ShouldUseCesiumTileLoadCamera())
+        {
+            ConfigureCesiumMapCamera(cesiumTileLoadCamera, center, up, north, loadHalfRangeMeters, loadCameraHeight);
+        }
+        if (ShouldRenderCesiumSceneBasemap(centerLat, centerLon, rangeNm))
+        {
+            cesiumMapCamera.Render();
+            nextCesiumRenderTime = Time.unscaledTime + Mathf.Max(0.05f, cesiumRenderIntervalSeconds);
+            lastCesiumRenderCenterLat = centerLat;
+            lastCesiumRenderCenterLon = centerLon;
+            lastCesiumRenderRangeNm = rangeNm;
+        }
 
         if (attributionText != null)
         {
             attributionText.text = GetBasemapAttribution();
         }
+    }
+
+    private bool ShouldRenderCesiumSceneBasemap(double centerLat, double centerLon, float rangeNm)
+    {
+        if (cesiumMapTexture == null || lastCesiumRenderRangeNm < 0f)
+        {
+            return true;
+        }
+
+        if (mapDirty || Time.unscaledTime >= nextCesiumRenderTime)
+        {
+            return true;
+        }
+
+        if (Mathf.Abs(rangeNm - lastCesiumRenderRangeNm) > Mathf.Max(0.02f, rangeNm * 0.01f))
+        {
+            return true;
+        }
+
+        LatLonToOffsetNm(lastCesiumRenderCenterLat, lastCesiumRenderCenterLon, centerLat, centerLon, out double northNm, out double eastNm);
+        double movedNm = Math.Sqrt(northNm * northNm + eastNm * eastNm);
+        return movedNm > Math.Max(0.02, rangeNm * 0.01);
     }
 
     private bool EnsureCesiumSceneBasemap()
@@ -1203,13 +1237,14 @@ public class FlightMapOverlay : MonoBehaviour
             cesiumMapTexture = new RenderTexture(textureSize, textureSize, 24, RenderTextureFormat.ARGB32)
             {
                 name = "FlightMap_CesiumSceneBasemap",
-                antiAliasing = 2,
+                antiAliasing = 1,
                 filterMode = FilterMode.Bilinear,
                 wrapMode = TextureWrapMode.Clamp,
                 useMipMap = false,
                 autoGenerateMips = false
             };
             cesiumMapTexture.Create();
+            lastCesiumRenderRangeNm = -1f;
         }
 
         if (cesiumMapCamera == null)
@@ -1221,11 +1256,38 @@ public class FlightMapOverlay : MonoBehaviour
             cesiumMapCamera.orthographic = true;
             cesiumMapCamera.clearFlags = CameraClearFlags.SolidColor;
             cesiumMapCamera.allowHDR = false;
-            cesiumMapCamera.allowMSAA = true;
+            cesiumMapCamera.allowMSAA = false;
             cesiumMapCamera.useOcclusionCulling = false;
         }
 
+        if (ShouldUseCesiumTileLoadCamera() && cesiumTileLoadCamera == null)
+        {
+            GameObject loadCameraGo = new GameObject("FlightMapCesiumTileLoadCamera");
+            DontDestroyOnLoad(loadCameraGo);
+            cesiumTileLoadCamera = loadCameraGo.AddComponent<Camera>();
+            cesiumTileLoadCamera.enabled = false;
+            cesiumTileLoadCamera.orthographic = true;
+            cesiumTileLoadCamera.clearFlags = CameraClearFlags.SolidColor;
+            cesiumTileLoadCamera.allowHDR = false;
+            cesiumTileLoadCamera.allowMSAA = false;
+            cesiumTileLoadCamera.useOcclusionCulling = false;
+        }
+        else if (!ShouldUseCesiumTileLoadCamera() && cesiumTileLoadCamera != null)
+        {
+            if (cesiumCameraManager != null)
+            {
+                cesiumCameraManager.additionalCameras.Remove(cesiumTileLoadCamera);
+            }
+
+            Destroy(cesiumTileLoadCamera.gameObject);
+            cesiumTileLoadCamera = null;
+        }
+
         cesiumMapCamera.targetTexture = cesiumMapTexture;
+        if (cesiumTileLoadCamera != null)
+        {
+            cesiumTileLoadCamera.targetTexture = null;
+        }
         RegisterCesiumMapCamera();
         return true;
     }
@@ -1242,10 +1304,40 @@ public class FlightMapOverlay : MonoBehaviour
             cesiumCameraManager = CesiumCameraManager.GetOrCreate(cesiumGeoreference.gameObject);
         }
 
-        if (cesiumCameraManager != null && !cesiumCameraManager.additionalCameras.Contains(cesiumMapCamera))
+        AddCesiumAdditionalCamera(cesiumMapCamera);
+        if (ShouldUseCesiumTileLoadCamera())
         {
-            cesiumCameraManager.additionalCameras.Add(cesiumMapCamera);
+            AddCesiumAdditionalCamera(cesiumTileLoadCamera);
         }
+    }
+
+    private bool ShouldUseCesiumTileLoadCamera()
+    {
+        return cesiumTileLoadRangeMultiplier > 1.01f;
+    }
+
+    private void AddCesiumAdditionalCamera(Camera camera)
+    {
+        if (cesiumCameraManager != null && camera != null && !cesiumCameraManager.additionalCameras.Contains(camera))
+        {
+            cesiumCameraManager.additionalCameras.Add(camera);
+        }
+    }
+
+    private void ConfigureCesiumMapCamera(Camera camera, Vector3 center, Vector3 up, Vector3 north, float halfRangeMeters, float cameraHeight)
+    {
+        if (camera == null)
+        {
+            return;
+        }
+
+        camera.transform.position = center + up * cameraHeight;
+        camera.transform.rotation = Quaternion.LookRotation(-up, north);
+        camera.orthographicSize = halfRangeMeters;
+        camera.nearClipPlane = 0.1f;
+        camera.farClipPlane = cameraHeight + Mathf.Max(cesiumFarPaddingMeters, halfRangeMeters * 1.5f);
+        camera.backgroundColor = cesiumMapClearColor;
+        camera.cullingMask = cesiumSceneLayerMask;
     }
 
     private Vector3 LongitudeLatitudeHeightToWorld(double longitudeDeg, double latitudeDeg, double heightMeters)
@@ -1264,10 +1356,21 @@ public class FlightMapOverlay : MonoBehaviour
             cesiumCameraManager.additionalCameras.Remove(cesiumMapCamera);
         }
 
+        if (cesiumCameraManager != null && cesiumTileLoadCamera != null)
+        {
+            cesiumCameraManager.additionalCameras.Remove(cesiumTileLoadCamera);
+        }
+
         if (cesiumMapCamera != null)
         {
             Destroy(cesiumMapCamera.gameObject);
             cesiumMapCamera = null;
+        }
+
+        if (cesiumTileLoadCamera != null)
+        {
+            Destroy(cesiumTileLoadCamera.gameObject);
+            cesiumTileLoadCamera = null;
         }
 
         if (cesiumMapTexture != null)
@@ -1276,6 +1379,10 @@ public class FlightMapOverlay : MonoBehaviour
             Destroy(cesiumMapTexture);
             cesiumMapTexture = null;
         }
+
+        cesiumSceneBasemapAvailable = false;
+        lastCesiumRenderRangeNm = -1f;
+        nextCesiumRenderTime = 0f;
     }
 
     private bool ShouldUseOnlineTileBasemap()
@@ -1290,7 +1397,7 @@ public class FlightMapOverlay : MonoBehaviour
             return cesiumSceneBasemapAvailable ? "CESIUM 3D TERRAIN" : "CESIUM LOADING";
         }
 
-        return ShouldUseOnlineTileBasemap() ? "ONLINE TILE" : "LOCAL TERRAIN";
+        return ShouldUseOnlineTileBasemap() ? "ONLINE TILE" : "STATIC MAP";
     }
 
     private string GetBasemapAttribution()
@@ -1657,10 +1764,11 @@ public class FlightMapOverlay : MonoBehaviour
     internal void PanMapFromDragDelta(double startCenterLat, double startCenterLon, Vector2 delta)
     {
         float range = Mathf.Max(minimumRangeNm, currentRangeNm > 0f ? currentRangeNm : defaultRangeNm);
-        double eastNm = delta.x * range * 2.0 / Math.Max(1.0, mapSize);
-        double northNm = delta.y * range * 2.0 / Math.Max(1.0, mapSize);
+        double eastNm = -delta.x * range * 2.0 / Math.Max(1.0, mapSize);
+        double northNm = -delta.y * range * 2.0 / Math.Max(1.0, mapSize);
         OffsetLatLon(startCenterLat, startCenterLon, northNm, eastNm, out manualCenterLatDeg, out manualCenterLonDeg);
         manualCenterOverride = true;
+        mapDirty = true;
     }
 
     internal void ResizeFromDragDelta(FlightMapWindowHandle.Mode mode, Vector2 startAnchoredPosition, float startMapSize, Vector2 delta)
@@ -1690,6 +1798,7 @@ public class FlightMapOverlay : MonoBehaviour
         mapSize = Mathf.Clamp(requestedSize, minMapSize, maxMapSize);
         panelRt.anchoredPosition = new Vector2(nextTopLeft.x + mapSize, nextTopLeft.y);
         ApplyWindowLayout();
+        mapDirty = true;
     }
 
     private Text CreateText(string name, RectTransform parent, float x, float y, float w, float h, int size, Color color, TextAnchor anchor)
