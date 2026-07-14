@@ -164,6 +164,7 @@ public class CockpitCameraController : MonoBehaviour
     private Rigidbody rb;
     private Camera cam;
     private Vector3 startLocalPos;
+    private Quaternion startLocalRotation;
     private float yaw;
     private float pitch;
     private bool isLooking;
@@ -191,9 +192,10 @@ public class CockpitCameraController : MonoBehaviour
         ResolveSidestickInput();
 
         startLocalPos = transform.localPosition;
+        startLocalRotation = transform.localRotation;
         // 用本地欧拉角初始化(相机是飞机子物体,视角在机体坐标系内表示)
-        yaw = transform.localEulerAngles.y;
-        pitch = transform.localEulerAngles.x;
+        yaw = startLocalRotation.eulerAngles.y;
+        pitch = startLocalRotation.eulerAngles.x;
 
         CacheAircraftBounds();
 
@@ -574,7 +576,7 @@ public class CockpitCameraController : MonoBehaviour
                         continue;
                     }
 
-                    if (rootToIgnore != null && hitTransform.root == rootToIgnore)
+                    if (IsPartOfAircraft(hitTransform, rootToIgnore))
                     {
                         continue;
                     }
@@ -591,6 +593,13 @@ public class CockpitCameraController : MonoBehaviour
         }
 
         return safePosition;
+    }
+
+    private static bool IsPartOfAircraft(Transform candidate, Transform aircraftRoot)
+    {
+        return candidate != null &&
+               aircraftRoot != null &&
+               (candidate == aircraftRoot || candidate.IsChildOf(aircraftRoot));
     }
 
     private Vector3 ClampToLocalMovementBox(Vector3 targetWorld)
@@ -768,6 +777,16 @@ public class CockpitCameraController : MonoBehaviour
         Cursor.visible = true;
     }
 
+    private void ResetCockpitView()
+    {
+        transform.localPosition = startLocalPos;
+        transform.localRotation = startLocalRotation;
+        yaw = startLocalRotation.eulerAngles.y;
+        pitch = startLocalRotation.eulerAngles.x;
+        hasMoveInput = false;
+        hasLookInput = false;
+    }
+
     public void SetActive(bool active)
     {
         if (cam == null)
@@ -788,7 +807,11 @@ public class CockpitCameraController : MonoBehaviour
 
         enabled = active;
 
-        if (active && cameraMode == CameraMode.ThirdPerson)
+        if (active && cameraMode == CameraMode.Cockpit)
+        {
+            ResetCockpitView();
+        }
+        else if (active && cameraMode == CameraMode.ThirdPerson)
         {
             InitializeThirdPersonOrbit();
             ApplyThirdPersonOrbit();

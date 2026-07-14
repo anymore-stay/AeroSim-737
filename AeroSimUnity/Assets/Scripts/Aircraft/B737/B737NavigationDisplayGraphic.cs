@@ -89,8 +89,8 @@ public class B737NavigationDisplayGraphic : MaskableGraphic
         AddRect(vh, new Vector2(0f, 0f), new Vector2(canvasSize, canvasSize), Background);
         AddVignette(vh);
         DrawRangeRings(vh);
-        DrawFlightPlan(vh);
         DrawCompassArc(vh);
+        DrawFixedHeadingReference(vh);
         DrawWindArrow(vh);
         DrawNavigationSymbols(vh);
         DrawAircraftSymbol(vh);
@@ -114,35 +114,16 @@ public class B737NavigationDisplayGraphic : MaskableGraphic
             AddDottedArc(vh, aircraftApex, radius, -halfArc, halfArc, 7f, 9f, 1.3f, DimGreen);
         }
 
-        AddDashedLine(vh,
-            aircraftApex,
-            PointFromBearing(0f, arcRadius * 0.98f),
-            13f,
-            10f,
-            1.5f,
-            new Color32(105, 178, 104, 180));
     }
 
-    private void DrawFlightPlan(VertexHelper vh)
+    private void DrawFixedHeadingReference(VertexHelper vh)
     {
-        float relTrack = Mathf.DeltaAngle(state.HeadingMagDeg, state.TrackMagDeg);
-        if (Mathf.Abs(relTrack) <= visibleArcDeg * 0.5f + 12f)
-        {
-            AddLine(vh,
-                aircraftApex,
-                PointFromBearing(relTrack, arcRadius * 0.98f),
-                1.4f,
-                new Color32(210, 226, 216, 210));
-        }
-
-        float relCourse = Mathf.DeltaAngle(state.HeadingMagDeg, state.CourseMagDeg);
-        AddDashedLine(vh,
-            PointFromBearing(relCourse + 180f, arcRadius * 0.18f),
-            PointFromBearing(relCourse, arcRadius * 0.94f),
-            18f,
-            10f,
-            1.8f,
-            Magenta);
+        // 当前 ND 只保留固定航向参考线，不再绘制中间的粉色课程虚线。
+        AddLine(vh,
+            aircraftApex,
+            PointFromBearing(0f, arcRadius * 1.1f),
+            1.6f,
+            new Color32(210, 226, 216, 230));
     }
 
     private void DrawCompassArc(VertexHelper vh)
@@ -150,10 +131,20 @@ public class B737NavigationDisplayGraphic : MaskableGraphic
         float halfArc = visibleArcDeg * 0.5f;
         AddArc(vh, aircraftApex, arcRadius, -halfArc, halfArc, 72, lineWidth, White);
 
-        for (float rel = -halfArc; rel <= halfArc + 0.1f; rel += 5f)
+        float firstTickHeading = Mathf.Floor((state.HeadingMagDeg - halfArc) / 5f) * 5f;
+        float lastTickHeading = state.HeadingMagDeg + halfArc + 5f;
+
+        for (float heading = firstTickHeading; heading <= lastTickHeading; heading += 5f)
         {
-            bool major = Mathf.Abs(Mathf.Repeat(rel + 360f, 30f)) < 0.1f || Mathf.Abs(Mathf.Repeat(rel + 360f, 30f) - 30f) < 0.1f;
-            bool medium = Mathf.Abs(Mathf.Repeat(rel + 360f, 10f)) < 0.1f || Mathf.Abs(Mathf.Repeat(rel + 360f, 10f) - 10f) < 0.1f;
+            float normalizedHeading = Mathf.Repeat(heading, 360f);
+            float rel = Mathf.DeltaAngle(state.HeadingMagDeg, normalizedHeading);
+            if (Mathf.Abs(rel) > halfArc + 0.1f)
+            {
+                continue;
+            }
+
+            bool major = IsHeadingMultiple(normalizedHeading, 30f);
+            bool medium = IsHeadingMultiple(normalizedHeading, 10f);
             float tick = major ? 22f : (medium ? 16f : 10f);
             float width = major ? 2f : 1.2f;
             AddLine(vh, PointFromBearing(rel, arcRadius), PointFromBearing(rel, arcRadius - tick), width, White);
@@ -372,6 +363,11 @@ public class B737NavigationDisplayGraphic : MaskableGraphic
     {
         float rad = relativeBearingDeg * Mathf.Deg2Rad;
         return new Vector2(Mathf.Sin(rad), -Mathf.Cos(rad));
+    }
+
+    private static bool IsHeadingMultiple(float headingDeg, float stepDeg)
+    {
+        return Mathf.Abs(Mathf.DeltaAngle(0f, Mathf.Repeat(headingDeg, stepDeg))) < 0.1f;
     }
 
     private Vector2 PixelToLocal(Vector2 p)

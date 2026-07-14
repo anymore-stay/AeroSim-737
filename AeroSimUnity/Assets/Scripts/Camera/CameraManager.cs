@@ -47,7 +47,6 @@ public class CameraManager : MonoBehaviour
     [SerializeField]
     private int defaultSlotIndex = 0;
 
-    private CameraSlot currentSlot;
     private Dictionary<int, CameraSlot> slotMap = new Dictionary<int, CameraSlot>();
 
     private static CameraManager instance;
@@ -180,13 +179,21 @@ public class CameraManager : MonoBehaviour
             return;
         }
 
-        if (currentSlot != null && currentSlot.cameraObject != null)
+        for (int i = 0; i < cameraSlots.Count; i++)
         {
-            SetCameraSlotActive(currentSlot, false);
+            CameraSlot registeredSlot = cameraSlots[i];
+            if (registeredSlot == null || registeredSlot.cameraObject == null)
+            {
+                continue;
+            }
+
+            if (registeredSlot.cameraObject != slot.cameraObject)
+            {
+                SetCameraSlotActive(registeredSlot, false);
+            }
         }
 
         SetCameraSlotActive(slot, true);
-        currentSlot = slot;
         ActiveCamera = slot.cameraObject.GetComponent<Camera>();
 
         Debug.Log("[CameraManager] 切换到: " + slot.displayName + " (Shift+" + slot.hotkeyNumber + ")");
