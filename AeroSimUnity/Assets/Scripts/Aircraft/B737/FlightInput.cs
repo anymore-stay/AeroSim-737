@@ -112,6 +112,29 @@ public class FlightInput : MonoBehaviour
     [SerializeField, Min(0f)] private float groundSteeringMaxAglFt = 15f;
     [Tooltip("中文名：反转 JSBSim 前轮转向。当前 737 场景保持关闭，使 Q 左转、E 右转。")]
     [SerializeField] private bool invertGroundSteering = false;
+    [Tooltip("仅在离地后反转侧杆扭转方向，修正 JSBSim 空中方向舵与地面前轮转向符号相反的问题。不会影响 Q/E。")]
+    [InspectorName("空中反转侧杆方向舵")]
+    [SerializeField] private bool invertJoystickYawInFlight = true;
+
+    [Header("侧杆偏航滚转补偿")]
+    [Tooltip("侧杆扭转偏航时保持开始偏航前的坡度，抵消方向舵带来的气动滚转。不会改变键盘操纵。")]
+    [InspectorName("启用侧杆偏航滚转补偿")]
+    [SerializeField] private bool joystickYawRollCompensation = true;
+    [Tooltip("侧杆偏航绝对值超过该值后开始保持坡度。")]
+    [InspectorName("侧杆偏航补偿触发死区")]
+    [SerializeField, Range(0f, 0.5f)] private float joystickYawCompensationDeadzone = 0.08f;
+    [Tooltip("侧杆横滚绝对值超过该值时，立即把副翼控制权交还给飞行员。")]
+    [InspectorName("侧杆横滚让权死区")]
+    [SerializeField, Range(0f, 0.5f)] private float joystickRollOverrideDeadzone = 0.08f;
+    [Tooltip("偏航造成坡度偏差时的回正强度。过大可能产生左右振荡。")]
+    [InspectorName("偏航坡度保持增益")]
+    [SerializeField, Min(0f)] private float joystickYawBankHoldGain = 0.04f;
+    [Tooltip("根据滚转角速度提前施加反向副翼，减少偏航带来的滚转和回正过冲。")]
+    [InspectorName("偏航滚转阻尼")]
+    [SerializeField, Min(0f)] private float joystickYawRollRateDamping = 0.04f;
+    [Tooltip("侧杆偏航补偿能够使用的最大副翼量。")]
+    [InspectorName("偏航副翼补偿上限")]
+    [SerializeField, Range(0f, 1f)] private float maxJoystickYawAileronCompensation = 0.5f;
 
     [Header("坡度角保护")]
     [Tooltip("限制飞行中的最大坡度角，防止持续按 A/D 导致飞机翻转。")]
@@ -142,7 +165,11 @@ public class FlightInput : MonoBehaviour
     private float keyboardRudder;
     private float pitchTrim;
     private float turnInput;
+    private float joystickAileronInput;
+    private float joystickRudderInput;
     private float smoothedTurnBankTargetDeg;
+    private float joystickYawBankTargetDeg;
+    private bool joystickYawBankHoldActive;
     private float throttle = 0f;   // 地面起飞:初始油门怠速 0,推 Shift 才加速
     private int flapStep;
     private int spoilerStep;
@@ -203,8 +230,8 @@ public class FlightInput : MonoBehaviour
         if (Input.GetKey(KeyCode.D)) rollInput += 1f;
         if (Input.GetKey(KeyCode.A)) rollInput -= 1f;
         keyboardAileron = StepAxis(keyboardAileron, rollInput, aileronRate, dt);
-        float joystickAileron = directJoystickControlActive ? sidestickInput.Roll : 0f;
-        aileron = Mathf.Clamp(joystickAileron + keyboardAileron, -1f, 1f);
+        joystickAileronInput = directJoystickControlActive ? sidestickInput.Roll : 0f;
+        aileron = Mathf.Clamp(joystickAileronInput + keyboardAileron, -1f, 1f);
 
         // ---- 方向舵:Q 左偏航, E 右偏航；键盘修正量与侧杆扭转叠加 ----
         float yawInput = 0f;
@@ -228,8 +255,13 @@ public class FlightInput : MonoBehaviour
         {
             keyboardRudder = StepAxis(keyboardRudder, yawInput, rudderRate, dt);
         }
-        float joystickRudder = directJoystickControlActive ? sidestickInput.Yaw : 0f;
-        rudder = Mathf.Clamp(joystickRudder + keyboardRudder, -1f, 1f);
+        joystickRudderInput = directJoystickControlActive
+            ? ResolveJoystickYaw(
+                sidestickInput.Yaw,
+                invertJoystickYawInFlight,
+                IsAirborneForJoystickYaw())
+            : 0f;
+        rudder = Mathf.Clamp(joystickRudderInput + keyboardRudder, -1f, 1f);
 
         // ---- 油门:Shift 加，Ctrl 收至怠速，同时按下可在任何状态增加反推 ----
         bool increaseThrottle = Input.GetKey(KeyCode.LeftShift);
@@ -443,7 +475,12 @@ public class FlightInput : MonoBehaviour
 
     private void SendControls()
     {
-        if (bridge == null || !bridge.ControlConnected) return;
+        if (bridge == null || !bridge.ControlConnected)
+        {
+            joystickYawBankHoldActive = false;
+            return;
+        }
+
         float coordinatedAileron = aileron;
         bool useTurnAssist = coordinatedTurnAssist &&
                              (!directJoystickControlActive || Mathf.Abs(turnInput) > coordinatedTurnDeadzone);
@@ -474,6 +511,46 @@ public class FlightInput : MonoBehaviour
         else if (useTurnAssist && hasTurnInput)
         {
             coordinatedAileron += turnInput * yawToAileron;
+        }
+
+        bool pilotRequestsRoll = Mathf.Abs(joystickAileronInput) > joystickRollOverrideDeadzone ||
+                                 Mathf.Abs(keyboardAileron) > joystickRollOverrideDeadzone ||
+                                 Mathf.Abs(turnInput) > coordinatedTurnDeadzone;
+        bool canCompensateJoystickYaw = joystickYawRollCompensation &&
+                                        directJoystickControlActive &&
+                                        bridge.HasState &&
+                                        IsAirborneForJoystickYaw() &&
+                                        !pilotRequestsRoll;
+        bool joystickYawRequested = canCompensateJoystickYaw &&
+                                    Mathf.Abs(joystickRudderInput) > joystickYawCompensationDeadzone;
+
+        if (!canCompensateJoystickYaw)
+        {
+            joystickYawBankHoldActive = false;
+        }
+        else if (joystickYawRequested && !joystickYawBankHoldActive)
+        {
+            joystickYawBankTargetDeg = bridge.RollDeg;
+            joystickYawBankHoldActive = true;
+        }
+
+        if (joystickYawBankHoldActive)
+        {
+            float rollRateDeg = bridge.GetValue("p_rps", 0f) * Mathf.Rad2Deg;
+            float bankErrorDeg = Mathf.DeltaAngle(bridge.RollDeg, joystickYawBankTargetDeg);
+            coordinatedAileron += CalculateJoystickYawRollCompensation(
+                bankErrorDeg,
+                rollRateDeg,
+                joystickYawBankHoldGain,
+                joystickYawRollRateDamping,
+                maxJoystickYawAileronCompensation);
+
+            if (!joystickYawRequested &&
+                Mathf.Abs(bankErrorDeg) <= levelBankDeadzoneDeg &&
+                Mathf.Abs(rollRateDeg) <= 1f)
+            {
+                joystickYawBankHoldActive = false;
+            }
         }
 
         float elevatorCommand = Mathf.Clamp(elevator * elevatorAuthority, -1f, 1f);
@@ -541,6 +618,42 @@ public class FlightInput : MonoBehaviour
             : rudder;
         float steeringCommand = Mathf.Clamp(steeringInput * groundSteeringAuthority, -1f, 1f);
         return invertGroundSteering ? -steeringCommand : steeringCommand;
+    }
+
+    private bool IsAirborneForJoystickYaw()
+    {
+        if (bridge == null || !bridge.HasState)
+            return false;
+
+        bool weightOnWheels = bridge.GetValue("gear_wow", 0f) > 0.5f ||
+                              bridge.GetValue("gear_unit_1_wow", 0f) > 0.5f ||
+                              bridge.GetValue("gear_unit_2_wow", 0f) > 0.5f;
+        return !weightOnWheels && bridge.AglFt > groundSteeringMaxAglFt;
+    }
+
+    private static float ResolveJoystickYaw(float joystickYaw, bool invertInFlight, bool airborne)
+    {
+        joystickYaw = Mathf.Clamp(joystickYaw, -1f, 1f);
+        return invertInFlight && airborne ? -joystickYaw : joystickYaw;
+    }
+
+    private static float CalculateJoystickYawRollCompensation(
+        float bankErrorDeg,
+        float rollRateDeg,
+        float bankHoldGain,
+        float rollRateDamping,
+        float maxCompensation)
+    {
+        if (float.IsNaN(bankErrorDeg) || float.IsInfinity(bankErrorDeg) ||
+            float.IsNaN(rollRateDeg) || float.IsInfinity(rollRateDeg))
+        {
+            return 0f;
+        }
+
+        float compensation = bankErrorDeg * Mathf.Max(0f, bankHoldGain) -
+                             rollRateDeg * Mathf.Max(0f, rollRateDamping);
+        float limit = Mathf.Clamp01(maxCompensation);
+        return Mathf.Clamp(compensation, -limit, limit);
     }
 
     // 给 HUD 读取

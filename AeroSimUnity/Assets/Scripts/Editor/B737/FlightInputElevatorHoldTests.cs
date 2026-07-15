@@ -55,6 +55,47 @@ public class FlightInputElevatorHoldTests
         Assert.That(result, Is.EqualTo(expected).Within(0.0001f));
     }
 
+    [TestCase(0.6f, true, false, 0.6f)]
+    [TestCase(0.6f, true, true, -0.6f)]
+    [TestCase(0.6f, false, true, 0.6f)]
+    public void JoystickYawOnlyReversesInFlightWhenEnabled(
+        float input,
+        bool invertInFlight,
+        bool airborne,
+        float expected)
+    {
+        float result = InvokeResolveJoystickYaw(input, invertInFlight, airborne);
+
+        Assert.That(result, Is.EqualTo(expected).Within(0.0001f));
+    }
+
+    [TestCase(-5f, 0f, -0.2f)]
+    [TestCase(5f, 0f, 0.2f)]
+    [TestCase(0f, 5f, -0.2f)]
+    [TestCase(0f, -5f, 0.2f)]
+    public void JoystickYawRollCompensationOpposesBankErrorAndRollRate(
+        float bankErrorDeg,
+        float rollRateDeg,
+        float expected)
+    {
+        float result = InvokeJoystickYawRollCompensation(
+            bankErrorDeg,
+            rollRateDeg,
+            0.04f,
+            0.04f,
+            0.5f);
+
+        Assert.That(result, Is.EqualTo(expected).Within(0.0001f));
+    }
+
+    [Test]
+    public void JoystickYawRollCompensationRespectsAileronLimit()
+    {
+        float result = InvokeJoystickYawRollCompensation(20f, 0f, 0.04f, 0.04f, 0.5f);
+
+        Assert.That(result, Is.EqualTo(0.5f).Within(0.0001f));
+    }
+
     private static float InvokeStepHeldAxis(float current, float input, float rate, float deltaTime)
     {
         MethodInfo method = typeof(FlightInput).GetMethod(
@@ -78,5 +119,39 @@ public class FlightInputElevatorHoldTests
         Assert.That(method, Is.Not.Null);
 
         return (float)method.Invoke(null, new object[] { current, noseUp, noseDown, rate, deltaTime });
+    }
+
+    private static float InvokeResolveJoystickYaw(float input, bool invertInFlight, bool airborne)
+    {
+        MethodInfo method = typeof(FlightInput).GetMethod(
+            "ResolveJoystickYaw",
+            BindingFlags.NonPublic | BindingFlags.Static);
+        Assert.That(method, Is.Not.Null);
+
+        return (float)method.Invoke(null, new object[] { input, invertInFlight, airborne });
+    }
+
+    private static float InvokeJoystickYawRollCompensation(
+        float bankErrorDeg,
+        float rollRateDeg,
+        float bankHoldGain,
+        float rollRateDamping,
+        float maxCompensation)
+    {
+        MethodInfo method = typeof(FlightInput).GetMethod(
+            "CalculateJoystickYawRollCompensation",
+            BindingFlags.NonPublic | BindingFlags.Static);
+        Assert.That(method, Is.Not.Null);
+
+        return (float)method.Invoke(
+            null,
+            new object[]
+            {
+                bankErrorDeg,
+                rollRateDeg,
+                bankHoldGain,
+                rollRateDamping,
+                maxCompensation
+            });
     }
 }

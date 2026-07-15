@@ -22,7 +22,7 @@ public class B737FlapController : MonoBehaviour
     [SerializeField] private bool useKeyboardInput = true;
     [SerializeField] private KeyCode extendKey = KeyCode.F;
     [SerializeField] private KeyCode retractKey = KeyCode.V;
-    [SerializeField] private float flapMoveSpeed = 0.6f;
+    [SerializeField, Min(0f)] private float flapMoveSpeed = 0.6f;
     [SerializeField] private bool startDeployed;
 
     [Header("Flaps")]
@@ -30,8 +30,10 @@ public class B737FlapController : MonoBehaviour
 
     [Header("Debug")]
     [SerializeField, Range(0f, 1f)] private float flapInput;
+    private float targetFlapInput;
 
     public float FlapInput => flapInput;
+    public float TargetFlapInput => targetFlapInput;
 
     private void OnValidate()
     {
@@ -43,6 +45,7 @@ public class B737FlapController : MonoBehaviour
         SyncTargetBindings();
         CaptureNeutralPose();
         flapInput = startDeployed ? 1f : 0f;
+        targetFlapInput = flapInput;
         ApplyFlaps();
     }
 
@@ -53,6 +56,10 @@ public class B737FlapController : MonoBehaviour
             UpdateKeyboardInput();
         }
 
+        flapInput = Mathf.MoveTowards(
+            flapInput,
+            targetFlapInput,
+            flapMoveSpeed * Time.deltaTime);
         ApplyFlaps();
     }
 
@@ -80,10 +87,11 @@ public class B737FlapController : MonoBehaviour
 
     public void SetFlapInput(float value, bool snapImmediately = false)
     {
-        flapInput = Mathf.Clamp01(value);
+        targetFlapInput = Mathf.Clamp01(value);
 
         if (snapImmediately)
         {
+            flapInput = targetFlapInput;
             ApplyFlaps();
         }
     }
@@ -106,7 +114,8 @@ public class B737FlapController : MonoBehaviour
             direction = -1f;
         }
 
-        flapInput = Mathf.Clamp01(flapInput + direction * flapMoveSpeed * Time.deltaTime);
+        targetFlapInput = Mathf.Clamp01(
+            targetFlapInput + direction * flapMoveSpeed * Time.deltaTime);
     }
 
     private void ApplyFlaps()
