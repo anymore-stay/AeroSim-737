@@ -96,7 +96,7 @@ public class FlightMapOverlay : MonoBehaviour
     [Header("Cesium Scene Basemap")]
     [SerializeField] private bool useCesiumSceneBasemap = true;
     [SerializeField, Range(256, 2048)] private int cesiumMapTextureSize = 256;
-    [SerializeField, Min(0.05f)] private float cesiumRenderIntervalSeconds = 1f;
+    [SerializeField, Min(0.05f)] private float cesiumRenderIntervalSeconds = 6f;
     [SerializeField, Min(1f)] private float cesiumVisibleRangeLimitNm = 12f;
     [SerializeField, Min(300f)] private float cesiumMinimumCameraHeightMeters = 1200f;
     [SerializeField, Min(1000f)] private float cesiumFarPaddingMeters = 12000f;
@@ -174,6 +174,7 @@ public class FlightMapOverlay : MonoBehaviour
     private bool mapVisible;
     private bool mapDirty = true;
     private float nextMapRenderTime;
+    private float nextHiddenTrackSampleTime;
     private float nextCesiumRenderTime;
     private double lastCesiumRenderCenterLat = double.NaN;
     private double lastCesiumRenderCenterLon = double.NaN;
@@ -268,6 +269,12 @@ public class FlightMapOverlay : MonoBehaviour
 
         if (!mapVisible)
         {
+            if (Time.unscaledTime >= nextHiddenTrackSampleTime)
+            {
+                UpdateFlightState();
+                nextHiddenTrackSampleTime = Time.unscaledTime + Mathf.Max(0.02f, mapRefreshIntervalSeconds);
+            }
+
             return;
         }
 
@@ -398,6 +405,8 @@ public class FlightMapOverlay : MonoBehaviour
         {
             cesiumSceneLayerMask = DefaultCesiumMapLayerMask;
         }
+
+        cesiumRenderIntervalSeconds = Mathf.Max(6f, cesiumRenderIntervalSeconds);
         mapSize = minMapSize;
         minimumRangeNm = Mathf.Clamp(minimumRangeNm, 0.2f, 2f);
         maximumRangeNm = Mathf.Clamp(maximumRangeNm, minimumRangeNm, Mathf.Max(minimumRangeNm, cesiumVisibleRangeLimitNm));
@@ -532,30 +541,13 @@ public class FlightMapOverlay : MonoBehaviour
 
     private void RenderMap()
     {
-        bool hasAircraft = TryReadAircraft(out double aircraftLat, out double aircraftLon, out float headingDeg);
-        UpdateDeparturePoint(hasAircraft, aircraftLat, aircraftLon);
-
-        double centerLat = manualCenterOverride ? manualCenterLatDeg : GetDisplayCenterLat(hasAircraft, aircraftLat);
-        double centerLon = manualCenterOverride ? manualCenterLonDeg : GetDisplayCenterLon(hasAircraft, aircraftLon);
-        currentCenterLatDeg = centerLat;
-        currentCenterLonDeg = centerLon;
-
-        float rangeNm = CalculateRangeNm(hasAircraft, aircraftLat, aircraftLon, centerLat, centerLon);
-        currentRangeNm = rangeNm;
-        if (ShouldUseOnlineTileBasemap())
-        {
-            PrepareMercatorProjection(centerLat, rangeNm);
-        }
-        else
-        {
-            currentTileZoom = -1;
-            currentTileDisplayScale = 1f;
-        }
-
-        if (hasAircraft)
-        {
-            UpdateTrack(aircraftLat, aircraftLon);
-        }
+        bool hasAircraft = UpdateFlightState(
+            out double aircraftLat,
+            out double aircraftLon,
+            out float headingDeg,
+            out double centerLat,
+            out double centerLon,
+            out float rangeNm);
 
         int activeLeg = FindActiveLeg(hasAircraft, aircraftLat, aircraftLon);
         Vector2[] routePoints = BuildRoutePoints(centerLat, centerLon, rangeNm);
@@ -596,6 +588,53 @@ public class FlightMapOverlay : MonoBehaviour
         });
 
         UpdateInfo(hasAircraft, aircraftLat, aircraftLon, headingDeg, rangeNm, activeLeg);
+    }
+
+    private bool UpdateFlightState()
+    {
+        return UpdateFlightState(
+            out _,
+            out _,
+            out _,
+            out _,
+            out _,
+            out _);
+    }
+
+    private bool UpdateFlightState(
+        out double aircraftLat,
+        out double aircraftLon,
+        out float headingDeg,
+        out double centerLat,
+        out double centerLon,
+        out float rangeNm)
+    {
+        bool hasAircraft = TryReadAircraft(out aircraftLat, out aircraftLon, out headingDeg);
+        UpdateDeparturePoint(hasAircraft, aircraftLat, aircraftLon);
+
+        if (hasAircraft)
+        {
+            UpdateTrack(aircraftLat, aircraftLon);
+        }
+
+        centerLat = manualCenterOverride ? manualCenterLatDeg : GetDisplayCenterLat(hasAircraft, aircraftLat);
+        centerLon = manualCenterOverride ? manualCenterLonDeg : GetDisplayCenterLon(hasAircraft, aircraftLon);
+        currentCenterLatDeg = centerLat;
+        currentCenterLonDeg = centerLon;
+
+        rangeNm = CalculateRangeNm(hasAircraft, aircraftLat, aircraftLon, centerLat, centerLon);
+        currentRangeNm = rangeNm;
+        if (ShouldUseOnlineTileBasemap())
+        {
+            PrepareMercatorProjection(centerLat, rangeNm);
+        }
+        else
+        {
+            currentTileZoom = -1;
+            currentTileDisplayScale = 1f;
+        }
+
+        return hasAircraft;
     }
 
     private bool HandleRangeInput()
