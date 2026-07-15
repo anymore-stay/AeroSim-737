@@ -1,3 +1,4 @@
+using System;
 using UnityEngine;
 using UnityEngine.Rendering;
 using UnityEngine.Rendering.Universal;
@@ -22,6 +23,25 @@ namespace UniStorm.Utility
                 return m_UniStormClouds == null;
             }
 
+            private static bool ShouldSkipCamera(CameraData cameraData)
+            {
+                Camera camera = cameraData.camera;
+                if (camera == null || cameraData.cameraType != CameraType.Game || !Application.isPlaying)
+                {
+                    return true;
+                }
+
+                if (camera.targetTexture != null)
+                {
+                    return true;
+                }
+
+                string cameraName = camera.name;
+                return cameraName.IndexOf("FlightMap", StringComparison.OrdinalIgnoreCase) >= 0
+                    || cameraName.IndexOf("Cesium", StringComparison.OrdinalIgnoreCase) >= 0
+                    || cameraName.IndexOf("Map", StringComparison.OrdinalIgnoreCase) >= 0;
+            }
+
             [System.Obsolete]
             public override void Execute(ScriptableRenderContext context, ref RenderingData renderingData)
             {
@@ -33,7 +53,7 @@ namespace UniStorm.Utility
                 CameraData cameraData = renderingData.cameraData;
                 Camera camera = cameraData.camera;
 
-                if (cameraData.cameraType == CameraType.SceneView || !Application.isPlaying) return;
+                if (ShouldSkipCamera(cameraData)) return;
                 if (!UniStormSystem.Instance.UniStormInitialized) return;
 
                 var cmd = CommandBufferPool.Get("UniStorm Clouds");

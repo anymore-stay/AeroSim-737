@@ -19,6 +19,25 @@ public class UniStormSunShaftsPass : ScriptableRenderPass
 
     private Transform sunTransform;
 
+    private static bool ShouldSkipCamera(CameraData cameraData)
+    {
+        Camera camera = cameraData.camera;
+        if (camera == null || cameraData.cameraType != CameraType.Game || !Application.isPlaying)
+        {
+            return true;
+        }
+
+        if (camera.targetTexture != null)
+        {
+            return true;
+        }
+
+        string cameraName = camera.name;
+        return cameraName.IndexOf("FlightMap", System.StringComparison.OrdinalIgnoreCase) >= 0
+            || cameraName.IndexOf("Cesium", System.StringComparison.OrdinalIgnoreCase) >= 0
+            || cameraName.IndexOf("Map", System.StringComparison.OrdinalIgnoreCase) >= 0;
+    }
+
     public Transform SunTransform
     {
         get
@@ -76,8 +95,7 @@ public class UniStormSunShaftsPass : ScriptableRenderPass
         CameraData cameraData = renderingData.cameraData;
         Camera camera = cameraData.camera;
 
-        //Skip execution for the Scene View camera or if not in runtime
-        if (cameraData.cameraType == CameraType.SceneView || !Application.isPlaying) return;
+        if (ShouldSkipCamera(cameraData)) return;
 
         CommandBuffer cmd = CommandBufferPool.Get(m_ProfilerTag);
 

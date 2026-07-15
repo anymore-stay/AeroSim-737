@@ -13,6 +13,19 @@ using UnityEngine.UI;
 public class FlightMapOverlay : MonoBehaviour
 {
     private static FlightMapOverlay activeInstance;
+    private const int CesiumMapExcludedLayerMask =
+        (1 << 1) |  // 透明特效层
+        (1 << 5) |  // UI 层
+        (1 << 6) |  // EICAS1 仪表层
+        (1 << 7) |  // EICAS2 仪表层
+        (1 << 8) |  // ND 仪表层
+        (1 << 9) |  // Clock 仪表层
+        (1 << 10) | // PFD_Left 仪表层
+        (1 << 11) | // PFD_Right 仪表层
+        (1 << 12) | // FMS 仪表层
+        (1 << 13) | // FMSButton 仪表交互层
+        (1 << 14);  // Standby 仪表层
+    private const int DefaultCesiumMapLayerMask = ~CesiumMapExcludedLayerMask;
 
     [Serializable]
     public class Waypoint
@@ -88,7 +101,7 @@ public class FlightMapOverlay : MonoBehaviour
     [SerializeField, Min(300f)] private float cesiumMinimumCameraHeightMeters = 1200f;
     [SerializeField, Min(1000f)] private float cesiumFarPaddingMeters = 12000f;
     [SerializeField, Min(1f)] private float cesiumTileLoadRangeMultiplier = 1f;
-    [SerializeField] private LayerMask cesiumSceneLayerMask = ~0;
+    [SerializeField] private LayerMask cesiumSceneLayerMask = DefaultCesiumMapLayerMask;
     [SerializeField] private Color cesiumImageTint = new Color(0.82f, 0.90f, 0.82f, 1f);
     [SerializeField] private Color cesiumMapColorWash = new Color(0.58f, 0.72f, 0.58f, 0.22f);
     [SerializeField] private Color cesiumMapClearColor = new Color(0.60f, 0.68f, 0.62f, 1f);
@@ -381,6 +394,10 @@ public class FlightMapOverlay : MonoBehaviour
         useCesiumSceneBasemap = true;
         useOnlineTileBasemap = false;
         allowMouseWheelRange = true;
+        if (cesiumSceneLayerMask.value == ~0)
+        {
+            cesiumSceneLayerMask = DefaultCesiumMapLayerMask;
+        }
         mapSize = minMapSize;
         minimumRangeNm = Mathf.Clamp(minimumRangeNm, 0.2f, 2f);
         maximumRangeNm = Mathf.Clamp(maximumRangeNm, minimumRangeNm, Mathf.Max(minimumRangeNm, cesiumVisibleRangeLimitNm));

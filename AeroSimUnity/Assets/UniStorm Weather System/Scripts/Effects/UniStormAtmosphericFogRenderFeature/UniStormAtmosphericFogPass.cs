@@ -18,6 +18,25 @@ public class UniStormAtmosphericFogPass : ScriptableRenderPass
 
     float TimeStamp;
 
+    private static bool ShouldSkipCamera(CameraData cameraData)
+    {
+        Camera camera = cameraData.camera;
+        if (camera == null || cameraData.cameraType != CameraType.Game || !Application.isPlaying)
+        {
+            return true;
+        }
+
+        if (camera.targetTexture != null)
+        {
+            return true;
+        }
+
+        string cameraName = camera.name;
+        return cameraName.IndexOf("FlightMap", StringComparison.OrdinalIgnoreCase) >= 0
+            || cameraName.IndexOf("Cesium", StringComparison.OrdinalIgnoreCase) >= 0
+            || cameraName.IndexOf("Map", StringComparison.OrdinalIgnoreCase) >= 0;
+    }
+
     public UniStormAtmosphericFogPass(string tag)
     {
         m_ProfilerTag = tag;
@@ -83,8 +102,7 @@ public class UniStormAtmosphericFogPass : ScriptableRenderPass
         CameraData cameraData = renderingData.cameraData;
         Camera camera = cameraData.camera;
 
-        //Skip execution for the Scene View camera or if not in runtime
-        if (cameraData.cameraType == CameraType.SceneView || !Application.isPlaying) return;
+        if (ShouldSkipCamera(cameraData)) return;
 
         Transform camtr = camera.transform;
 
