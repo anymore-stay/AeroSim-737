@@ -12031,6 +12031,12 @@ MonoBehaviour:
   pulseLightIntensityScales:
   - 0.09411765
   - 1.35
+  pulseLightRangeScales:
+  - 0.28
+  - 1
+  pulseLightCullingMasks:
+  - 0
+  - -1
   pulseLightRange: 22
   pulseLightType: 0
   pulseLightSpotAngle: 150
@@ -12119,7 +12125,7 @@ Light:
   m_RenderMode: 0
   m_CullingMask:
     serializedVersion: 2
-    m_Bits: 4294967295
+    m_Bits: 0
   m_RenderingLayerMask: 1
   m_Lightmapping: 4
   m_LightShadowCasterMode: 0

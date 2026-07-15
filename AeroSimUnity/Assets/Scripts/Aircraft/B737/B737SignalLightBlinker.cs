@@ -13,6 +13,10 @@ public class B737SignalLightBlinker : MonoBehaviour
     public const float DefaultLowerPulseLightIntensityScale = 0.09411765f;
     public const float DefaultUpperPulseLightIntensityScale = 1.35f;
     public const float DefaultPulseLightRange = 22f;
+    public const float DefaultLowerPulseLightRangeScale = 0.28f;
+    public const float DefaultUpperPulseLightRangeScale = 1f;
+    public const int DefaultLowerPulseLightCullingMask = 0;
+    public const int DefaultUpperPulseLightCullingMask = -1;
     public const LightType DefaultPulseLightType = LightType.Spot;
     public const float DefaultPulseLightSpotAngle = 150f;
     public const float DefaultPulseLightInnerSpotAngle = 95f;
@@ -60,6 +64,16 @@ public class B737SignalLightBlinker : MonoBehaviour
         DefaultLowerPulseLightIntensityScale,
         DefaultUpperPulseLightIntensityScale
     };
+    [SerializeField] private float[] pulseLightRangeScales =
+    {
+        DefaultLowerPulseLightRangeScale,
+        DefaultUpperPulseLightRangeScale
+    };
+    [SerializeField] private int[] pulseLightCullingMasks =
+    {
+        DefaultLowerPulseLightCullingMask,
+        DefaultUpperPulseLightCullingMask
+    };
     [SerializeField] private float pulseLightRange = DefaultPulseLightRange;
     [SerializeField] private LightType pulseLightType = DefaultPulseLightType;
     [SerializeField, Range(1f, 179f)] private float pulseLightSpotAngle = DefaultPulseLightSpotAngle;
@@ -85,6 +99,7 @@ public class B737SignalLightBlinker : MonoBehaviour
         public float InnerSpotAngle;
         public LightShadows Shadows;
         public LightRenderMode RenderMode;
+        public int CullingMask;
         public Vector3 LocalPosition;
         public Quaternion LocalRotation;
     }
@@ -128,6 +143,11 @@ public class B737SignalLightBlinker : MonoBehaviour
     public static float EvaluatePulseLightIntensity(float beaconIntensity, float peakIntensity, float intensityScale)
     {
         return EvaluatePulseLightIntensity(beaconIntensity, peakIntensity) * Mathf.Max(0f, intensityScale);
+    }
+
+    public static float EvaluatePulseLightRange(float baseRange, float rangeScale)
+    {
+        return Mathf.Max(0.1f, Mathf.Max(0f, baseRange) * Mathf.Max(0f, rangeScale));
     }
 
     public static Color EvaluateVisualOverlayColor(Color color, float beaconIntensity, float peakAlpha)
@@ -617,7 +637,11 @@ public class B737SignalLightBlinker : MonoBehaviour
                 beaconIntensity,
                 pulseLightIntensity,
                 GetPulseLightIntensityScale(index));
-            ApplyPulseLightIntensity(pulseLights[index], lightIntensity);
+            ApplyPulseLightIntensity(
+                pulseLights[index],
+                lightIntensity,
+                GetPulseLightRangeScale(index),
+                GetPulseLightCullingMask(index));
         }
     }
 
@@ -668,6 +692,26 @@ public class B737SignalLightBlinker : MonoBehaviour
         return Mathf.Max(0f, pulseLightIntensityScales[index]);
     }
 
+    private float GetPulseLightRangeScale(int index)
+    {
+        if (pulseLightRangeScales == null || index < 0 || index >= pulseLightRangeScales.Length)
+        {
+            return 1f;
+        }
+
+        return Mathf.Max(0f, pulseLightRangeScales[index]);
+    }
+
+    private int GetPulseLightCullingMask(int index)
+    {
+        if (pulseLightCullingMasks == null || index < 0 || index >= pulseLightCullingMasks.Length)
+        {
+            return DefaultUpperPulseLightCullingMask;
+        }
+
+        return pulseLightCullingMasks[index];
+    }
+
     private static Quaternion GetPulseLightLocalRotation(Vector3 localDirection)
     {
         Vector3 forward = localDirection.sqrMagnitude > 0.0001f ? localDirection.normalized : Vector3.up;
@@ -698,7 +742,7 @@ public class B737SignalLightBlinker : MonoBehaviour
         }
     }
 
-    private void ApplyPulseLightIntensity(Light light, float lightIntensity)
+    private void ApplyPulseLightIntensity(Light light, float lightIntensity, float lightRangeScale, int lightCullingMask)
     {
         if (light == null)
         {
@@ -707,7 +751,8 @@ public class B737SignalLightBlinker : MonoBehaviour
 
         light.enabled = lightIntensity > 0.001f;
         light.color = onColor;
-        light.range = Mathf.Max(0.1f, pulseLightRange);
+        light.range = EvaluatePulseLightRange(pulseLightRange, lightRangeScale);
+        light.cullingMask = lightCullingMask;
         light.intensity = lightIntensity;
     }
 
@@ -725,6 +770,7 @@ public class B737SignalLightBlinker : MonoBehaviour
             InnerSpotAngle = light.innerSpotAngle,
             Shadows = light.shadows,
             RenderMode = light.renderMode,
+            CullingMask = light.cullingMask,
             LocalPosition = light.transform.localPosition,
             LocalRotation = light.transform.localRotation
         };
@@ -746,6 +792,7 @@ public class B737SignalLightBlinker : MonoBehaviour
         state.Light.innerSpotAngle = state.InnerSpotAngle;
         state.Light.shadows = state.Shadows;
         state.Light.renderMode = state.RenderMode;
+        state.Light.cullingMask = state.CullingMask;
         state.Light.transform.localPosition = state.LocalPosition;
         state.Light.transform.localRotation = state.LocalRotation;
     }

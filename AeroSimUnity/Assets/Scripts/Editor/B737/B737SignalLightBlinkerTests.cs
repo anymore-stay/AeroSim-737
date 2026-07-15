@@ -118,6 +118,20 @@ public class B737SignalLightBlinkerTests
     }
 
     [Test]
+    public void PulseLightRangeCanBeScaledPerLamp()
+    {
+        Assert.That(
+            B737SignalLightBlinker.EvaluatePulseLightRange(22f, 0.28f),
+            Is.EqualTo(6.16f).Within(0.001f));
+        Assert.That(
+            B737SignalLightBlinker.EvaluatePulseLightRange(22f, 1f),
+            Is.EqualTo(22f).Within(0.001f));
+        Assert.That(
+            B737SignalLightBlinker.EvaluatePulseLightRange(22f, -1f),
+            Is.EqualTo(0.1f).Within(0.001f));
+    }
+
+    [Test]
     public void PulseLightDefaultsUseRestrictedAnticollisionSpotCone()
     {
         Type blinkerType = Type.GetType("B737SignalLightBlinker, Assembly-CSharp");
@@ -138,16 +152,36 @@ public class B737SignalLightBlinkerTests
         FieldInfo upperScaleField = blinkerType.GetField(
             "DefaultUpperPulseLightIntensityScale",
             BindingFlags.Public | BindingFlags.Static);
+        FieldInfo lowerRangeScaleField = blinkerType.GetField(
+            "DefaultLowerPulseLightRangeScale",
+            BindingFlags.Public | BindingFlags.Static);
+        FieldInfo upperRangeScaleField = blinkerType.GetField(
+            "DefaultUpperPulseLightRangeScale",
+            BindingFlags.Public | BindingFlags.Static);
+        FieldInfo lowerCullingMaskField = blinkerType.GetField(
+            "DefaultLowerPulseLightCullingMask",
+            BindingFlags.Public | BindingFlags.Static);
+        FieldInfo upperCullingMaskField = blinkerType.GetField(
+            "DefaultUpperPulseLightCullingMask",
+            BindingFlags.Public | BindingFlags.Static);
 
         Assert.That(typeField, Is.Not.Null);
         Assert.That(spotAngleField, Is.Not.Null);
         Assert.That(beaconRedField, Is.Not.Null);
         Assert.That(lowerScaleField, Is.Not.Null);
         Assert.That(upperScaleField, Is.Not.Null);
+        Assert.That(lowerRangeScaleField, Is.Not.Null);
+        Assert.That(upperRangeScaleField, Is.Not.Null);
+        Assert.That(lowerCullingMaskField, Is.Not.Null);
+        Assert.That(upperCullingMaskField, Is.Not.Null);
         Assert.That((LightType)typeField.GetValue(null), Is.EqualTo(LightType.Spot));
         Assert.That((float)spotAngleField.GetValue(null), Is.EqualTo(150f).Within(0.001f));
         Assert.That((float)lowerScaleField.GetValue(null), Is.EqualTo(0.09411765f).Within(0.001f));
         Assert.That((float)upperScaleField.GetValue(null), Is.EqualTo(1.35f).Within(0.001f));
+        Assert.That((float)lowerRangeScaleField.GetValue(null), Is.EqualTo(0.28f).Within(0.001f));
+        Assert.That((float)upperRangeScaleField.GetValue(null), Is.EqualTo(1f).Within(0.001f));
+        Assert.That((int)lowerCullingMaskField.GetValue(null), Is.EqualTo(0));
+        Assert.That((int)upperCullingMaskField.GetValue(null), Is.EqualTo(-1));
 
         Color beaconRed = (Color)beaconRedField.GetValue(null);
         Assert.That(beaconRed.r, Is.EqualTo(0.72f).Within(0.001f));
