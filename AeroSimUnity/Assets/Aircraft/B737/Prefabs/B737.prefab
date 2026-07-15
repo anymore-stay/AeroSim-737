@@ -48701,7 +48701,7 @@ MonoBehaviour:
   localSpinAxis: {x: 1, y: 0, z: 0}
   wheelRadiusMeters: 0.34
   speedMultiplier: 1
-  invertSpin: 0
+  invertSpin: 1
   requireGearFullyExtended: 1
   requireNearGround: 1
   maxGroundAglFt: 15
