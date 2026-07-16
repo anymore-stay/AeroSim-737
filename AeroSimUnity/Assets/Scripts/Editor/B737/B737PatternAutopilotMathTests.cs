@@ -80,4 +80,41 @@ public class B737PatternAutopilotMathTests
 
         Assert.That(lead, Is.InRange(700f, 3500f));
     }
+
+    [Test]
+    public void CalculateFlareTargetPitch_CommandsMorePitchForExcessSinkRate()
+    {
+        float targetPitch = B737PatternAutopilotMath.CalculateFlareTargetPitch(
+            40f,
+            70f,
+            4.5f,
+            10f,
+            2f,
+            -12f,
+            4f,
+            0.25f,
+            3f,
+            6f);
+
+        Assert.That(targetPitch, Is.GreaterThan(4f));
+        Assert.That(targetPitch, Is.LessThanOrEqualTo(6f));
+    }
+
+    [Test]
+    public void CalculateFlareTargetPitch_ApproachesBasePitchAtTouchdownSinkRate()
+    {
+        float targetPitch = B737PatternAutopilotMath.CalculateFlareTargetPitch(
+            4.5f,
+            70f,
+            4.5f,
+            10f,
+            2f,
+            -2f,
+            4f,
+            0.25f,
+            3f,
+            6f);
+
+        Assert.That(targetPitch, Is.EqualTo(4f).Within(0.001f));
+    }
 }

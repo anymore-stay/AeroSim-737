@@ -122,10 +122,21 @@ public sealed class B737PatternAutopilot : MonoBehaviour
 
     [Header("Auto Land")]
     [SerializeField] private bool autoLand = true;
-    [SerializeField] private float flareStartAglFt = 45f;
+    [SerializeField] private float flareStartAglFt = 70f;
     [SerializeField] private float flareMaxDistanceM = 900f;
     [SerializeField] private float flarePastThresholdAllowanceM = 1500f;
-    [SerializeField] private float flarePitchDeg = 1f;
+    [SerializeField] private float flarePitchDeg = 4f;
+    [SerializeField] private float flareEntrySinkRateFps = 10f;
+    [SerializeField] private float flareTouchdownSinkRateFps = 2f;
+    [SerializeField] private float flareVerticalSpeedToPitchGain = 0.25f;
+    [SerializeField] private float flareMinPitchDeg = 3f;
+    [SerializeField] private float flareMaxPitchDeg = 6f;
+    [SerializeField, Range(0f, 1f)] private float flareElevatorLimit = 0.55f;
+    [SerializeField] private float flareIdleStartAglFt = 30f;
+    [SerializeField] private float touchdownDetectionAglFt = 4.5f;
+    [SerializeField] private float touchdownDetectionMaxSinkRateFps = 3f;
+    [SerializeField] private float rolloutNoseHoldSeconds = 2.5f;
+    [SerializeField] private float rolloutNoseHoldPitchDeg = 2f;
     [SerializeField, Range(0f, 1f)] private float touchdownSpeedbrake = 1f;
     [SerializeField, Range(0f, 1f)] private float rolloutBrake = 0.7f;
     [SerializeField] private float rolloutCompleteSpeedKts = 20f;
@@ -485,8 +496,20 @@ public sealed class B737PatternAutopilot : MonoBehaviour
     private void ApplyFlare(float crossTrackM)
     {
         ApplyHeadingControl(GetFinalTrackHeading(crossTrackM), Mathf.Min(8f, finalMaxBankDeg));
-        ApplyPitchControl(flarePitchDeg, maxElevator);
-        MoveThrottleTowards(0f);
+        float targetPitchDeg = B737PatternAutopilotMath.CalculateFlareTargetPitch(
+            bridge.AglFt,
+            flareStartAglFt,
+            touchdownDetectionAglFt,
+            flareEntrySinkRateFps,
+            flareTouchdownSinkRateFps,
+            bridge.VerticalSpeedFps,
+            flarePitchDeg,
+            flareVerticalSpeedToPitchGain,
+            flareMinPitchDeg,
+            flareMaxPitchDeg);
+        ApplyPitchControl(targetPitchDeg, flareElevatorLimit);
+        if (bridge.AglFt <= flareIdleStartAglFt)
+            MoveThrottleTowards(0f);
         ApplyYawDamping();
         ApplyConfiguration(approachFlaps, 0f, 0f);
     }
@@ -495,7 +518,10 @@ public sealed class B737PatternAutopilot : MonoBehaviour
     {
         float desiredHeading = GetFinalTrackHeading(crossTrackM);
         ApplyHeadingControl(desiredHeading, 5f);
-        commandedElevator = Mathf.MoveTowards(commandedElevator, 0f, Time.deltaTime);
+        if (Time.time - legEnteredTime < rolloutNoseHoldSeconds)
+            ApplyPitchControl(rolloutNoseHoldPitchDeg, flareElevatorLimit);
+        else
+            SetElevatorCommand(0f);
         MoveThrottleTowards(0f);
 
         float headingErrorDeg = Mathf.DeltaAngle(bridge.HeadingDeg, desiredHeading);
@@ -562,7 +588,7 @@ public sealed class B737PatternAutopilot : MonoBehaviour
                 break;
             case PatternLeg.Final:
                 float distanceToThresholdM = -alongM;
-                if (autoLand && IsWeightOnWheels())
+                if (autoLand && IsLandingContactDetected())
                     EnterLeg(PatternLeg.Rollout, "weight on wheels");
                 else if (autoLand && bridge.AglFt <= flareStartAglFt &&
                          distanceToThresholdM <= flareMaxDistanceM &&
@@ -570,7 +596,7 @@ public sealed class B737PatternAutopilot : MonoBehaviour
                     EnterLeg(PatternLeg.Flare, "flare height reached");
                 break;
             case PatternLeg.Flare:
-                if (IsWeightOnWheels())
+                if (IsLandingContactDetected())
                     EnterLeg(PatternLeg.Rollout, "weight on wheels");
                 break;
             case PatternLeg.Rollout:
@@ -851,6 +877,15 @@ public sealed class B737PatternAutopilot : MonoBehaviour
         }
 
         return hasWow ? weightOnWheels : bridge.AglFt <= 5f;
+    }
+
+    private bool IsLandingContactDetected()
+    {
+        if (IsWeightOnWheels())
+            return true;
+
+        return bridge.AglFt <= touchdownDetectionAglFt &&
+               bridge.VerticalSpeedFps >= -Mathf.Abs(touchdownDetectionMaxSinkRateFps);
     }
 
     private void GetPatternCoordinates(out float alongM, out float crossTrackM)

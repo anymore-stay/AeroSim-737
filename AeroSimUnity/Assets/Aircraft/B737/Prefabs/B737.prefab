@@ -70592,10 +70592,21 @@ MonoBehaviour:
   finalFlightPathGain: 0.1
   finalPitchRateDamping: 0.8
   autoLand: 1
-  flareStartAglFt: 45
+  flareStartAglFt: 70
   flareMaxDistanceM: 900
   flarePastThresholdAllowanceM: 1500
-  flarePitchDeg: 1
+  flarePitchDeg: 4
+  flareEntrySinkRateFps: 10
+  flareTouchdownSinkRateFps: 2
+  flareVerticalSpeedToPitchGain: 0.25
+  flareMinPitchDeg: 3
+  flareMaxPitchDeg: 6
+  flareElevatorLimit: 0.55
+  flareIdleStartAglFt: 30
+  touchdownDetectionAglFt: 4.5
+  touchdownDetectionMaxSinkRateFps: 3
+  rolloutNoseHoldSeconds: 2.5
+  rolloutNoseHoldPitchDeg: 2
   touchdownSpeedbrake: 1
   rolloutBrake: 0.7
   rolloutCompleteSpeedKts: 20

@@ -101,4 +101,31 @@ public static class B737PatternAutopilotMath
             -Mathf.Abs(noseUpLimit),
             Mathf.Abs(noseDownLimit));
     }
+
+    public static float CalculateFlareTargetPitch(
+        float aglFt,
+        float flareStartAglFt,
+        float touchdownAglFt,
+        float entrySinkRateFps,
+        float touchdownSinkRateFps,
+        float currentVerticalSpeedFps,
+        float basePitchDeg,
+        float verticalSpeedToPitchGain,
+        float minimumPitchDeg,
+        float maximumPitchDeg)
+    {
+        float altitudeSpanFt = Mathf.Max(1f, flareStartAglFt - touchdownAglFt);
+        float flareProgress = Mathf.Clamp01(
+            (flareStartAglFt - aglFt) / altitudeSpanFt);
+        float desiredVerticalSpeedFps = Mathf.Lerp(
+            -Mathf.Abs(entrySinkRateFps),
+            -Mathf.Abs(touchdownSinkRateFps),
+            flareProgress);
+        float targetPitchDeg = basePitchDeg +
+                               (desiredVerticalSpeedFps - currentVerticalSpeedFps) *
+                               Mathf.Max(0f, verticalSpeedToPitchGain);
+        float lowerPitchDeg = Mathf.Min(minimumPitchDeg, maximumPitchDeg);
+        float upperPitchDeg = Mathf.Max(minimumPitchDeg, maximumPitchDeg);
+        return Mathf.Clamp(targetPitchDeg, lowerPitchDeg, upperPitchDeg);
+    }
 }
