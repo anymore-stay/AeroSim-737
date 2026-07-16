@@ -12270,9 +12270,7 @@ MonoBehaviour:
   pulseLightRangeScales:
   - 0.28
   - 1
-  pulseLightCullingMasks:
-  - 0
-  - -1
+  pulseLightCullingMasks: 00000000ffffffff
   pulseLightRange: 22
   pulseLightType: 0
   pulseLightSpotAngle: 150
@@ -50317,7 +50315,7 @@ Camera:
     width: 1
     height: 1
   near clip plane: 0.01
-  far clip plane: 60000
+  far clip plane: 95000
   field of view: 60
   orthographic: 0
   orthographic size: 5
@@ -70947,7 +70945,7 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 5773677376619802584}
-  m_Enabled: 0
+  m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 08333ceef2b2f354fad836cd0560bbe4, type: 3}
   m_Name: 
@@ -70957,8 +70955,8 @@ MonoBehaviour:
   realisticSmokeTrails:
   - {fileID: 7447325053990996381}
   - {fileID: 6658138434635948040}
-  minimumAltitudeFt: 9999999
-  minimumSpeedKts: 180
+  minimumAltitudeFt: 2700
+  minimumSpeedKts: 160
   altitudeHysteresisFt: 500
   speedHysteresisKts: 10
   useAltitudeAboveSeaLevel: 1
@@ -109721,7 +109719,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 445030, guid: 4f672daf6d5264e5c9c59059b417bd89, type: 3}
       propertyPath: m_LocalPosition.y
-      value: -1.222
+      value: -9.66
       objectReference: {fileID: 0}
     - target: {fileID: 445030, guid: 4f672daf6d5264e5c9c59059b417bd89, type: 3}
       propertyPath: m_LocalPosition.z
@@ -110070,11 +110068,11 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 445030, guid: 4f672daf6d5264e5c9c59059b417bd89, type: 3}
       propertyPath: m_LocalPosition.y
-      value: -1.222
+      value: -9.66
       objectReference: {fileID: 0}
     - target: {fileID: 445030, guid: 4f672daf6d5264e5c9c59059b417bd89, type: 3}
       propertyPath: m_LocalPosition.z
-      value: -1.155
+      value: -1.15
       objectReference: {fileID: 0}
     - target: {fileID: 445030, guid: 4f672daf6d5264e5c9c59059b417bd89, type: 3}
       propertyPath: m_LocalRotation.w
