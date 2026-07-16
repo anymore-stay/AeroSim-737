@@ -184,6 +184,14 @@ public class FlightInput : MonoBehaviour
     private float sendTimer;
     private bool escapePaused;
     private float timeScaleBeforePause = 1f;
+    private bool externalControlActive;
+    private float externalElevator;
+    private float externalAileron;
+    private float externalRudder;
+    private float externalThrottle;
+    private float externalFlaps;
+    private float externalSpoilers;
+    private bool externalBrakes;
 
     private void Awake()
     {
@@ -205,6 +213,11 @@ public class FlightInput : MonoBehaviour
         }
 
         if (escapePaused) return;
+        if (externalControlActive)
+        {
+            HandleExternalLandingGearToggleInput();
+            return;
+        }
 
         float dt = Time.deltaTime;
         directJoystickControlActive = sidestickInput != null && sidestickInput.ControlActive;
@@ -407,10 +420,19 @@ public class FlightInput : MonoBehaviour
                bridge.HasState &&
                bridge.AglFt >= minimumGearRetractionAglFt;
     }
+
+    private void HandleExternalLandingGearToggleInput()
+    {
+        if (!Input.GetKeyDown(KeyCode.G))
+            return;
+
+        if (!TrySetGearDown(!gearDown, out string rejectionReason))
+            Debug.LogWarning("[FlightInput] " + rejectionReason);
+    }
     private void LateUpdate()
     {
         flapController?.SetFlapInput(Flaps);
-        mechanicalController?.SetGearExtended(gearDown);
+        mechanicalController?.SetGearExtended(GearDown);
     }
     private void SetEscapePaused(bool paused)
     {
@@ -475,7 +497,7 @@ public class FlightInput : MonoBehaviour
 
     private void SendControls()
     {
-        if (bridge == null || !bridge.ControlConnected)
+        if (externalControlActive || bridge == null || !bridge.ControlConnected)
         {
             joystickYawBankHoldActive = false;
             return;
@@ -668,6 +690,79 @@ public class FlightInput : MonoBehaviour
         }
     }
 
+    public void SetExternalControlActive(bool active)
+    {
+        if (externalControlActive == active)
+            return;
+
+        if (active)
+        {
+            externalElevator = 0f;
+            externalAileron = 0f;
+            externalRudder = 0f;
+            externalThrottle = Mathf.Clamp01(throttle);
+            externalFlaps = Flaps;
+            externalSpoilers = Spoilers;
+            externalBrakes = brakes;
+            ResetManualFlightAxes();
+            mechanicalController?.SetExternalInputs(0f, 0f, 0f);
+            externalControlActive = true;
+            return;
+        }
+
+        throttle = externalThrottle;
+        flapStep = Mathf.Clamp(
+            Mathf.RoundToInt(externalFlaps * flapStepCount),
+            0,
+            flapStepCount);
+        spoilerStep = Mathf.Clamp(
+            Mathf.RoundToInt(externalSpoilers * spoilerStepCount),
+            0,
+            spoilerStepCount);
+        brakes = externalBrakes;
+        externalControlActive = false;
+        ResetManualFlightAxes();
+    }
+
+    public void SetExternalControlState(
+        float elevatorValue,
+        float aileronValue,
+        float rudderValue,
+        float throttleValue,
+        float flapValue,
+        float spoilerValue,
+        bool brakesApplied)
+    {
+        externalElevator = Mathf.Clamp(elevatorValue, -1f, 1f);
+        externalAileron = Mathf.Clamp(aileronValue, -1f, 1f);
+        externalRudder = Mathf.Clamp(rudderValue, -1f, 1f);
+        externalThrottle = Mathf.Clamp01(throttleValue);
+        externalFlaps = Mathf.Clamp01(flapValue);
+        externalSpoilers = Mathf.Clamp01(spoilerValue);
+        externalBrakes = brakesApplied;
+    }
+
+    private void ResetManualFlightAxes()
+    {
+        elevator = 0f;
+        aileron = 0f;
+        rudder = 0f;
+        keyboardElevator = 0f;
+        keyboardAileron = 0f;
+        keyboardRudder = 0f;
+        joystickAileronInput = 0f;
+        joystickRudderInput = 0f;
+        turnInput = 0f;
+        smoothedTurnBankTargetDeg = 0f;
+        joystickYawBankTargetDeg = 0f;
+        joystickYawBankHoldActive = false;
+        pitchTrim = 0f;
+        directJoystickControlActive = false;
+        keyboardThrottleOverride = false;
+        shiftHoldingIdleAfterReverse = false;
+        shiftWasUsedForReverse = false;
+    }
+
     public void SetFlapStep(int step)
     {
         flapStep = Mathf.Clamp(step, 0, flapStepCount);
@@ -702,6 +797,7 @@ public class FlightInput : MonoBehaviour
         }
 
         gearDown = down;
+        bridge?.SetProperty("gear/gear-cmd-norm", gearDown ? 1f : 0f);
         return true;
     }
 
@@ -777,19 +873,25 @@ public class FlightInput : MonoBehaviour
         }
     }
 
-    public float Elevator => elevator;
+    public bool ExternalControlActive => externalControlActive;
+    public float Elevator => externalControlActive ? externalElevator : elevator;
     public float PitchTrim => pitchTrim;
-    public float Aileron => aileron;
-    public float Rudder => rudder;
-    public float Throttle => throttle;
-    public bool ReverseThrustActive => throttle < 0f;
-    public float Flaps => flapStepCount > 0 ? (float)flapStep / flapStepCount : 0f;
+    public float Aileron => externalControlActive ? externalAileron : aileron;
+    public float Rudder => externalControlActive ? externalRudder : rudder;
+    public float Throttle => externalControlActive ? externalThrottle : throttle;
+    public bool ReverseThrustActive => !externalControlActive && throttle < 0f;
+    public float Flaps => externalControlActive
+        ? externalFlaps
+        : (flapStepCount > 0 ? (float)flapStep / flapStepCount : 0f);
+    public float FlapVisualPosition => flapController != null ? flapController.FlapInput : Flaps;
     public int FlapStep => flapStep;
     public int FlapStepCount => flapStepCount;
-    public float Spoilers => spoilerStepCount > 0 ? (float)spoilerStep / spoilerStepCount : 0f;
+    public float Spoilers => externalControlActive
+        ? externalSpoilers
+        : (spoilerStepCount > 0 ? (float)spoilerStep / spoilerStepCount : 0f);
     public int SpoilerStep => spoilerStep;
     public int SpoilerStepCount => spoilerStepCount;
     public bool GearDown => gearDown;
-    public bool Brakes => brakes;
+    public bool Brakes => externalControlActive ? externalBrakes : brakes;
     public bool IsPaused => escapePaused;
 }

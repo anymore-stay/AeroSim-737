@@ -69941,6 +69941,7 @@ GameObject:
   - component: {fileID: 6949996342638378363}
   - component: {fileID: 5768411947729856939}
   - component: {fileID: 6647761873250940005}
+  - component: {fileID: 4612124806798823766}
   - component: {fileID: 8219233128410032355}
   - component: {fileID: 2327114715132849011}
   - component: {fileID: 8011146791934725401}
@@ -70256,6 +70257,8 @@ MonoBehaviour:
   axisResponseSpeed: 3.5
   axisReturnSpeed: 2.5
   gearTransitionSeconds: 1.8
+  externalAileronVisualScale: 2
+  externalRudderVisualScale: 5
   startWithGearExtended: 1
   ailerons:
   - label: LEFT
@@ -70508,6 +70511,144 @@ MonoBehaviour:
   bankProtectionLookAheadSeconds: 0.35
   bankProtectionMinSpeedKts: 60
   sendRate: 50
+--- !u!114 &4612124806798823766
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5773677376619802584}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0af2d7c50b9e42c3ac1a62fdf784838b, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  bridge: {fileID: 5768411947729856939}
+  flightInput: {fileID: 6647761873250940005}
+  toggleKey: 111
+  activeOnStart: 0
+  startLeg: 0
+  advanceLegKey: 286
+  captureRunwayOnFirstEngage: 1
+  runwayThresholdNorthM: 0
+  runwayThresholdEastM: 0
+  runwayHeadingDeg: 0
+  runwayElevationM: 0
+  runwayReferenceCaptured: 0
+  trafficDirection: 1
+  upwindTurnDistanceM: 4500
+  downwindOffsetM: 4500
+  baseTurnBeforeThresholdM: 7000
+  finalTurnLeadM: 2400
+  minimumLegTimeSec: 5
+  useDynamicTurnLead: 1
+  turnLeadScale: 1.05
+  minTurnLeadM: 700
+  maxTurnLeadM: 3500
+  patternAltitudeAglFt: 3000
+  upwindTargetAltitudeAglFt: 2100
+  crosswindTurnMinAglFt: 2000
+  downwindTurnMinAglFt: 3000
+  upwindSpeedKts: 180
+  crosswindSpeedKts: 180
+  crosswindMaxPitchDeg: 20
+  crosswindMaxElevator: 0.8
+  crosswindPitchGain: 0.28
+  crosswindCapturePitchFloorDeg: 7.5
+  crosswindPitchReductionRateDegPerSec: 1.5
+  crosswindHeadingToleranceDeg: 3
+  downwindSpeedKts: 170
+  baseSpeedKts: 160
+  patternMaxBankDeg: 30
+  altitudeProtectionBandFt: 300
+  sinkRateProtectionFps: 8
+  protectedBankDeg: 30
+  recoveryPitchFloorDeg: 6
+  recoveryClimbRateFps: 20
+  recoveryElevatorLimit: 0.65
+  recoveryMinThrottle: 0.7
+  rotationSpeedKts: 150
+  takeoffTargetSpeedKts: 200
+  takeoffElevatorLimit: 0.65
+  takeoffPitchGain: 0.22
+  takeoffFlaps: 0.5
+  takeoffFlapReadyTolerance: 0.05
+  crosswindFlaps: 0
+  climbThrottleBase: 0.9
+  maxClimbRateFps: 55
+  maxClimbPitchDeg: 14
+  takeoffAltitudeToVerticalSpeedGain: 0.24
+  glideSlopeDeg: 3
+  thresholdCrossingHeightM: 15
+  useAglForGlideSlope: 1
+  finalSpeedKts: 150
+  finalMaxBankDeg: 22
+  centerlineLookaheadM: 1200
+  maxInterceptDeg: 25
+  finalCenterlineLookaheadM: 800
+  finalMaxInterceptDeg: 30
+  finalPathCorrectionDegPerFt: 0.012
+  finalMinFlightPathDeg: -7
+  finalMaxFlightPathDeg: 2
+  finalElevatorTrim: -0.18
+  finalFlightPathGain: 0.1
+  finalPitchRateDamping: 0.8
+  autoLand: 1
+  flareStartAglFt: 45
+  flareMaxDistanceM: 900
+  flarePastThresholdAllowanceM: 1500
+  flarePitchDeg: 1
+  touchdownSpeedbrake: 1
+  rolloutBrake: 0.7
+  rolloutCompleteSpeedKts: 20
+  bankPerHeadingError: 2.5
+  aileronGain: 0.04
+  rollRateDamping: 0.7
+  maxAileron: 0.4
+  invertAileron: 0
+  altitudeToPitchGain: 0.003
+  altitudeToVerticalSpeedGain: 0.012
+  verticalSpeedToPitchGain: 0.08
+  levelPitchBiasDeg: 4.5
+  turnPitchCompensationDeg: 1
+  pitchGain: 0.14
+  pitchRateDamping: 1.1
+  elevatorCommandSlewRate: 0.45
+  elevatorNoseDownSlewRate: 0.15
+  minTargetPitchDeg: -3
+  maxTargetPitchDeg: 8
+  patternMaxElevator: 0.45
+  maxElevator: 0.35
+  maxNoseDownElevator: 0.25
+  autopilotPitchTrim: 0
+  invertElevator: 0
+  patternThrottleBase: 0.62
+  approachThrottleBase: 0.45
+  throttleSpeedGain: 0.014
+  throttleSlewRate: 0.5
+  turnThrottleCompensation: 0.08
+  overspeedThrottleCutKts: 20
+  minThrottle: 0.18
+  maxThrottle: 1
+  yawRateDamping: 0.25
+  rudderCommandSlewRate: 0.3
+  rolloutHeadingGain: 0.012
+  rolloutSteeringHeadingGain: 0.05
+  rolloutSteeringCrossTrackGain: 0.002
+  rolloutMaxSteer: 0.6
+  maxRudder: 0.08
+  invertRudder: 0
+  manageConfiguration: 1
+  downwindFlaps: 0.5
+  baseFlaps: 0.75
+  approachFlaps: 1
+  approachSpeedbrake: 0
+  sendRate: 50
+  logState: 1
+  logInterval: 2
+  recordTelemetry: 1
+  telemetryRateHz: 5
+  currentLeg: 0
 --- !u!114 &8219233128410032355
 MonoBehaviour:
   m_ObjectHideFlags: 0

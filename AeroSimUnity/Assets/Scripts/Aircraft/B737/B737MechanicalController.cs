@@ -80,6 +80,8 @@ public class B737MechanicalController : MonoBehaviour
     [SerializeField] private float axisResponseSpeed = 3.5f;
     [SerializeField] private float axisReturnSpeed = 2.5f;
     [SerializeField] private float gearTransitionSeconds = 1.8f;
+    [SerializeField, Min(1f)] private float externalAileronVisualScale = 2f;
+    [SerializeField, Min(1f)] private float externalRudderVisualScale = 5f;
 
     [Header("Initial State")]
     [SerializeField] private bool startWithGearExtended = true;
@@ -136,14 +138,24 @@ public class B737MechanicalController : MonoBehaviour
         }
 
         // FlightInput 中 W 为正、S 为负；机械模型原有约定与其相反。
+        float visualScaleAileron = flightInput.ExternalControlActive
+            ? externalAileronVisualScale
+            : 1f;
+        float visualScaleRudder = flightInput.ExternalControlActive
+            ? externalRudderVisualScale
+            : 1f;
         pitchInput = Mathf.Clamp(-flightInput.Elevator, -1f, 1f);
+        rollInput = Mathf.Clamp(flightInput.Aileron * visualScaleAileron, -1f, 1f);
+        yawInput = Mathf.Clamp(flightInput.Rudder * visualScaleRudder, -1f, 1f);
+        ApplyControlSurfaceGroup(ailerons, rollInput);
         ApplyControlSurfaceGroup(elevators, pitchInput);
+        ApplyControlSurfaceGroup(rudders, yawInput);
         ApplyCockpitYokes();
     }
 
     private void Update()
     {
-        if (useKeyboardInput)
+        if (useKeyboardInput && (flightInput == null || !flightInput.ExternalControlActive))
         {
             UpdateKeyboardInput();
         }
