@@ -25,11 +25,11 @@ public class B737WingtipVortexController : MonoBehaviour
     [SerializeField, Range(0f, 1f)] private float minimumVisibleStrength = 0.12f;
 
     [Header("Particle tuning")]
-    [SerializeField, Min(0.1f)] private float minimumLifetimeSeconds = 0.4f;
-    [SerializeField, Min(0.1f)] private float maximumLifetimeSeconds = 0.7f;
+    [SerializeField, Min(0.1f)] private float minimumLifetimeSeconds = 0.25f;
+    [SerializeField, Min(0.1f)] private float maximumLifetimeSeconds = 0.45f;
     [SerializeField, Min(0.02f)] private float particleSizeMeters = 0.42f;
     [SerializeField, Min(0.05f)] private float particleSpacingMeters = 0.05f;
-    [SerializeField, Min(1)] private int maximumParticles = 1800;
+    [SerializeField, Min(1)] private int maximumParticles = 1200;
     [SerializeField, Min(0f)] private float wakeSinkMetersPerSecond = 0.22f;
     [SerializeField, Min(0f)] private float wakeInwardMetersPerSecond = 0.12f;
     [SerializeField, Min(0.01f)] private float fadeInSeconds = 0.2f;
@@ -92,7 +92,6 @@ public class B737WingtipVortexController : MonoBehaviour
         ResolveReferences();
         SubscribeToGeoreference();
         DetectTransformRecentering();
-        FollowWingtips();
         UpdateVisibleStrength();
         EmitVorticesByDistance();
         CaptureAircraftPosition();
@@ -192,18 +191,6 @@ public class B737WingtipVortexController : MonoBehaviour
             renderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
             renderer.receiveShadows = false;
         }
-    }
-
-    private void FollowWingtips()
-    {
-        FollowWingtip(leftVortex, leftWingtip);
-        FollowWingtip(rightVortex, rightWingtip);
-    }
-
-    private static void FollowWingtip(ParticleSystem particleSystem, Transform wingtip)
-    {
-        if (particleSystem == null || wingtip == null) return;
-        particleSystem.transform.SetPositionAndRotation(wingtip.position, wingtip.rotation);
     }
 
     private void UpdateVisibleStrength()
@@ -308,13 +295,12 @@ public class B737WingtipVortexController : MonoBehaviour
         }
 
         float spacing = Mathf.Lerp(particleSpacingMeters * 1.35f, particleSpacingMeters, visibleStrength);
-        EmitAlongSegment(leftVortex, leftWingtip, ref leftLastEmissionPosition, spacing);
-        EmitAlongSegment(rightVortex, rightWingtip, ref rightLastEmissionPosition, spacing);
+        EmitAlongSegment(leftVortex, ref leftLastEmissionPosition, spacing);
+        EmitAlongSegment(rightVortex, ref rightLastEmissionPosition, spacing);
     }
 
     private void EmitAlongSegment(
         ParticleSystem particleSystem,
-        Transform wingtip,
         ref Vector3 previousPosition,
         float spacing)
     {
@@ -331,7 +317,7 @@ public class B737WingtipVortexController : MonoBehaviour
 
         Vector3 direction = segment / distance;
         int emitCount = Mathf.Min(Mathf.FloorToInt(distance / spacing), 128);
-        Vector3 inward = GetInwardDirection(wingtip);
+        Vector3 inward = GetInwardDirection(particleSystem.transform);
         Vector3 wakeVelocity = Vector3.down * wakeSinkMetersPerSecond + inward * wakeInwardMetersPerSecond;
         float alpha = Mathf.Lerp(0.16f, 0.52f, visibleStrength);
         float size = particleSizeMeters * Mathf.Lerp(0.72f, 1f, visibleStrength);
@@ -354,11 +340,11 @@ public class B737WingtipVortexController : MonoBehaviour
         previousPosition += direction * spacing * emitCount;
     }
 
-    private Vector3 GetInwardDirection(Transform wingtip)
+    private Vector3 GetInwardDirection(Transform emitter)
     {
-        if (aircraft == null || wingtip == null) return Vector3.zero;
+        if (aircraft == null || emitter == null) return Vector3.zero;
 
-        Vector3 inward = Vector3.ProjectOnPlane(aircraft.position - wingtip.position, Vector3.up);
+        Vector3 inward = Vector3.ProjectOnPlane(aircraft.position - emitter.position, Vector3.up);
         return inward.sqrMagnitude > 0.0001f ? inward.normalized : Vector3.zero;
     }
 

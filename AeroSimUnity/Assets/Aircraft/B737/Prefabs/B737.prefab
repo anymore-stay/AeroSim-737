@@ -71015,11 +71015,11 @@ MonoBehaviour:
   angleOfAttackOnsetDeg: 5.2
   angleOfAttackHysteresisDeg: 1.2
   minimumVisibleStrength: 0.12
-  minimumLifetimeSeconds: 0.4
-  maximumLifetimeSeconds: 0.7
+  minimumLifetimeSeconds: 0.25
+  maximumLifetimeSeconds: 0.45
   particleSizeMeters: 0.42
   particleSpacingMeters: 0.05
-  maximumParticles: 1800
+  maximumParticles: 1200
   wakeSinkMetersPerSecond: 0.22
   wakeInwardMetersPerSecond: 0.12
   fadeInSeconds: 0.2
@@ -108127,7 +108127,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 19897242, guid: 4f672daf6d5264e5c9c59059b417bd89, type: 3}
       propertyPath: InitialModule.maxNumParticles
-      value: 1800
+      value: 1200
       objectReference: {fileID: 0}
     - target: {fileID: 19897242, guid: 4f672daf6d5264e5c9c59059b417bd89, type: 3}
       propertyPath: InitialModule.startSize.scalar
@@ -108143,7 +108143,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 19897242, guid: 4f672daf6d5264e5c9c59059b417bd89, type: 3}
       propertyPath: InitialModule.startLifetime.scalar
-      value: 0.7
+      value: 0.45
       objectReference: {fileID: 0}
     - target: {fileID: 19897242, guid: 4f672daf6d5264e5c9c59059b417bd89, type: 3}
       propertyPath: InitialModule.gravityModifier.scalar
@@ -108163,7 +108163,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 19897242, guid: 4f672daf6d5264e5c9c59059b417bd89, type: 3}
       propertyPath: InitialModule.startLifetime.minScalar
-      value: 0.4
+      value: 0.25
       objectReference: {fileID: 0}
     - target: {fileID: 19897242, guid: 4f672daf6d5264e5c9c59059b417bd89, type: 3}
       propertyPath: InitialModule.startRotationX.minMaxState
@@ -110692,7 +110692,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 19897242, guid: 4f672daf6d5264e5c9c59059b417bd89, type: 3}
       propertyPath: InitialModule.maxNumParticles
-      value: 1800
+      value: 1200
       objectReference: {fileID: 0}
     - target: {fileID: 19897242, guid: 4f672daf6d5264e5c9c59059b417bd89, type: 3}
       propertyPath: InitialModule.startSize.scalar
@@ -110708,7 +110708,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 19897242, guid: 4f672daf6d5264e5c9c59059b417bd89, type: 3}
       propertyPath: InitialModule.startLifetime.scalar
-      value: 0.7
+      value: 0.45
       objectReference: {fileID: 0}
     - target: {fileID: 19897242, guid: 4f672daf6d5264e5c9c59059b417bd89, type: 3}
       propertyPath: InitialModule.gravityModifier.scalar
@@ -110728,7 +110728,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 19897242, guid: 4f672daf6d5264e5c9c59059b417bd89, type: 3}
       propertyPath: InitialModule.startLifetime.minScalar
-      value: 0.4
+      value: 0.25
       objectReference: {fileID: 0}
     - target: {fileID: 19897242, guid: 4f672daf6d5264e5c9c59059b417bd89, type: 3}
       propertyPath: InitialModule.startRotationX.minMaxState

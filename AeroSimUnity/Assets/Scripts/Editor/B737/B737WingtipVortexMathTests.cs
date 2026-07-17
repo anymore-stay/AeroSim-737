@@ -44,9 +44,9 @@ public class B737WingtipVortexMathTests
         Assert.That(rightVortex.GetComponent<ParticleSystemRenderer>().sharedMaterial,
             Is.EqualTo(source.GetComponent<ParticleSystemRenderer>().sharedMaterial));
         Assert.That(spacing, Is.EqualTo(0.05f).Within(0.001f));
-        Assert.That(maximumParticles, Is.EqualTo(1800));
-        Assert.That(minimumLifetime, Is.EqualTo(0.4f).Within(0.001f));
-        Assert.That(maximumLifetime, Is.EqualTo(0.7f).Within(0.001f));
+        Assert.That(maximumParticles, Is.EqualTo(1200));
+        Assert.That(minimumLifetime, Is.EqualTo(0.25f).Within(0.001f));
+        Assert.That(maximumLifetime, Is.EqualTo(0.45f).Within(0.001f));
         Assert.That(recenterThreshold, Is.LessThanOrEqualTo(5f));
     }
 
