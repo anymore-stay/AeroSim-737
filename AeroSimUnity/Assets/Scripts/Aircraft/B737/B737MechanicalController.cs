@@ -81,7 +81,7 @@ public class B737MechanicalController : MonoBehaviour
     [SerializeField] private float axisReturnSpeed = 2.5f;
     [SerializeField] private float gearTransitionSeconds = 1.8f;
     [SerializeField, Min(1f)] private float externalAileronVisualScale = 2f;
-    [SerializeField, Min(1f)] private float externalRudderVisualScale = 5f;
+    [SerializeField, Min(1f)] private float externalRudderVisualScale = 30f;
 
     [Header("Initial State")]
     [SerializeField] private bool startWithGearExtended = true;

@@ -70259,7 +70259,7 @@ MonoBehaviour:
   axisReturnSpeed: 2.5
   gearTransitionSeconds: 1.8
   externalAileronVisualScale: 2
-  externalRudderVisualScale: 5
+  externalRudderVisualScale: 30
   startWithGearExtended: 1
   ailerons:
   - label: LEFT
