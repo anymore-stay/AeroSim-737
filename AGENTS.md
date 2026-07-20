@@ -14,7 +14,7 @@
 
 AeroSim-737 是基于 Unity 和 JSBSim 的 Boeing 737-800 飞行模拟项目。Unity 负责画面、交互、相机、HUD、天气、机场环境、驾驶舱仪表、声音和飞机可视部件动画；JSBSim 作为外部进程负责飞行动力学，并通过仓库根目录下的 `JSBSimBridge/` 与 Unity 双向通信。
 
-截至 **2026-07-14**，当前工程已经完成主功能整合，具备从开始界面选择画质、进入模拟、地面静止、启动双发、滑跑起飞、空中操纵到接地反推的完整演示链路。当前阶段是**验收、稳定性回归和资源收口**，不再是早期资源整理或主场景搭建阶段。
+截至 **2026-07-20**，当前工程已经完成主功能整合，具备从主场景地面静止、启动双发、手动滑跑起飞、空中操纵到接地反推的完整演示链路，并提供从起飞、五边航线、进近、拉平、接地到滑跑减速的自动驾驶演示。当前阶段是**最终验收、稳定性回归和资源收口**，不再是早期资源整理或主场景搭建阶段。
 
 项目定位仍是可演示、可继续扩展的飞行模拟工程，不应描述为商用级、训练认证级或完整复刻真实 737 全部航电与飞行程序的产品。
 
@@ -32,7 +32,6 @@ AeroSim-737 是基于 Unity 和 JSBSim 的 Boeing 737-800 飞行模拟项目。U
 ## 当前工程入口
 
 - Unity 工程：`AeroSimUnity/`
-- 构建启动场景：`AeroSimUnity/Assets/Scenes/StartMenu.unity`
 - Unity 主场景：`AeroSimUnity/Assets/Scenes/MainScene.unity`
 - 主飞机 Prefab：`AeroSimUnity/Assets/Aircraft/B737/Prefabs/B737.prefab`
 - 737 运行时脚本：`AeroSimUnity/Assets/Scripts/Aircraft/B737/`
@@ -40,7 +39,6 @@ AeroSim-737 是基于 Unity 和 JSBSim 的 Boeing 737-800 飞行模拟项目。U
 - 地图脚本：`AeroSimUnity/Assets/Scripts/Map/`
 - 大世界脚本：`AeroSimUnity/Assets/Scripts/World/`
 - 编辑器工具与测试：`AeroSimUnity/Assets/Scripts/Editor/B737/`
-- Windows 构建工具：`AeroSimUnity/Assets/Scripts/Editor/B737/AeroSimWindowsBuildUtility.cs`
 - JSBSim 桥接：`JSBSimBridge/`
 - 项目图片：`Pictures/`
 - 项目说明：`README.md`
@@ -49,19 +47,19 @@ AeroSim-737 是基于 Unity 和 JSBSim 的 Boeing 737-800 飞行模拟项目。U
 
 ## 已完成功能基线
 
-- Windows 构建以 `StartMenu.unity` 为首场景，提供流畅 `1080p`、均衡 `2K`、最高 `4K` 三档全屏画质，并从开始界面进入 `MainScene`。
 - 主场景已整合 B737、北京大兴机场环境、Cesium 地理参考、Floating Origin 和 UniStorm URP 天气系统。
 - JSBSim 在 Windows 上默认随 Unity Play 自动启动，使用 UDP `5501` 向 Unity 输出状态，使用 TCP `5502` 接收控制命令；退出 Play 时会清理由 Unity 启动的进程树。
 - 飞机以地面静止、双发运转、油门怠速、刹车锁定状态开始，可完成滑跑、起飞、转弯、配平、襟翼/扰流板、起落架、刹车和反推操作。
 - 键盘与图马思特 TCA/A320 侧杆可并行输入；侧杆支持横滚、俯仰、扭转方向舵、油门轴、POV 视角和断线重连。
 - 飞控包含协调转弯、地面前轮转向、坡度角保护、侧滑保护、起落架低空收起限制和油门推起时自动松刹车。
+- 按 `O` 可启用五边自动驾驶演示，自动完成起飞、上风边、侧风边、下风边、基准边、最后进近、拉平、接地和滑跑减速；再次按 `O` 立即恢复手动控制。
 - 驾驶舱操纵盘、操纵柱、油门杆、舵面、襟翼、起落架、机轮和发动机风扇等可视部件已接入状态动画。
 - HUD 已显示 JSBSim 连接、速度、高度、姿态、发动机 `N1`、控制量和操作提示。
 - PFD、ND、EICAS、备用仪表、Clock ET 和可点击 FMS 显示已接入驾驶舱。
 - 独立飞行地图按 `M` 打开，支持航迹、飞机朝向、缩放、拖动、平移和窗口尺寸调整，并提供本地地图背景。
 - 驾驶舱、客舱、第三人称相机统一由 `CameraManager` 管理并强制互斥；重新切回驾驶舱时恢复初始机位，第三人称具备环绕、缩放、避障、机体包围盒保护和近地视角限制。
 - UniStorm 已提供昼夜、云层、雨雪、雷暴、雾、天气声音和右上角天气/时间菜单；夜间机场和机体外部灯光已适配。
-- 发动机声音、飞行气流、接地/起落架声音、天气声音、航迹云和发动机热浪等效果已接入。
+- 发动机声音、飞行气流、接地/起落架声音、天气声音、航迹云、发动机热浪和按空速、迎角、襟翼及湿度驱动的翼尖涡流等效果已接入。
 - 讯飞语音控制按 `Y` 使用，支持油门、起落架、襟翼、扰流板、刹车、配平和暂停指令；语音反推出于安全原因保持禁用。
 
 ## 默认操作基线
@@ -80,6 +78,8 @@ AeroSim-737 是基于 Unity 和 JSBSim 的 Boeing 737-800 飞行模拟项目。U
 | `G` | 起落架收放；低于约 `10 ft AGL` 时拒绝收起 |
 | `B` | 刹车开关；正推超过阈值时自动松刹车 |
 | `Esc` | 同时暂停 / 恢复 Unity 与 JSBSim |
+| `O` | 启用 / 退出五边自动驾驶演示；退出后恢复手动控制 |
+| `F5` | 自动驾驶启用时手动切换到下一航段，仅用于调试和验收 |
 | `Shift + 7/8/9` | 客舱 / 驾驶舱 / 第三人称相机 |
 | 鼠标右键拖动 | 转动当前视角 |
 | 方向键、`PageUp/PageDown` | 驾驶舱和客舱内移动视角 |
@@ -123,13 +123,13 @@ AeroSim-737/
 │   │   │   └── Instruments/    # PFD、ND、EICAS、FMS、备用仪表等
 │   │   ├── Environment/        # 机场与环境资源
 │   │   ├── Resources/          # 运行时加载资源，包括地图背景
-│   │   ├── Scenes/             # 构建入口 StartMenu 与飞行主场景 MainScene
+│   │   ├── Scenes/             # Unity 场景，当前运行入口为 MainScene
 │   │   ├── Scripts/
 │   │   │   ├── Aircraft/B737/  # 飞机运行时逻辑和 Voice 子目录
 │   │   │   ├── Camera/         # 相机与 AudioListener 管理
 │   │   │   ├── Map/            # 飞行地图
 │   │   │   ├── World/          # Floating Origin 与帧率显示
-│   │   │   └── Editor/B737/    # 编辑器工具、Windows 构建工具和 EditMode 测试
+│   │   │   └── Editor/B737/    # 编辑器工具和 EditMode 测试
 │   │   ├── UniStorm Weather System/
 │   │   ├── Plugins/ThirdParty/
 │   │   └── Settings/
@@ -162,8 +162,7 @@ AeroSim-737/
 - 主场景中的飞机必须来自 `B737.prefab`，不要长期使用裸 FBX 或复制出的临时飞机对象开发。
 - 移动、重命名或复制 Unity 资源时必须连同 `.meta` 文件一起处理。
 - 修改 Prefab、Scene、材质、RenderTexture 或贴图后，必须回 Unity 检查 Missing Script、Missing Reference、材质丢失和 Console 编译错误。
-- `StartMenu.unity`、`MainScene.unity` 和 `B737.prefab` 是当前演示链路的核心资产，改动前后都要核对引用稳定性。
-- Windows 构建场景顺序必须保持 `StartMenu -> MainScene`。开始界面由 `AeroSimWindowsBuildUtility` 生成和校验，修改画质档位、场景名或输出路径时要同步更新控制器、构建工具和测试。
+- `MainScene.unity` 和 `B737.prefab` 是当前演示链路的核心资产，改动前后都要核对引用稳定性。
 - `AeroSimUnity/Assets/Settings/`、`AeroSimUnity/ProjectSettings/` 和 `Packages/packages-lock.json` 属于工程配置区，没有明确需求时不要手动改动。
 - UniStorm、Cesium、天空盒和体积云材质可能在 Unity Play 或保存场景后产生自动脏改动；提交前逐项确认是否属于本次任务。
 - 不要为了消除 YAML 尾随空格而批量格式化 Scene、Prefab 或材质文件，这会制造难以审查的大型无意义差异。
@@ -185,6 +184,8 @@ AeroSim-737/
 - 键盘输入和 TCA/A320 侧杆输入是叠加关系；侧杆断开后键盘仍可用，不要改成互斥模式。
 - 升降舵采用保持型键盘修正，副翼和方向舵采用松键回中；俯仰配平是独立保持状态。
 - 反推使用带符号油门，负值表示反推。语音反推必须继续禁用，除非另有明确的安全设计和测试。
+- 五边自动驾驶通过 `FlightInput` 的外部控制接口接管舵面、油门、襟翼、扰流板和刹车；`O` 退出后必须清除外部控制并恢复键盘和侧杆输入。
+- 自动驾驶接管期间仍允许 `G` 手动切换起落架；不要把当前五边航线演示描述为真实 737 自动驾驶、自动油门或认证级自动着陆系统。
 - 起落架收起必须保留动画进行中门控和最低离地高度限制。
 - 坡度角保护、侧滑保护、协调转弯和地面前轮转向属于当前手感基线，修改时必须同步检查键盘和侧杆两条输入链路。
 - 驾驶舱油门摇杆当前是 `FlightInput.Throttle` 的可视反馈，不是独立鼠标拖动输入控件。
@@ -223,14 +224,17 @@ AeroSim-737/
 - 仓库使用 Git LFS 管理 FBX、贴图、音视频、压缩包和文档类大资源。首次拉取执行 `git lfs install` 和 `git lfs pull`。
 - 如果资源内容是 LFS 文本指针，先运行 `git lfs pull`，不要误以为资源损坏后重新导入。
 - 不提交 `Library/`、`Temp/`、`Logs/`、`obj/`、`UserSettings/`、`.vs/`、`*.csproj`、`*.sln`。
+- `AeroSimUnity/Captures/` 是运行时生成的自动驾驶遥测和临时验证截图目录，不提交其中的 CSV、截图或其他验证产物；需要长期保留的结论应整理到 `Docs/`。
 - Commit Message 使用中文，建议格式为 `<类型>：<简述>`，类型可用 `功能`、`修复`、`资源`、`脚本`、`文档`、`配置`、`性能`、`测试`。
 - 仓库可能存在用户尚未提交的修改。只处理本次任务相关文件，不回退、不覆盖、不顺手提交无关改动。
 
 ## 当前维护重点
 
-- 保持 `StartMenu.unity`、`MainScene.unity`、`B737.prefab`、JSBSim 配置和三种相机引用稳定。
-- 以完整演示流程做回归：开始界面切换三档画质、进入 `MainScene`、JSBSim 自动启动、松刹车滑跑、起飞、转弯、配平、襟翼/起落架、地图、天气、语音、接地和反推。
+- 保持 `MainScene.unity`、`B737.prefab`、JSBSim 配置和三种相机引用稳定。
+- 以完整演示流程做回归：打开 `MainScene`、JSBSim 自动启动、松刹车滑跑、起飞、转弯、配平、襟翼/起落架、地图、天气、语音、接地和反推。
+- 单独回归 `O` 五边自动驾驶全流程，检查首次接通时跑道基准捕获、各航段切换、最后进近、拉平、主轮接地、扰流板/刹车和退出后手动接管。
 - 在键盘与 TCA/A320 侧杆两套输入下检查飞控手感和保护逻辑。
 - 检查 PFD、ND、EICAS、FMS、备用仪表、HUD 和地图在驾驶舱/客舱/第三人称之间的可见性与性能。
+- 检查翼尖涡流在不同空速、迎角、襟翼、湿度和 Floating Origin 重定位条件下的出现、消散与连续性。
 - 继续处理最终光照、声音混音、材质、Missing Reference 和 Unity 自动脏改动，不主动扩张到新的大型系统。
 - 更新 README 或协作文档时使用仓库相对路径，不写个人电脑绝对路径；状态性说明应标注核对日期。
